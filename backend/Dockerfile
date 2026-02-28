@@ -23,9 +23,9 @@ RUN apk add --no-cache ca-certificates unzip wget
 
 # Download PocketBase
 RUN wget -q "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_${TARGETARCH}.zip" -O /tmp/pb.zip \
-    && unzip /tmp/pb.zip -d /pb/ \
+    && unzip /tmp/pb.zip -d /usr/local/bin/ \
     && rm /tmp/pb.zip \
-    && chmod +x /pb/pocketbase
+    && chmod +x /usr/local/bin/pocketbase
 
 # Copy frontend build output into PocketBase public dir
 COPY --from=frontend-builder /app/frontend/dist /pb/pb_public
@@ -36,4 +36,4 @@ COPY backend/pb_hooks /pb/pb_hooks
 
 EXPOSE 8090
 
-CMD ["/pb/pocketbase", "serve", "--http=0.0.0.0:8090", "--dir=/pb/pb_data", "--migrationsDir=/pb/pb_migrations", "--hooksDir=/pb/pb_hooks", "--publicDir=/pb/pb_public"]
+CMD ["pocketbase", "serve", "--http=0.0.0.0:8090", "--dir=/pb/pb_data", "--migrationsDir=/pb/pb_migrations", "--hooksDir=/pb/pb_hooks", "--publicDir=/pb/pb_public"]

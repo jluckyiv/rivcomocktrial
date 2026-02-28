@@ -1,6 +1,8 @@
 services:
   pocketbase:
-    image: ghcr.io/muchobien/pocketbase:latest
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.dev
     ports:
       - "8090:8090"
     volumes:
