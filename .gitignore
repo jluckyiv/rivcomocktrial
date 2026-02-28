@@ -19,3 +19,6 @@ docker-compose.override.yml
 # Environment
 .env
 .env.local
+
+# Reference documents (PDFs, emails, samples — local only)
+resources/
