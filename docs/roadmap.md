@@ -287,6 +287,22 @@ results, and standings without logging in.
 
 ---
 
+## Staging Environment
+
+Deploy a staging instance on fly.io early so the other
+admins (2–5 people) can try the UI and give feedback.
+Not gated on a specific milestone — deploy as soon as
+core admin flows are usable.
+
+- Separate fly.io app (e.g. `rivcomocktrial-staging`)
+- Deploy from main (re-enable GitHub Actions workflow)
+- Staging data is disposable — admins can create test
+  tournaments, schools, etc.
+- Production app created later when we're ready for
+  real data
+
+---
+
 ## Open Questions
 
 These are deferred to the relevant milestones:
