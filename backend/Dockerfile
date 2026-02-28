@@ -1,16 +1,19 @@
 # Stage 1: Build Elm frontend
-FROM node:20-alpine AS frontend-builder
+FROM node:20-slim AS frontend-builder
 
 WORKDIR /app
 
-# Install elm-land
+# Install CA certificates for SSL and elm-land
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN npm install -g elm-land@0.20.1
 
 # Copy frontend source
 COPY frontend/ ./frontend/
 
-# Build
+# Install dependencies and build
 WORKDIR /app/frontend
+RUN npm install
+ENV PATH="/app/frontend/node_modules/.bin:$PATH"
 RUN elm-land build
 
 # Stage 2: PocketBase
