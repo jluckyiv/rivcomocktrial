@@ -1,0 +1,21 @@
+# PocketBase
+backend/pb_data/*
+!backend/pb_data/.gitkeep
+
+# Elm
+frontend/elm-stuff/
+frontend/.elm-land/
+frontend/dist/
+
+# Node
+node_modules/
+
+# Docker
+docker-compose.override.yml
+
+# OS
+.DS_Store
+
+# Environment
+.env
+.env.local

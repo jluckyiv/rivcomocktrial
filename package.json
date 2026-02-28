@@ -1,0 +1,11 @@
+{
+  "name": "rivcomocktrial",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'Run in separate terminals:\n  npm run pb:dev\n  npm run fe:dev'",
+    "pb:dev": "docker compose up -d",
+    "pb:stop": "docker compose down",
+    "fe:dev": "cd frontend && PATH=\"./node_modules/.bin:$PATH\" elm-land server",
+    "fe:build": "cd frontend && PATH=\"./node_modules/.bin:$PATH\" elm-land build"
+  }
+}
