@@ -33,6 +33,23 @@ Admin-side competition management tool + public-facing site for Riverside County
 - `npm run fe:dev` — start elm-land dev server
 - `npm run fe:build` — build frontend for production
 
+## Development Workflow
+
+1. **Plan** — use plan mode to design the approach
+2. **Issue** — create a GitHub issue with the plan (clears context, sets benchmarks)
+3. **Implement** — TDD by default (ask first); red/green/refactor with real local PocketBase
+4. **Document** — update README and `docs/` so documentation is current with the code
+5. **Commit & PR** — commit, push branch, open PR
+6. **Merge** — merge PR to main
+7. **Tag** — at milestones only (not every PR)
+8. **Update memory** — capture patterns, decisions, and lessons learned
+
+## Testing
+
+- TDD by default — ask before skipping
+- No mocks — use the real local PocketBase instance for integration tests
+- Dev data is local only; migrations are version-controlled
+
 ## Key URLs (local dev)
 
 - PocketBase admin: http://localhost:8090/_/

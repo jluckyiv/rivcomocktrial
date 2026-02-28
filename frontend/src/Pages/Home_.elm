@@ -9,9 +9,11 @@ page : View msg
 page =
     { title = "Riverside County Mock Trial"
     , body =
-        [ Html.div [ Attr.style "text-align" "center", Attr.style "padding" "4rem 2rem" ]
-            [ Html.h1 [] [ Html.text "Riverside County Mock Trial" ]
-            , Html.p [] [ Html.text "Competition management and information portal." ]
+        [ Html.section [ Attr.class "hero is-primary is-medium" ]
+            [ Html.div [ Attr.class "hero-body" ]
+                [ Html.p [ Attr.class "title" ] [ Html.text "Riverside County Mock Trial" ]
+                , Html.p [ Attr.class "subtitle" ] [ Html.text "Competition management and information portal." ]
+                ]
             ]
         ]
     }
