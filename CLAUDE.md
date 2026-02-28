@@ -28,7 +28,7 @@ Admin-side competition management tool + public-facing site for Riverside County
 ## Dev Commands
 
 - `npm run dev` — instructions for running both servers
-- `npm run pb:dev` — start PocketBase via docker-compose
+- `npm run pb:dev` — start PocketBase via docker-compose watch (auto-restarts on migration/hook changes)
 - `npm run pb:stop` — stop PocketBase
 - `npm run fe:dev` — start elm-land dev server
 - `npm run fe:build` — build frontend for production
