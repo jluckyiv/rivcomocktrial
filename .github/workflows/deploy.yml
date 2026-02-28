@@ -3,6 +3,12 @@ name: Deploy to fly.io (staging)
 on:
   push:
     branches: [main]
+    paths:
+      - "frontend/**"
+      - "backend/**"
+      - "fly.staging.toml"
+      - "fly.toml"
+      - ".dockerignore"
 
 jobs:
   deploy:
