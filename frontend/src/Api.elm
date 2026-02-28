@@ -210,7 +210,7 @@ encodeCourtroom c =
 adminLogin : { email : String, password : String } -> (Result Http.Error String -> msg) -> Cmd msg
 adminLogin credentials toMsg =
     Http.post
-        { url = "/api/admins/auth-with-password"
+        { url = "/api/collections/_superusers/auth-with-password"
         , body =
             Http.jsonBody
                 (Encode.object
