@@ -89,9 +89,9 @@ OAuth and other roles come later.
 
 ---
 
-## Milestone 2: Round Pairing & Scheduling
+## Milestone 2: Round Pairing & Scheduling ✅
 
-**Status:** Not started
+**Status:** Done
 
 **Goal:** Admin can create rounds, input pairings (round 1
 manual from live drawing), and assign courtrooms. System
