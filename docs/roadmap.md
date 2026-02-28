@@ -28,9 +28,9 @@ This roadmap builds an admin-first competition management tool backed by PocketB
 - Elm Land + PocketBase + Docker + fly.io skeleton
 - Bulma CSS, dev workflow (compose watch, npm scripts), CI/CD
 
-## Milestone 1: Data Model & Admin Auth
+## Milestone 1: Data Model & Admin Auth ✅
 
-**Status:** In progress
+**Status:** Done (v0.1.0)
 
 **Goal:** Core entities exist in PocketBase. Admins can log in and manage tournaments.
 
@@ -64,23 +64,6 @@ This roadmap builds an admin-first competition management tool backed by PocketB
 | Public         | View published results         | No auth                               |
 
 **Note:** Milestone 1 implements admin auth only. Coach OAuth and other roles come later.
-
-### What's been built
-
-- 5 PocketBase migrations (tournaments, schools, courtrooms, teams, students)
-- Elm API module with full CRUD for all 5 collections
-- Admin layout with Bulma navbar
-- Admin login page (superuser auth)
-- CRUD pages for tournaments, schools, teams, students, courtrooms
-- Shared auth state (token in Shared.Model)
-- Auth guard on admin pages (redirects to login if not authenticated)
-
-### What's remaining
-
-- Create GitHub issue for this milestone
-- Test against running PocketBase instance
-- Verify migrations apply correctly
-- Integration testing of CRUD operations
 
 ---
 
