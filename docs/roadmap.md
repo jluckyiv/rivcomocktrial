@@ -56,13 +56,13 @@ in and manage tournaments.
 
 ### Collections
 
-| Collection  | Fields                            | Relations        |
-|-------------|-----------------------------------|------------------|
-| tournaments | name, year, num_preliminary_rounds, num_elimination_rounds, status | — |
-| schools     | name, district                    | —                |
-| courtrooms  | name, location                    | —                |
-| teams       | team_number, name                 | → tournament, → school |
-| students    | name                              | → school         |
+| Collection  | Fields                                                             | Relations              |
+| ----------- | ------------------------------------------------------------------ | ---------------------- |
+| tournaments | name, year, num_preliminary_rounds, num_elimination_rounds, status | —                      |
+| schools     | name, district                                                     | —                      |
+| courtrooms  | name, location                                                     | —                      |
+| teams       | team_number, name                                                  | → tournament, → school |
+| students    | name                                                               | → school               |
 
 ### Pages
 
@@ -76,13 +76,13 @@ in and manage tournaments.
 
 ### Auth Model
 
-| Role           | Access             | Auth method        |
-|----------------|--------------------|--------------------|
-| Admin          | Full access        | PocketBase superuser (email/password) |
-| Teacher coach  | Submit rosters, view published | OAuth (Google/MS), linked to school |
-| Attorney coach | View published     | View-only          |
-| Scorer         | Enter ballots      | No auth — anonymous via link |
-| Public         | View published     | No auth            |
+| Role           | Access                         | Auth method                           |
+| -------------- | ------------------------------ | ------------------------------------- |
+| Admin          | Full access                    | PocketBase superuser (email/password) |
+| Teacher coach  | Submit rosters, view published | OAuth (Google/MS), linked to school   |
+| Attorney coach | View published                 | View-only                             |
+| Scorer         | Enter ballots                  | No auth — anonymous via link          |
+| Public         | View published                 | No auth                               |
 
 **Note:** Milestone 1 implements admin auth only. Coach
 OAuth and other roles come later.
@@ -99,10 +99,10 @@ handles power matching for rounds 2+.
 
 ### Collections
 
-| Collection | Fields                           | Relations         |
-|------------|----------------------------------|-------------------|
-| rounds     | number, date, type (preliminary/elimination), published | → tournament |
-| trials     | —                                | → round, → prosecution_team, → defense_team, → courtroom |
+| Collection | Fields                                                  | Relations                                                |
+| ---------- | ------------------------------------------------------- | -------------------------------------------------------- |
+| rounds     | number, date, type (preliminary/elimination), published | → tournament                                             |
+| trials     | —                                                       | → round, → prosecution_team, → defense_team, → courtroom |
 
 ### Features
 
@@ -136,10 +136,10 @@ and courtroom assignments.
 
 ### Collections
 
-| Collection       | Fields             | Relations              |
-|------------------|--------------------|------------------------|
-| round_rosters    | submitted_at, locked | → team, → round      |
-| role_assignments | role, detail       | → round_roster, → student |
+| Collection       | Fields               | Relations                 |
+| ---------------- | -------------------- | ------------------------- |
+| round_rosters    | submitted_at, locked | → team, → round           |
+| role_assignments | role, detail         | → round_roster, → student |
 
 ### Roles on a Roster
 
@@ -170,10 +170,10 @@ round winners and stores results.
 
 ### Collections
 
-| Collection | Fields                           | Relations         |
-|------------|----------------------------------|-------------------|
-| ballots    | scorer_name, scorer_email, prosecution_total, defense_total, submitted_at | → trial |
-| scores     | category, points, rank (nullable) | → ballot, → student |
+| Collection | Fields                                                                    | Relations           |
+| ---------- | ------------------------------------------------------------------------- | ------------------- |
+| ballots    | scorer_name, scorer_email, prosecution_total, defense_total, submitted_at | → trial             |
+| scores     | category, points, rank (nullable)                                         | → ballot, → student |
 
 ### Ballot Entry Flow
 
@@ -287,19 +287,27 @@ results, and standings without logging in.
 
 ---
 
-## Staging Environment
+## Staging Environment ✅
 
-Deploy a staging instance on fly.io early so the other
-admins (2–5 people) can try the UI and give feedback.
-Not gated on a specific milestone — deploy as soon as
-core admin flows are usable.
+**Status:** Done
 
-- Separate fly.io app (e.g. `rivcomocktrial-staging`)
-- Deploy from main (re-enable GitHub Actions workflow)
+Staging instance on fly.io for the admin team (2–5
+people) to try the UI and give feedback.
+
+- **App:** `rivcomocktrial-staging` on fly.io (LAX)
+- **URL:** https://rivcomocktrial-staging.fly.dev/
+- **Volume:** 1GB persistent volume for SQLite data
+- **CI/CD:** GitHub Actions deploys on push to main,
+  scoped to `frontend/**`, `backend/**`, fly configs,
+  and `.dockerignore` (documentation-only changes
+  do not trigger a deploy)
+- **Config:** `fly.staging.toml` (separate from
+  `fly.toml` which is reserved for production)
+- **Superuser:** created manually via `fly ssh console`
 - Staging data is disposable — admins can create test
   tournaments, schools, etc.
-- Production app created later when we're ready for
-  real data
+- Production app (`rivcomocktrial`) created later when
+  ready for real data
 
 ---
 

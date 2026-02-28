@@ -15,8 +15,8 @@ workflow.
   migrations and hooks, no custom Go)
 - **Deployment:** [fly.io](https://fly.io) via Docker —
   single container serves both frontend and backend
-- **CI/CD:** GitHub Actions deploys to fly.io on push to
-  main
+- **CI/CD:** GitHub Actions deploys to fly.io staging on
+  push to main (path-scoped to app files only)
 
 ## Project Layout
 
@@ -35,7 +35,9 @@ workflow.
 │   ├── Dockerfile     Production build
 │   └── Dockerfile.dev Local dev container
 ├── docs/              Roadmap, decisions
-├── fly.toml           fly.io config
+├── fly.toml           fly.io config (production, future)
+├── fly.staging.toml   fly.io config (staging)
+├── .dockerignore      Excludes node_modules from build
 ├── docker-compose.yml Local dev (Docker)
 └── package.json       Dev scripts
 ```
@@ -88,6 +90,33 @@ docker compose exec pocketbase \
 | `npm run pb:kill`  | Kill watch + stop PocketBase |
 | `npm run fe:dev`   | Elm Land dev server          |
 | `npm run fe:build` | Build frontend for prod      |
+
+## Staging Environment
+
+The staging instance is live for the admin team to
+test and give UI feedback.
+
+| Service             | URL                                           |
+| ------------------- | --------------------------------------------- |
+| Staging app         | https://rivcomocktrial-staging.fly.dev/        |
+| Staging admin UI    | https://rivcomocktrial-staging.fly.dev/_/      |
+
+- Deploys automatically on push to main (only when
+  `frontend/`, `backend/`, fly configs, or
+  `.dockerignore` change)
+- Staging data is disposable — create test tournaments,
+  schools, etc.
+- Production app (`rivcomocktrial`) is reserved for
+  later use with real data
+
+### Creating a staging superuser
+
+```bash
+fly ssh console --config fly.staging.toml -C \
+  "pocketbase superuser create \
+  admin@example.com yourpassword \
+  --dir=/pb/pb_data"
+```
 
 ## Documentation
 

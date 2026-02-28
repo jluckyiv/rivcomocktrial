@@ -5,6 +5,47 @@ rationale. Newest first.
 
 ---
 
+## ADR-005: Staging environment on fly.io
+
+**Date:** 2026-02-28
+
+**Context:** The admin team (2–5 people) needs to try
+the app and give UI feedback without running locally.
+We need a deployed instance before the app is
+production-ready.
+
+**Decision:** Create a separate `rivcomocktrial-staging`
+app on fly.io with its own config (`fly.staging.toml`)
+and deploy token. GitHub Actions deploys to staging on
+push to main, scoped to app-relevant paths only
+(`frontend/**`, `backend/**`, fly configs,
+`.dockerignore`). Reserve `fly.toml` and the
+`rivcomocktrial` app name for future production use.
+
+**Rationale:**
+- Separate staging app avoids risk to future production
+  data
+- Path-scoped deploys avoid unnecessary builds for
+  documentation-only changes
+- Same Dockerfile for both environments — no config
+  drift
+- `node:20-slim` (not alpine) required for the frontend
+  build stage because the elm npm binary needs glibc
+
+**Consequences:**
+- Two fly.io apps to manage (staging now, production
+  later)
+- Each environment needs its own `FLY_API_TOKEN` — may
+  need to rename the GitHub secret when production is
+  added
+- Staging data is disposable and not backed up
+- Dockerfile uses a mixed base image strategy:
+  `node:20-slim` for build (glibc for elm) and
+  `alpine:3.19` for runtime (small image for
+  PocketBase)
+
+---
+
 ## ADR-004: Admin auth via PocketBase superuser (Milestone 1)
 
 **Date:** 2026-02-28
