@@ -8,6 +8,7 @@ module Rank exposing
     , toInt
     )
 
+import Error exposing (Error(..))
 import Role exposing (Role(..))
 import Student exposing (Student)
 
@@ -16,13 +17,13 @@ type Rank
     = Rank Int
 
 
-fromInt : Int -> Maybe Rank
+fromInt : Int -> Result Error Rank
 fromInt n =
     if n >= 1 && n <= 5 then
-        Just (Rank n)
+        Ok (Rank n)
 
     else
-        Nothing
+        Err (Error ("Rank must be 1–5, got " ++ String.fromInt n))
 
 
 toInt : Rank -> Int

@@ -19,7 +19,7 @@ type PrelimVerdict
 
 courtTotal : Side -> VerifiedBallot -> Int
 courtTotal targetSide ballot =
-    ballot.presentations
+    VerifiedBallot.presentations ballot
         |> List.filter (\p -> SubmittedBallot.side p == targetSide)
         |> List.map SubmittedBallot.weightedPoints
         |> List.sum

@@ -7,15 +7,15 @@ module PresiderBallot exposing
 import Side exposing (Side)
 
 
-type alias PresiderBallot =
-    { winner : Side }
+type PresiderBallot
+    = PresiderBallot Side
 
 
 for : Side -> PresiderBallot
 for side =
-    { winner = side }
+    PresiderBallot side
 
 
 winner : PresiderBallot -> Side
-winner ballot =
-    ballot.winner
+winner (PresiderBallot side) =
+    side

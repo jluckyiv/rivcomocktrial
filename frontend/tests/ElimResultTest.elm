@@ -24,16 +24,21 @@ alice =
 pts : Int -> SubmittedBallot.Points
 pts n =
     case SubmittedBallot.fromInt n of
-        Just p ->
+        Ok p ->
             p
 
-        Nothing ->
-            pts 5
+        Err _ ->
+            Debug.todo ("Invalid points: " ++ String.fromInt n)
 
 
 ballot : List ScoredPresentation -> VerifiedBallot.VerifiedBallot
-ballot presentations =
-    VerifiedBallot.verify { presentations = presentations }
+ballot list =
+    case SubmittedBallot.create list of
+        Ok b ->
+            VerifiedBallot.verify b
+
+        Err _ ->
+            Debug.todo "Ballot must have presentations"
 
 
 pWins : VerifiedBallot.VerifiedBallot

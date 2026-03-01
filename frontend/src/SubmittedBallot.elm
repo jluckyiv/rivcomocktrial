@@ -3,8 +3,10 @@ module SubmittedBallot exposing
     , ScoredPresentation(..)
     , SubmittedBallot
     , Weight(..)
+    , create
     , fromInt
     , points
+    , presentations
     , side
     , student
     , toInt
@@ -12,6 +14,7 @@ module SubmittedBallot exposing
     , weightedPoints
     )
 
+import Error exposing (Error(..))
 import Side exposing (Side(..))
 import Student exposing (Student)
 
@@ -20,13 +23,13 @@ type Points
     = Points Int
 
 
-fromInt : Int -> Maybe Points
+fromInt : Int -> Result Error Points
 fromInt n =
     if n >= 1 && n <= 10 then
-        Just (Points n)
+        Ok (Points n)
 
     else
-        Nothing
+        Err (Error ("Points must be 1–10, got " ++ String.fromInt n))
 
 
 toInt : Points -> Int
@@ -45,8 +48,23 @@ type ScoredPresentation
     | BailiffPerformance Student Points
 
 
-type alias SubmittedBallot =
-    { presentations : List ScoredPresentation }
+type SubmittedBallot
+    = SubmittedBallot (List ScoredPresentation)
+
+
+create : List ScoredPresentation -> Result Error SubmittedBallot
+create list =
+    case list of
+        [] ->
+            Err (Error "Ballot must have at least one presentation")
+
+        _ ->
+            Ok (SubmittedBallot list)
+
+
+presentations : SubmittedBallot -> List ScoredPresentation
+presentations (SubmittedBallot list) =
+    list
 
 
 type Weight

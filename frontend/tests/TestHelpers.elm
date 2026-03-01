@@ -1,10 +1,25 @@
-module TestHelpers exposing (applicant, teamA, teamB)
+module TestHelpers exposing
+    ( applicant
+    , coachName
+    , teamA
+    , teamB
+    )
 
 import Coach exposing (TeacherCoach, TeacherCoachApplicant)
 import District
 import School
 import Student
 import Team exposing (Team)
+
+
+coachName : String -> String -> Coach.Name
+coachName first last =
+    case Coach.nameFromStrings first last of
+        Ok n ->
+            n
+
+        Err _ ->
+            Debug.todo ("Invalid coach name: " ++ first ++ " " ++ last)
 
 
 teamA : Team
@@ -37,21 +52,9 @@ teamB =
 
 applicant : String -> String -> TeacherCoachApplicant
 applicant first last =
-    { name =
-        { first = first
-        , last = last
-        , preferred = Nothing
-        }
-    , email = "test@example.com"
-    }
+    Coach.apply (coachName first last) "test@example.com"
 
 
 coach : String -> String -> TeacherCoach
 coach first last =
-    { name =
-        { first = first
-        , last = last
-        , preferred = Nothing
-        }
-    , email = "test@example.com"
-    }
+    Coach.verify (applicant first last)

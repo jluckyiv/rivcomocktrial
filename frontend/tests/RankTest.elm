@@ -24,28 +24,33 @@ rankSuite =
         [ test "fromInt 1 succeeds" <|
             \_ ->
                 Rank.fromInt 1
-                    |> Expect.notEqual Nothing
+                    |> isOk
+                    |> Expect.equal True
         , test "fromInt 5 succeeds" <|
             \_ ->
                 Rank.fromInt 5
-                    |> Expect.notEqual Nothing
+                    |> isOk
+                    |> Expect.equal True
         , test "fromInt 3 round-trips via toInt" <|
             \_ ->
                 Rank.fromInt 3
-                    |> Maybe.map Rank.toInt
-                    |> Expect.equal (Just 3)
+                    |> Result.map Rank.toInt
+                    |> Expect.equal (Ok 3)
         , test "fromInt 0 fails" <|
             \_ ->
                 Rank.fromInt 0
-                    |> Expect.equal Nothing
+                    |> isErr
+                    |> Expect.equal True
         , test "fromInt 6 fails" <|
             \_ ->
                 Rank.fromInt 6
-                    |> Expect.equal Nothing
+                    |> isErr
+                    |> Expect.equal True
         , test "fromInt -1 fails" <|
             \_ ->
                 Rank.fromInt -1
-                    |> Expect.equal Nothing
+                    |> isErr
+                    |> Expect.equal True
         ]
 
 
@@ -94,11 +99,11 @@ rankPointsSuite =
     let
         rank n =
             case Rank.fromInt n of
-                Just r ->
+                Ok r ->
                     r
 
-                Nothing ->
-                    rank 1
+                Err _ ->
+                    Debug.todo ("Invalid rank: " ++ String.fromInt n)
     in
     describe "rankPoints"
         [ test "1st of 5 = 5 points" <|
@@ -122,3 +127,18 @@ rankPointsSuite =
                 Rank.rankPoints 3 (rank 3)
                     |> Expect.equal 1
         ]
+
+
+isOk : Result e a -> Bool
+isOk result =
+    case result of
+        Ok _ ->
+            True
+
+        Err _ ->
+            False
+
+
+isErr : Result e a -> Bool
+isErr result =
+    not (isOk result)

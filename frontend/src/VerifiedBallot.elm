@@ -1,5 +1,7 @@
 module VerifiedBallot exposing
     ( VerifiedBallot
+    , original
+    , presentations
     , verify
     , verifyWithCorrections
     )
@@ -11,17 +13,19 @@ import SubmittedBallot
         )
 
 
-type alias VerifiedBallot =
-    { original : SubmittedBallot
-    , presentations : List ScoredPresentation
-    }
+type VerifiedBallot
+    = VerifiedBallot
+        { original : SubmittedBallot
+        , presentations : List ScoredPresentation
+        }
 
 
 verify : SubmittedBallot -> VerifiedBallot
 verify ballot =
-    { original = ballot
-    , presentations = ballot.presentations
-    }
+    VerifiedBallot
+        { original = ballot
+        , presentations = SubmittedBallot.presentations ballot
+        }
 
 
 verifyWithCorrections :
@@ -29,6 +33,17 @@ verifyWithCorrections :
     -> List ScoredPresentation
     -> VerifiedBallot
 verifyWithCorrections ballot corrected =
-    { original = ballot
-    , presentations = corrected
-    }
+    VerifiedBallot
+        { original = ballot
+        , presentations = corrected
+        }
+
+
+original : VerifiedBallot -> SubmittedBallot
+original (VerifiedBallot r) =
+    r.original
+
+
+presentations : VerifiedBallot -> List ScoredPresentation
+presentations (VerifiedBallot r) =
+    r.presentations

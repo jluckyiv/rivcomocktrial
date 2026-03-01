@@ -25,11 +25,21 @@ alice =
 pts : Int -> SubmittedBallot.Points
 pts n =
     case SubmittedBallot.fromInt n of
-        Just p ->
+        Ok p ->
             p
 
-        Nothing ->
-            pts 5
+        Err _ ->
+            Debug.todo ("Invalid points: " ++ String.fromInt n)
+
+
+makeBallot : List ScoredPresentation -> SubmittedBallot.SubmittedBallot
+makeBallot list =
+    case SubmittedBallot.create list of
+        Ok b ->
+            b
+
+        Err _ ->
+            Debug.todo "Ballot must have presentations"
 
 
 suite : Test
@@ -42,7 +52,7 @@ suite =
             Closing Defense alice (pts 9)
 
         ballot =
-            { presentations = [ opening, closing ] }
+            makeBallot [ opening, closing ]
     in
     describe "VerifiedBallot"
         [ describe "verify"
@@ -50,13 +60,13 @@ suite =
                 \_ ->
                     ballot
                         |> VerifiedBallot.verify
-                        |> .presentations
+                        |> VerifiedBallot.presentations
                         |> Expect.equal [ opening, closing ]
             , test "links back to original" <|
                 \_ ->
                     ballot
                         |> VerifiedBallot.verify
-                        |> .original
+                        |> VerifiedBallot.original
                         |> Expect.equal ballot
             ]
         , describe "verifyWithCorrections"
@@ -69,7 +79,7 @@ suite =
                             ]
                     in
                     VerifiedBallot.verifyWithCorrections ballot corrected
-                        |> .presentations
+                        |> VerifiedBallot.presentations
                         |> Expect.equal corrected
             , test "still links to original" <|
                 \_ ->
@@ -78,7 +88,7 @@ suite =
                             [ Opening Prosecution alice (pts 8) ]
                     in
                     VerifiedBallot.verifyWithCorrections ballot corrected
-                        |> .original
+                        |> VerifiedBallot.original
                         |> Expect.equal ballot
             ]
         ]

@@ -26,10 +26,43 @@ alice =
 suite : Test
 suite =
     describe "SubmittedBallot"
-        [ pointsSuite
+        [ createSuite
+        , pointsSuite
         , weightSuite
         , accessorSuite
         , weightedPointsSuite
+        ]
+
+
+createSuite : Test
+createSuite =
+    let
+        p =
+            unsafePoints 7
+    in
+    describe "create"
+        [ test "succeeds with non-empty presentations" <|
+            \_ ->
+                SubmittedBallot.create
+                    [ Opening Prosecution alice p ]
+                    |> isOk
+                    |> Expect.equal True
+        , test "rejects empty presentations" <|
+            \_ ->
+                SubmittedBallot.create []
+                    |> isErr
+                    |> Expect.equal True
+        , test "presentations round-trip" <|
+            \_ ->
+                let
+                    list =
+                        [ Opening Prosecution alice p
+                        , Closing Defense alice p
+                        ]
+                in
+                SubmittedBallot.create list
+                    |> Result.map SubmittedBallot.presentations
+                    |> Expect.equal (Ok list)
         ]
 
 
@@ -39,28 +72,33 @@ pointsSuite =
         [ test "fromInt 1 succeeds" <|
             \_ ->
                 SubmittedBallot.fromInt 1
-                    |> Expect.notEqual Nothing
+                    |> isOk
+                    |> Expect.equal True
         , test "fromInt 10 succeeds" <|
             \_ ->
                 SubmittedBallot.fromInt 10
-                    |> Expect.notEqual Nothing
+                    |> isOk
+                    |> Expect.equal True
         , test "fromInt 5 round-trips via toInt" <|
             \_ ->
                 SubmittedBallot.fromInt 5
-                    |> Maybe.map SubmittedBallot.toInt
-                    |> Expect.equal (Just 5)
+                    |> Result.map SubmittedBallot.toInt
+                    |> Expect.equal (Ok 5)
         , test "fromInt 0 fails" <|
             \_ ->
                 SubmittedBallot.fromInt 0
-                    |> Expect.equal Nothing
+                    |> isErr
+                    |> Expect.equal True
         , test "fromInt 11 fails" <|
             \_ ->
                 SubmittedBallot.fromInt 11
-                    |> Expect.equal Nothing
+                    |> isErr
+                    |> Expect.equal True
         , test "fromInt -1 fails" <|
             \_ ->
                 SubmittedBallot.fromInt -1
-                    |> Expect.equal Nothing
+                    |> isErr
+                    |> Expect.equal True
         ]
 
 
@@ -68,7 +106,7 @@ weightSuite : Test
 weightSuite =
     let
         pts =
-            Maybe.withDefault (unsafe 5) (SubmittedBallot.fromInt 5)
+            unsafePoints 5
     in
     describe "weight"
         [ test "Pretrial is Double" <|
@@ -118,7 +156,7 @@ accessorSuite : Test
 accessorSuite =
     let
         pts =
-            Maybe.withDefault (unsafe 5) (SubmittedBallot.fromInt 7)
+            unsafePoints 7
     in
     describe "accessors"
         [ describe "points"
@@ -182,7 +220,7 @@ weightedPointsSuite : Test
 weightedPointsSuite =
     let
         pts =
-            Maybe.withDefault (unsafe 5) (SubmittedBallot.fromInt 8)
+            unsafePoints 8
     in
     describe "weightedPoints"
         [ test "Single-weighted returns points value" <|
@@ -198,13 +236,29 @@ weightedPointsSuite =
         ]
 
 
-{-| Unsafe helper for tests only — avoids Maybe unwrapping noise.
+{-| Unsafe helper for tests only — avoids Result
+unwrapping noise.
 -}
-unsafe : Int -> Points
-unsafe n =
+unsafePoints : Int -> Points
+unsafePoints n =
     case SubmittedBallot.fromInt n of
-        Just p ->
+        Ok p ->
             p
 
-        Nothing ->
-            unsafe 5
+        Err _ ->
+            Debug.todo ("Invalid points: " ++ String.fromInt n)
+
+
+isOk : Result e a -> Bool
+isOk result =
+    case result of
+        Ok _ ->
+            True
+
+        Err _ ->
+            False
+
+
+isErr : Result e a -> Bool
+isErr result =
+    not (isOk result)
