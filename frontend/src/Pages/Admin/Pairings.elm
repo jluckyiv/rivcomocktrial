@@ -73,6 +73,7 @@ type alias Model =
     , bulkError : Maybe String
     , showBulkPreview : Bool
     , bulkSaving : Bool
+    , crossBracketStrategy : CrossBracketStrategy
     , powerMatchResult : Maybe PowerMatchResult
     }
 
@@ -103,6 +104,7 @@ init user route _ =
       , bulkError = Nothing
       , showBulkPreview = False
       , bulkSaving = False
+      , crossBracketStrategy = HighHigh
       , powerMatchResult = Nothing
       }
     , if roundId == "" then
@@ -143,6 +145,7 @@ type Msg
     | ConfirmBulkCreate
     | GotBulkCreateResponse (Result Http.Error Trial)
     | CancelBulkPreview
+    | SetCrossBracketStrategy CrossBracketStrategy
     | GeneratePowerMatch
     | AcceptPowerMatch
     | ClearPowerMatch
@@ -395,6 +398,9 @@ update user msg model =
         CancelBulkPreview ->
             ( { model | showBulkPreview = False, bulkParsed = [] }, Effect.none )
 
+        SetCrossBracketStrategy strategy ->
+            ( { model | crossBracketStrategy = strategy }, Effect.none )
+
         GeneratePowerMatch ->
             let
                 rankedTeams =
@@ -402,7 +408,7 @@ update user msg model =
 
                 result =
                     PowerMatch.powerMatch
-                        HighHigh
+                        model.crossBracketStrategy
                         rankedTeams
                         model.allTrials
                         model.trials
@@ -801,8 +807,41 @@ viewPowerMatchSection model =
     in
     div [ Attr.class "mb-5" ]
         ([ if roundNumber >= 2 then
-            button [ Attr.class "button is-info", Events.onClick GeneratePowerMatch ]
-                [ text "Generate Power Match" ]
+            div [ Attr.class "field is-grouped is-align-items-center" ]
+                [ div [ Attr.class "control" ]
+                    [ button [ Attr.class "button is-info", Events.onClick GeneratePowerMatch ]
+                        [ text "Generate Power Match" ]
+                    ]
+                , div [ Attr.class "control" ]
+                    [ div [ Attr.class "select" ]
+                        [ select
+                            [ Events.onInput
+                                (\val ->
+                                    if val == "HighLow" then
+                                        SetCrossBracketStrategy HighLow
+
+                                    else
+                                        SetCrossBracketStrategy HighHigh
+                                )
+                            ]
+                            [ option
+                                [ Attr.value "HighHigh"
+                                , Attr.selected (model.crossBracketStrategy == HighHigh)
+                                ]
+                                [ text "High-High" ]
+                            , option
+                                [ Attr.value "HighLow"
+                                , Attr.selected (model.crossBracketStrategy == HighLow)
+                                ]
+                                [ text "High-Low" ]
+                            ]
+                        ]
+                    ]
+                , div [ Attr.class "control" ]
+                    [ span [ Attr.class "help" ]
+                        [ text "Cross-bracket pairing strategy" ]
+                    ]
+                ]
 
            else
             button [ Attr.class "button is-info", Events.onClick GeneratePowerMatch ]
