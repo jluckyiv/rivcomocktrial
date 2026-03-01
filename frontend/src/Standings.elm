@@ -65,28 +65,36 @@ cumulativePercentage (TeamRecord rec) =
         toFloat rec.pointsFor / toFloat total
 
 
-type Tiebreaker
+type Tiebreaker team
     = ByWins
     | ByCumulativePercentage
     | ByPointDifferential
-    | ByHeadToHead
+    | ByHeadToHead (team -> team -> Order)
 
 
-type alias RankingStrategy =
-    List Tiebreaker
+type alias RankingStrategy team =
+    List (Tiebreaker team)
 
 
-rank : RankingStrategy -> List ( team, TeamRecord ) -> List ( team, TeamRecord )
+rank : RankingStrategy team -> List ( team, TeamRecord ) -> List ( team, TeamRecord )
 rank strategy entries =
     List.sortWith (compareByStrategy strategy) entries
 
 
-compareByStrategy : RankingStrategy -> ( team, TeamRecord ) -> ( team, TeamRecord ) -> Order
-compareByStrategy strategy ( _, a ) ( _, b ) =
+compareByStrategy :
+    RankingStrategy team
+    -> ( team, TeamRecord )
+    -> ( team, TeamRecord )
+    -> Order
+compareByStrategy strategy a b =
     compareByTiebreakers strategy a b
 
 
-compareByTiebreakers : List Tiebreaker -> TeamRecord -> TeamRecord -> Order
+compareByTiebreakers :
+    List (Tiebreaker team)
+    -> ( team, TeamRecord )
+    -> ( team, TeamRecord )
+    -> Order
 compareByTiebreakers tiebreakers a b =
     case tiebreakers of
         [] ->
@@ -101,8 +109,12 @@ compareByTiebreakers tiebreakers a b =
                     order
 
 
-compareByTiebreaker : Tiebreaker -> TeamRecord -> TeamRecord -> Order
-compareByTiebreaker breaker a b =
+compareByTiebreaker :
+    Tiebreaker team
+    -> ( team, TeamRecord )
+    -> ( team, TeamRecord )
+    -> Order
+compareByTiebreaker breaker ( teamA, a ) ( teamB, b ) =
     case breaker of
         ByWins ->
             compare (wins b) (wins a)
@@ -117,5 +129,5 @@ compareByTiebreaker breaker a b =
                 (pointsFor b - pointsAgainst b)
                 (pointsFor a - pointsAgainst a)
 
-        ByHeadToHead ->
-            EQ
+        ByHeadToHead fn ->
+            fn teamA teamB
