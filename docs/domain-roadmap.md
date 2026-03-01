@@ -480,10 +480,33 @@ strategy as an ordered list. The compiler enforces
 exhaustive handling.
 
 **Status:** Criteria in flux. What we know:
-- Based on ballot ranks (min 3, max 5 per category)
+- Based on ballot ranks (min/max configurable,
+  currently 3–5 per category)
+- Rank points = (count + 1) - rank position
 - May use AMTA-style criteria
 - Playoff "top advocate" happened in 2026 finals but
   is undocumented in the handbook
+
+**Known problem: relative vs absolute quality.**
+In 2026, some students received high ranks despite
+low point scores (5–6/10) because their opponents
+were worse. Rank-only awards reward "best of the
+meh." The award algorithm must account for absolute
+performance, not just relative ranking within a
+trial. Possible approaches:
+- **Score threshold** — nominations only count if
+  point score meets a minimum. Simple but arbitrary.
+- **Ballot median delta** — compare student's score
+  to the median on that ballot. Captures "actually
+  good" vs "less bad." Already listed as a tiebreaker.
+- **Weighted composite** — combine rank points with
+  normalized scores (e.g., z-score across category).
+- **AMTA-style tiering** — rank points primary, raw
+  scores and median delta as tiebreakers.
+
+The raw data needed (point scores + rank nominations)
+is already captured in Layer 3 (SubmittedBallot +
+Rank). The combination logic belongs here in Layer 4.
 
 ### Summary
 
