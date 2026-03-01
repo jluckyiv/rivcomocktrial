@@ -2,7 +2,13 @@ module PowerMatch2026Test exposing (..)
 
 import Api exposing (Trial)
 import Expect
-import PowerMatch exposing (hasPlayed, sideHistory)
+import PowerMatch
+    exposing
+        ( CrossBracketStrategy(..)
+        , hasPlayed
+        , powerMatch
+        , sideHistory
+        )
 import PowerMatchFixtures as F
 import Test exposing (Test, describe, test)
 
@@ -435,6 +441,211 @@ winLossTests =
                 in
                 fourOh |> Expect.equal [ 9, 13 ]
         ]
+
+
+
+-- REMATCH AVOIDANCE: CHAPARRAL (22) vs RAMONA (16)
+
+
+chaparralRematchTests : Test
+chaparralRematchTests =
+    describe "2026 R4: Chaparral moved to avoid Ramona rematch"
+        [ test "Ramona (16) and Chaparral (22) played in R2" <|
+            \_ ->
+                hasPlayed F.round2Trials F.team16.id F.team22.id
+                    |> Expect.equal True
+        , test "both are 2-1 going into R4" <|
+            \_ ->
+                let
+                    wins =
+                        countWins (F.trialsThrough 3)
+
+                    ramonaWins =
+                        getWins wins F.team16.id
+
+                    chaparralWins =
+                        getWins wins F.team22.id
+                in
+                ( ramonaWins, chaparralWins )
+                    |> Expect.equal ( 2, 2 )
+        , test "Ramona needs P in R4 (played D in R3)" <|
+            \_ ->
+                let
+                    sides =
+                        sideHistory F.round3Trials F.team16.id
+                in
+                sides |> Expect.equal { prosecution = 0, defense = 1 }
+        , test "Chaparral needs D in R4 (played P in R3)" <|
+            \_ ->
+                let
+                    sides =
+                        sideHistory F.round3Trials F.team22.id
+                in
+                sides |> Expect.equal { prosecution = 1, defense = 0 }
+        , test "without the R2 matchup, they would be paired" <|
+            \_ ->
+                -- Isolate just Ramona and Chaparral in their
+                -- own bracket. With no rematch history, the
+                -- algorithm must pair them (only option).
+                let
+                    ranked =
+                        [ F.makeRankedTeam 16 "Ramona" 2 1 1
+                        , F.makeRankedTeam 22 "Chaparral" 2 1 2
+                        ]
+
+                    -- R3 sides only (no R2 matchup between them)
+                    priorTrials =
+                        [ -- Ramona played D in R3 → needs P
+                          F.makeTrial "side_16" 3
+                            F.team19.id
+                            F.team16.id
+
+                        -- Chaparral played P in R3 → needs D
+                        , F.makeTrial "side_22" 3
+                            F.team22.id
+                            F.team09.id
+                        ]
+
+                    result =
+                        powerMatch HighHigh ranked priorTrials []
+
+                    paired =
+                        List.any
+                            (\p ->
+                                p.prosecutionTeam
+                                    == F.team16.id
+                                    && p.defenseTeam
+                                    == F.team22.id
+                            )
+                            result.pairings
+                in
+                paired |> Expect.equal True
+        , test "the R2 matchup prevents that pairing" <|
+            \_ ->
+                -- Same setup, but add the R2 trial between them
+                let
+                    ranked =
+                        [ F.makeRankedTeam 16 "Ramona" 2 1 1
+                        , F.makeRankedTeam 22 "Chaparral" 2 1 2
+                        ]
+
+                    priorTrials =
+                        [ F.makeTrial "side_16" 3
+                            F.team19.id
+                            F.team16.id
+                        , F.makeTrial "side_22" 3
+                            F.team22.id
+                            F.team09.id
+
+                        -- The R2 rematch
+                        , F.makeTrial "r2_04" 2
+                            F.team16.id
+                            F.team22.id
+                        ]
+
+                    result =
+                        powerMatch HighHigh ranked priorTrials []
+                in
+                -- Can't pair them — only 2 teams and they're
+                -- a rematch, so zero pairings produced
+                List.length result.pairings
+                    |> Expect.equal 0
+        , test "powerMatch does not pair Ramona with Chaparral in R4" <|
+            \_ ->
+                let
+                    priorTrials =
+                        F.trialsThrough 3
+
+                    ranked =
+                        rankedAfterR3
+
+                    result =
+                        powerMatch HighHigh ranked priorTrials []
+
+                    pairsRamonaWithChaparral =
+                        List.any
+                            (\p ->
+                                (p.prosecutionTeam
+                                    == F.team16.id
+                                    && p.defenseTeam
+                                    == F.team22.id
+                                )
+                                    || (p.prosecutionTeam
+                                            == F.team22.id
+                                            && p.defenseTeam
+                                            == F.team16.id
+                                       )
+                            )
+                            result.pairings
+                in
+                pairsRamonaWithChaparral |> Expect.equal False
+        , test "powerMatch does not pair Ramona with Chaparral under HighLow either" <|
+            \_ ->
+                let
+                    priorTrials =
+                        F.trialsThrough 3
+
+                    ranked =
+                        rankedAfterR3
+
+                    result =
+                        powerMatch HighLow ranked priorTrials []
+
+                    pairsRamonaWithChaparral =
+                        List.any
+                            (\p ->
+                                (p.prosecutionTeam
+                                    == F.team16.id
+                                    && p.defenseTeam
+                                    == F.team22.id
+                                )
+                                    || (p.prosecutionTeam
+                                            == F.team22.id
+                                            && p.defenseTeam
+                                            == F.team16.id
+                                       )
+                            )
+                            result.pairings
+                in
+                pairsRamonaWithChaparral |> Expect.equal False
+        ]
+
+
+{-| Ranked teams after R3 for R4 power matching.
+3-0: 1, 9, 12, 13
+2-1: 2, 5, 10, 15, 16, 20, 22, 25, 27
+1-2: 4, 6, 8, 11, 19, 21, 23, 26, 28
+0-3: 3, 14, 17, 24
+-}
+rankedAfterR3 : List PowerMatch.RankedTeam
+rankedAfterR3 =
+    [ F.makeRankedTeam 1 "Palm Desert" 3 0 1
+    , F.makeRankedTeam 9 "Notre Dame" 3 0 2
+    , F.makeRankedTeam 12 "Temecula Valley" 3 0 3
+    , F.makeRankedTeam 13 "Poly" 3 0 4
+    , F.makeRankedTeam 2 "Santiago" 2 1 1
+    , F.makeRankedTeam 5 "Patriot" 2 1 2
+    , F.makeRankedTeam 10 "Valley View" 2 1 3
+    , F.makeRankedTeam 15 "Indio" 2 1 4
+    , F.makeRankedTeam 16 "Ramona" 2 1 5
+    , F.makeRankedTeam 20 "Hemet" 2 1 6
+    , F.makeRankedTeam 22 "Chaparral" 2 1 7
+    , F.makeRankedTeam 25 "St. Jeanne de Lestonnac" 2 1 8
+    , F.makeRankedTeam 27 "Martin Luther King" 2 1 9
+    , F.makeRankedTeam 4 "Murrieta Valley" 1 2 1
+    , F.makeRankedTeam 6 "La Quinta" 1 2 2
+    , F.makeRankedTeam 8 "Norco" 1 2 3
+    , F.makeRankedTeam 11 "Canyon Springs" 1 2 4
+    , F.makeRankedTeam 19 "John W. North" 1 2 5
+    , F.makeRankedTeam 21 "Great Oak" 1 2 6
+    , F.makeRankedTeam 23 "Paloma Valley" 1 2 7
+    , F.makeRankedTeam 26 "Centennial" 1 2 8
+    , F.makeRankedTeam 28 "San Jacinto" 1 2 9
+    , F.makeRankedTeam 3 "Vista del Lago" 0 3 1
+    , F.makeRankedTeam 14 "Heritage" 0 3 2
+    , F.makeRankedTeam 17 "Liberty" 0 3 3
+    , F.makeRankedTeam 24 "Palo Verde" 0 3 4
+    ]
 
 
 
