@@ -24,7 +24,7 @@ type Name
     = Name { first : String, last : String }
 
 
-nameFromStrings : String -> String -> Result Error Name
+nameFromStrings : String -> String -> Result (List Error) Name
 nameFromStrings first last =
     let
         trimmedFirst =
@@ -34,10 +34,10 @@ nameFromStrings first last =
             String.trim last
     in
     if String.isEmpty trimmedFirst then
-        Err (Error "First name cannot be blank")
+        Err [ Error "First name cannot be blank" ]
 
     else if String.isEmpty trimmedLast then
-        Err (Error "Last name cannot be blank")
+        Err [ Error "Last name cannot be blank" ]
 
     else
         Ok (Name { first = trimmedFirst, last = trimmedLast })

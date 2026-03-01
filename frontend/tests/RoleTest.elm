@@ -1,9 +1,20 @@
 module RoleTest exposing (..)
 
 import Expect
-import Role exposing (Role(..), Witness(..))
+import Role exposing (Role(..))
 import Side exposing (Side(..))
 import Test exposing (Test, describe, test)
+import Witness exposing (Witness)
+
+
+witness : String -> String -> Witness
+witness n d =
+    case Witness.create n d of
+        Ok w ->
+            w
+
+        Err _ ->
+            Debug.todo ("Invalid witness: " ++ n)
 
 
 sideTests : Test
@@ -21,7 +32,7 @@ sideTests =
                     |> Expect.equal Prosecution
         , test "ProsecutionWitness is Prosecution" <|
             \_ ->
-                ProsecutionWitness (Witness "Rio Sacks, Detective")
+                ProsecutionWitness (witness "Rio Sacks" "Detective")
                     |> Role.side
                     |> Expect.equal Prosecution
         , test "Clerk is Prosecution" <|
@@ -41,7 +52,7 @@ sideTests =
                     |> Expect.equal Defense
         , test "DefenseWitness is Defense" <|
             \_ ->
-                DefenseWitness (Witness "Casey Marshall")
+                DefenseWitness (witness "Casey Marshall" "Defendant")
                     |> Role.side
                     |> Expect.equal Defense
         , test "Bailiff is Defense" <|

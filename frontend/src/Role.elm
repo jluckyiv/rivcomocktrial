@@ -1,6 +1,7 @@
-module Role exposing (Role(..), Witness(..), side)
+module Role exposing (Role(..), side)
 
 import Side exposing (Side(..))
+import Witness exposing (Witness)
 
 
 type Role
@@ -12,10 +13,6 @@ type Role
     | DefenseWitness Witness
     | Clerk
     | Bailiff
-
-
-type Witness
-    = Witness String
 
 
 side : Role -> Side

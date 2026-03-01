@@ -10,17 +10,12 @@ import SubmittedBallot
         , Weight(..)
         )
 import Test exposing (Test, describe, test)
+import TestHelpers
 
 
 alice : Student
 alice =
-    { name =
-        { first = "Alice"
-        , last = "Smith"
-        , preferred = Nothing
-        }
-    , pronouns = Student.SheHer
-    }
+    TestHelpers.alice
 
 
 suite : Test

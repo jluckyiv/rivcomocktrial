@@ -1,6 +1,7 @@
 module CoachTest exposing (suite)
 
 import Coach
+import Email
 import Expect
 import Test exposing (Test, describe, test)
 
@@ -64,13 +65,21 @@ verifySuite =
 
                 Err _ ->
                     Debug.todo "Jane Doe must be valid"
+
+        janeEmail =
+            case Email.fromString "jane@example.com" of
+                Ok e ->
+                    e
+
+                Err _ ->
+                    Debug.todo "jane@example.com must be valid"
     in
     describe "verify"
         [ test "preserves the applicant's name" <|
             \_ ->
                 let
                     applicant =
-                        Coach.apply name "jane@example.com"
+                        Coach.apply name janeEmail
                 in
                 applicant
                     |> Coach.verify
@@ -80,12 +89,12 @@ verifySuite =
             \_ ->
                 let
                     applicant =
-                        Coach.apply name "jane@example.com"
+                        Coach.apply name janeEmail
                 in
                 applicant
                     |> Coach.verify
                     |> Coach.teacherCoachEmail
-                    |> Expect.equal "jane@example.com"
+                    |> Expect.equal janeEmail
         ]
 
 

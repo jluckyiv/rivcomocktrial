@@ -2,17 +2,96 @@ module Student exposing
     ( Name
     , Pronouns(..)
     , Student
+    , create
     , displayName
+    , first
     , fullName
+    , last
+    , nameFromStrings
+    , preferred
+    , pronouns
     , pronounsToString
+    , studentName
     )
 
+import Error exposing (Error(..))
+import Validate
 
-type alias Name =
-    { first : String
-    , last : String
-    , preferred : Maybe String
-    }
+
+type Name
+    = Name
+        { first : String
+        , last : String
+        , preferred : Maybe String
+        }
+
+
+nameFromStrings :
+    String
+    -> String
+    -> Maybe String
+    -> Result (List Error) Name
+nameFromStrings rawFirst rawLast rawPreferred =
+    let
+        trimmedFirst =
+            String.trim rawFirst
+
+        trimmedLast =
+            String.trim rawLast
+
+        trimmedPreferred =
+            Maybe.map String.trim rawPreferred
+                |> Maybe.andThen
+                    (\s ->
+                        if String.isEmpty s then
+                            Nothing
+
+                        else
+                            Just s
+                    )
+    in
+    Validate.validate
+        (Validate.all
+            [ Validate.ifBlank Tuple.first
+                (Error "First name cannot be blank")
+            , Validate.ifBlank Tuple.second
+                (Error "Last name cannot be blank")
+            ]
+        )
+        ( trimmedFirst, trimmedLast )
+        |> Result.map
+            (\_ ->
+                Name
+                    { first = trimmedFirst
+                    , last = trimmedLast
+                    , preferred = trimmedPreferred
+                    }
+            )
+
+
+first : Name -> String
+first (Name r) =
+    r.first
+
+
+last : Name -> String
+last (Name r) =
+    r.last
+
+
+preferred : Name -> Maybe String
+preferred (Name r) =
+    r.preferred
+
+
+displayName : Name -> String
+displayName (Name r) =
+    Maybe.withDefault r.first r.preferred
+
+
+fullName : Name -> String
+fullName n =
+    displayName n ++ " " ++ last n
 
 
 type Pronouns
@@ -22,25 +101,28 @@ type Pronouns
     | Other String
 
 
-type alias Student =
-    { name : Name
-    , pronouns : Pronouns
-    }
+type Student
+    = Student { name : Name, pronouns : Pronouns }
 
 
-displayName : Name -> String
-displayName name =
-    Maybe.withDefault name.first name.preferred
+create : Name -> Pronouns -> Student
+create n p =
+    Student { name = n, pronouns = p }
 
 
-fullName : Name -> String
-fullName name =
-    displayName name ++ " " ++ name.last
+studentName : Student -> Name
+studentName (Student r) =
+    r.name
+
+
+pronouns : Student -> Pronouns
+pronouns (Student r) =
+    r.pronouns
 
 
 pronounsToString : Pronouns -> String
-pronounsToString pronouns =
-    case pronouns of
+pronounsToString p =
+    case p of
         HeHim ->
             "he/him"
 

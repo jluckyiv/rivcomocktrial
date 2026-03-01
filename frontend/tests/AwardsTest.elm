@@ -22,8 +22,17 @@ suite =
                         |> Expect.equal Advocate
             , test "BestWitness → NonAdvocate" <|
                 \_ ->
+                    let
+                        witness =
+                            case Witness.create "Rio Sacks" "Detective" of
+                                Ok w ->
+                                    w
+
+                                Err _ ->
+                                    Debug.todo "Rio Sacks must be valid"
+                    in
                     Awards.nominationCategory
-                        (BestWitness (Witness.fromString "Rio Sacks"))
+                        (BestWitness witness)
                         |> Expect.equal NonAdvocate
             , test "BestClerk → NonAdvocate" <|
                 \_ ->

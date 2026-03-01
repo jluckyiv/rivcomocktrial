@@ -17,13 +17,13 @@ type Rank
     = Rank Int
 
 
-fromInt : Int -> Result Error Rank
+fromInt : Int -> Result (List Error) Rank
 fromInt n =
     if n >= 1 && n <= 5 then
         Ok (Rank n)
 
     else
-        Err (Error ("Rank must be 1–5, got " ++ String.fromInt n))
+        Err [ Error ("Rank must be 1–5, got " ++ String.fromInt n) ]
 
 
 toInt : Rank -> Int

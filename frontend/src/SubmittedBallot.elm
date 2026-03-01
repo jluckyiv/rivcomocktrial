@@ -23,13 +23,13 @@ type Points
     = Points Int
 
 
-fromInt : Int -> Result Error Points
+fromInt : Int -> Result (List Error) Points
 fromInt n =
     if n >= 1 && n <= 10 then
         Ok (Points n)
 
     else
-        Err (Error ("Points must be 1–10, got " ++ String.fromInt n))
+        Err [ Error ("Points must be 1–10, got " ++ String.fromInt n) ]
 
 
 toInt : Points -> Int
@@ -52,11 +52,11 @@ type SubmittedBallot
     = SubmittedBallot (List ScoredPresentation)
 
 
-create : List ScoredPresentation -> Result Error SubmittedBallot
+create : List ScoredPresentation -> Result (List Error) SubmittedBallot
 create list =
     case list of
         [] ->
-            Err (Error "Ballot must have at least one presentation")
+            Err [ Error "Ballot must have at least one presentation" ]
 
         _ ->
             Ok (SubmittedBallot list)

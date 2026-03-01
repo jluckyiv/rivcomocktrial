@@ -25,10 +25,10 @@ type Pairing
         }
 
 
-create : Team -> Team -> Result Error Pairing
+create : Team -> Team -> Result (List Error) Pairing
 create p d =
     if p == d then
-        Err (Error "Cannot pair a team against itself")
+        Err [ Error "Cannot pair a team against itself" ]
 
     else
         Ok

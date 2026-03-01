@@ -8,18 +8,13 @@ import SubmittedBallot
         ( ScoredPresentation(..)
         )
 import Test exposing (Test, describe, test)
+import TestHelpers
 import VerifiedBallot
 
 
 alice : Student
 alice =
-    { name =
-        { first = "Alice"
-        , last = "Smith"
-        , preferred = Nothing
-        }
-    , pronouns = Student.SheHer
-    }
+    TestHelpers.alice
 
 
 pts : Int -> SubmittedBallot.Points

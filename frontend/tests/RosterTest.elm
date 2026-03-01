@@ -4,6 +4,7 @@ import Expect
 import Roster exposing (AttorneyDuty(..), RoleAssignment(..))
 import Student exposing (Student)
 import Test exposing (Test, describe, test)
+import TestHelpers
 import Witness
 
 
@@ -12,16 +13,15 @@ suite =
     let
         alice : Student
         alice =
-            { name =
-                { first = "Alice"
-                , last = "Smith"
-                , preferred = Nothing
-                }
-            , pronouns = Student.SheHer
-            }
+            TestHelpers.alice
 
         witness =
-            Witness.fromString "Jordan Riley"
+            case Witness.create "Jordan Riley" "Lead Investigator" of
+                Ok w ->
+                    w
+
+                Err _ ->
+                    Debug.todo "Jordan Riley must be valid"
     in
     describe "Roster"
         [ describe "student"
@@ -58,7 +58,7 @@ suite =
                         |> (\duty ->
                                 case duty of
                                     DirectOf w ->
-                                        Witness.toString w
+                                        Witness.name w
                                             |> Expect.equal "Jordan Riley"
 
                                     _ ->
@@ -70,7 +70,7 @@ suite =
                         |> (\duty ->
                                 case duty of
                                     CrossOf w ->
-                                        Witness.toString w
+                                        Witness.name w
                                             |> Expect.equal "Jordan Riley"
 
                                     _ ->

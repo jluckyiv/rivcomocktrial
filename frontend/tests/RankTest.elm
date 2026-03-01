@@ -5,7 +5,8 @@ import Rank
     exposing
         ( NominationCategory(..)
         )
-import Role exposing (Role(..), Witness(..))
+import Role exposing (Role(..))
+import Witness exposing (Witness)
 import Test exposing (Test, describe, test)
 
 
@@ -54,6 +55,16 @@ rankSuite =
         ]
 
 
+unsafeWitness : String -> String -> Witness
+unsafeWitness n d =
+    case Witness.create n d of
+        Ok w ->
+            w
+
+        Err _ ->
+            Debug.todo ("Invalid witness: " ++ n)
+
+
 nominationCategorySuite : Test
 nominationCategorySuite =
     describe "nominationCategory"
@@ -76,12 +87,12 @@ nominationCategorySuite =
         , test "ProsecutionWitness is NonAdvocate" <|
             \_ ->
                 Rank.nominationCategory
-                    (ProsecutionWitness (Witness "Rio Sacks"))
+                    (ProsecutionWitness (unsafeWitness "Rio Sacks" "Detective"))
                     |> Expect.equal NonAdvocate
         , test "DefenseWitness is NonAdvocate" <|
             \_ ->
                 Rank.nominationCategory
-                    (DefenseWitness (Witness "Haley Fromholz"))
+                    (DefenseWitness (unsafeWitness "Haley Fromholz" "Witness"))
                     |> Expect.equal NonAdvocate
         , test "Clerk is NonAdvocate" <|
             \_ ->
