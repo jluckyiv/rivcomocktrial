@@ -2,7 +2,10 @@ module TestHelpers exposing
     ( alice
     , applicant
     , coachName
+    , courtroomName
+    , districtName
     , email
+    , schoolName
     , studentName
     , teamA
     , teamB
@@ -11,6 +14,7 @@ module TestHelpers exposing
     )
 
 import Coach exposing (TeacherCoach, TeacherCoachApplicant)
+import Courtroom
 import District
 import Email exposing (Email)
 import School
@@ -73,14 +77,45 @@ teamNumber n =
             Debug.todo ("Invalid team number: " ++ String.fromInt n)
 
 
+districtName : String -> District.Name
+districtName raw =
+    case District.nameFromString raw of
+        Ok n ->
+            n
+
+        Err _ ->
+            Debug.todo ("Invalid district name: " ++ raw)
+
+
+schoolName : String -> School.Name
+schoolName raw =
+    case School.nameFromString raw of
+        Ok n ->
+            n
+
+        Err _ ->
+            Debug.todo ("Invalid school name: " ++ raw)
+
+
+courtroomName : String -> Courtroom.Name
+courtroomName raw =
+    case Courtroom.nameFromString raw of
+        Ok n ->
+            n
+
+        Err _ ->
+            Debug.todo ("Invalid courtroom name: " ++ raw)
+
+
 teamA : Team
 teamA =
     Team.create
         (teamNumber 1)
         (teamName "Team A")
-        { name = School.Name "School A"
-        , district = { name = District.Name "District A" }
-        }
+        (School.create
+            (schoolName "School A")
+            (District.create (districtName "District A"))
+        )
         (coach "Alice" "Smith")
 
 
@@ -89,9 +124,10 @@ teamB =
     Team.create
         (teamNumber 2)
         (teamName "Team B")
-        { name = School.Name "School B"
-        , district = { name = District.Name "District B" }
-        }
+        (School.create
+            (schoolName "School B")
+            (District.create (districtName "District B"))
+        )
         (coach "Bob" "Jones")
 
 

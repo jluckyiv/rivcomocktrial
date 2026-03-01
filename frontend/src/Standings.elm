@@ -3,20 +3,57 @@ module Standings exposing
     , TeamRecord
     , Tiebreaker(..)
     , cumulativePercentage
+    , losses
+    , pointsAgainst
+    , pointsFor
     , rank
+    , teamRecord
+    , wins
     )
 
 
-type alias TeamRecord =
+type TeamRecord
+    = TeamRecord
+        { wins : Int
+        , losses : Int
+        , pointsFor : Int
+        , pointsAgainst : Int
+        }
+
+
+teamRecord :
     { wins : Int
     , losses : Int
     , pointsFor : Int
     , pointsAgainst : Int
     }
+    -> TeamRecord
+teamRecord r =
+    TeamRecord r
+
+
+wins : TeamRecord -> Int
+wins (TeamRecord r) =
+    r.wins
+
+
+losses : TeamRecord -> Int
+losses (TeamRecord r) =
+    r.losses
+
+
+pointsFor : TeamRecord -> Int
+pointsFor (TeamRecord r) =
+    r.pointsFor
+
+
+pointsAgainst : TeamRecord -> Int
+pointsAgainst (TeamRecord r) =
+    r.pointsAgainst
 
 
 cumulativePercentage : TeamRecord -> Float
-cumulativePercentage rec =
+cumulativePercentage (TeamRecord rec) =
     let
         total =
             rec.pointsFor + rec.pointsAgainst
@@ -68,7 +105,7 @@ compareByTiebreaker : Tiebreaker -> TeamRecord -> TeamRecord -> Order
 compareByTiebreaker breaker a b =
     case breaker of
         ByWins ->
-            compare b.wins a.wins
+            compare (wins b) (wins a)
 
         ByCumulativePercentage ->
             compare
@@ -77,8 +114,8 @@ compareByTiebreaker breaker a b =
 
         ByPointDifferential ->
             compare
-                (b.pointsFor - b.pointsAgainst)
-                (a.pointsFor - a.pointsAgainst)
+                (pointsFor b - pointsAgainst b)
+                (pointsFor a - pointsAgainst a)
 
         ByHeadToHead ->
             EQ

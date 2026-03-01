@@ -2,9 +2,12 @@ module Roster exposing
     ( AttorneyDuty(..)
     , RoleAssignment(..)
     , Roster
+    , assignments
+    , create
     , student
     )
 
+import Error exposing (Error(..))
 import Student exposing (Student)
 import Witness exposing (Witness)
 
@@ -24,8 +27,22 @@ type RoleAssignment
     | BailiffRole Student
 
 
-type alias Roster =
-    { assignments : List RoleAssignment }
+type Roster
+    = Roster (List RoleAssignment)
+
+
+create : List RoleAssignment -> Result (List Error) Roster
+create list =
+    if List.isEmpty list then
+        Err [ Error "Roster cannot be empty" ]
+
+    else
+        Ok (Roster list)
+
+
+assignments : Roster -> List RoleAssignment
+assignments (Roster list) =
+    list
 
 
 student : RoleAssignment -> Student

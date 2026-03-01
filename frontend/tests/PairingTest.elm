@@ -6,7 +6,7 @@ import Expect
 import Judge exposing (Judge(..))
 import Pairing
 import Test exposing (Test, describe, test)
-import TestHelpers exposing (teamA, teamB)
+import TestHelpers exposing (courtroomName, teamA, teamB)
 
 
 suite : Test
@@ -48,13 +48,13 @@ suite =
             [ test "sets the courtroom" <|
                 \_ ->
                     let
-                        courtroom =
-                            { name = Courtroom.name "Dept 1" }
+                        cr =
+                            Courtroom.create (courtroomName "Dept 1")
                     in
                     Pairing.create teamA teamB
-                        |> Result.map (Pairing.assignCourtroom courtroom)
+                        |> Result.map (Pairing.assignCourtroom cr)
                         |> Result.map Pairing.courtroom
-                        |> Expect.equal (Ok (Assigned courtroom))
+                        |> Expect.equal (Ok (Assigned cr))
             ]
         , describe "assignJudge"
             [ test "sets the judge" <|

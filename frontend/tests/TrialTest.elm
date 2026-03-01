@@ -6,7 +6,7 @@ import Expect
 import Judge exposing (Judge(..))
 import Pairing
 import Test exposing (Test, describe, test)
-import TestHelpers exposing (teamA, teamB)
+import TestHelpers exposing (courtroomName, teamA, teamB)
 import Trial
 
 
@@ -22,7 +22,7 @@ unsafePairing =
 
 courtroom : Courtroom.Courtroom
 courtroom =
-    { name = Courtroom.name "Dept 1" }
+    Courtroom.create (courtroomName "Dept 1")
 
 
 suite : Test

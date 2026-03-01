@@ -24,7 +24,28 @@ suite =
                     Debug.todo "Jordan Riley must be valid"
     in
     describe "Roster"
-        [ describe "student"
+        [ describe "create"
+            [ test "rejects empty list" <|
+                \_ ->
+                    Roster.create []
+                        |> isErr
+                        |> Expect.equal True
+            , test "accepts non-empty list" <|
+                \_ ->
+                    Roster.create [ ClerkRole alice ]
+                        |> isOk
+                        |> Expect.equal True
+            , test "assignments accessor round-trips" <|
+                \_ ->
+                    let
+                        list =
+                            [ ClerkRole alice, BailiffRole alice ]
+                    in
+                    Roster.create list
+                        |> Result.map Roster.assignments
+                        |> Expect.equal (Ok list)
+            ]
+        , describe "student"
             [ test "returns student from PretorialAttorney" <|
                 \_ ->
                     PretorialAttorney alice
@@ -78,3 +99,18 @@ suite =
                            )
             ]
         ]
+
+
+isOk : Result e a -> Bool
+isOk result =
+    case result of
+        Ok _ ->
+            True
+
+        Err _ ->
+            False
+
+
+isErr : Result e a -> Bool
+isErr result =
+    not (isOk result)

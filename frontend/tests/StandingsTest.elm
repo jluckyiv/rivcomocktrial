@@ -12,8 +12,41 @@ import Test exposing (Test, describe, test)
 suite : Test
 suite =
     describe "Standings"
-        [ cumulativePercentageSuite
+        [ teamRecordSuite
+        , cumulativePercentageSuite
         , rankSuite
+        ]
+
+
+record : Int -> Int -> Int -> Int -> TeamRecord
+record w l pf pa =
+    Standings.teamRecord
+        { wins = w, losses = l, pointsFor = pf, pointsAgainst = pa }
+
+
+teamRecordSuite : Test
+teamRecordSuite =
+    describe "teamRecord"
+        [ test "wins accessor" <|
+            \_ ->
+                record 3 1 300 200
+                    |> Standings.wins
+                    |> Expect.equal 3
+        , test "losses accessor" <|
+            \_ ->
+                record 3 1 300 200
+                    |> Standings.losses
+                    |> Expect.equal 1
+        , test "pointsFor accessor" <|
+            \_ ->
+                record 3 1 300 200
+                    |> Standings.pointsFor
+                    |> Expect.equal 300
+        , test "pointsAgainst accessor" <|
+            \_ ->
+                record 3 1 300 200
+                    |> Standings.pointsAgainst
+                    |> Expect.equal 200
         ]
 
 
@@ -22,25 +55,20 @@ cumulativePercentageSuite =
     describe "cumulativePercentage"
         [ test "pointsFor / (pointsFor + pointsAgainst)" <|
             \_ ->
-                { wins = 2, losses = 1, pointsFor = 300, pointsAgainst = 200 }
+                record 2 1 300 200
                     |> Standings.cumulativePercentage
                     |> Expect.within (Expect.Absolute 0.001) 0.6
         , test "returns 0 when no points" <|
             \_ ->
-                { wins = 0, losses = 0, pointsFor = 0, pointsAgainst = 0 }
+                record 0 0 0 0
                     |> Standings.cumulativePercentage
                     |> Expect.within (Expect.Absolute 0.001) 0.0
         , test "100% when opponent scored 0" <|
             \_ ->
-                { wins = 1, losses = 0, pointsFor = 100, pointsAgainst = 0 }
+                record 1 0 100 0
                     |> Standings.cumulativePercentage
                     |> Expect.within (Expect.Absolute 0.001) 1.0
         ]
-
-
-record : Int -> Int -> Int -> Int -> TeamRecord
-record w l pf pa =
-    { wins = w, losses = l, pointsFor = pf, pointsAgainst = pa }
 
 
 rankSuite : Test

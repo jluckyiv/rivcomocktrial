@@ -1,6 +1,6 @@
-module CourtroomTest exposing (suite)
+module DistrictTest exposing (suite)
 
-import Courtroom
+import District
 import Error exposing (Error(..))
 import Expect
 import Test exposing (Test, describe, test)
@@ -8,7 +8,7 @@ import Test exposing (Test, describe, test)
 
 suite : Test
 suite =
-    describe "Courtroom"
+    describe "District"
         [ nameFromStringSuite
         , createSuite
         ]
@@ -19,27 +19,27 @@ nameFromStringSuite =
     describe "nameFromString"
         [ test "accepts a valid name" <|
             \_ ->
-                Courtroom.nameFromString "Department 1"
+                District.nameFromString "Riverside"
                     |> isOk
                     |> Expect.equal True
         , test "round-trips through nameToString" <|
             \_ ->
-                Courtroom.nameFromString "Department 1"
-                    |> Result.map Courtroom.nameToString
-                    |> Expect.equal (Ok "Department 1")
+                District.nameFromString "Riverside"
+                    |> Result.map District.nameToString
+                    |> Expect.equal (Ok "Riverside")
         , test "trims whitespace" <|
             \_ ->
-                Courtroom.nameFromString "  Department 1  "
-                    |> Result.map Courtroom.nameToString
-                    |> Expect.equal (Ok "Department 1")
+                District.nameFromString "  Riverside  "
+                    |> Result.map District.nameToString
+                    |> Expect.equal (Ok "Riverside")
         , test "rejects blank string" <|
             \_ ->
-                Courtroom.nameFromString ""
+                District.nameFromString ""
                     |> isErr
                     |> Expect.equal True
         , test "rejects whitespace-only string" <|
             \_ ->
-                Courtroom.nameFromString "   "
+                District.nameFromString "   "
                     |> isErr
                     |> Expect.equal True
         ]
@@ -50,12 +50,12 @@ createSuite =
     describe "create"
         [ test "accessor round-trips name" <|
             \_ ->
-                case Courtroom.nameFromString "Department 1" of
+                case District.nameFromString "Riverside" of
                     Ok n ->
-                        Courtroom.create n
-                            |> Courtroom.courtroomName
-                            |> Courtroom.nameToString
-                            |> Expect.equal "Department 1"
+                        District.create n
+                            |> District.districtName
+                            |> District.nameToString
+                            |> Expect.equal "Riverside"
 
                     Err _ ->
                         Expect.fail "nameFromString should succeed"
