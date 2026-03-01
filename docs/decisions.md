@@ -5,6 +5,44 @@ rationale. Newest first.
 
 ---
 
+## ADR-006: Flat module-per-concept for domain types
+
+**Date:** 2026-03-01
+
+**Context:** Building a pure domain layer (no persistence
+concerns). Need to decide how to organize domain types
+in the Elm frontend. Options considered: a single
+`Domain.elm` module, a `Domain.*` namespace, or flat
+top-level modules named after domain concepts.
+
+**Decision:** One flat module per domain concept, named
+after the noun: `School.elm`, `Student.elm`, `Coach.elm`,
+`Team.elm`. No `Domain` namespace.
+
+**Rationale:**
+- Follows elm-spa-example convention (Feldman): each
+  module is the domain concept, not a layer
+- Consistent with ML-family best practices (Haskell,
+  OCaml, F#) — `Domain` is an OOP/DDD-ism that adds
+  a redundant namespace
+- "The Life of a File" (Czaplicki): split around domain
+  concepts, not architectural layers
+- `School.elm` is self-evidently a domain concept —
+  wrapping it in `Domain.School` adds noise
+- Types and their functions live together in the same
+  module (test combinators, not type definitions)
+
+**Consequences:**
+- Domain types tested via combinators/derived values,
+  not construction — Elm's type system already prevents
+  invalid construction
+- May need to rename if a module name collides with
+  an Elm Land page module (unlikely for domain nouns)
+- Related types grouped by proximity: e.g., `District`
+  lives in `School.elm` since it's tightly coupled
+
+---
+
 ## ADR-005: Staging environment on fly.io
 
 **Date:** 2026-02-28
