@@ -64,9 +64,13 @@ nominationCategory role =
             NonAdvocate
 
 
-rankPoints : Int -> Rank -> Int
+rankPoints : Int -> Rank -> Result (List Error) Int
 rankPoints count rank =
-    count + 1 - toInt rank
+    if count >= 1 then
+        Ok (count + 1 - toInt rank)
+
+    else
+        Err [ Error ("Nominee count must be positive, got " ++ String.fromInt count) ]
 
 
 type alias Nomination =

@@ -5,6 +5,7 @@ module PrelimResult exposing
     , prelimVerdictWithPresider
     )
 
+import Error exposing (Error(..))
 import PresiderBallot exposing (PresiderBallot)
 import Side exposing (Side(..))
 import SubmittedBallot
@@ -25,36 +26,46 @@ courtTotal targetSide ballot =
         |> List.sum
 
 
-prelimVerdict : List VerifiedBallot -> PrelimVerdict
+prelimVerdict :
+    List VerifiedBallot
+    -> Result (List Error) PrelimVerdict
 prelimVerdict ballots =
-    let
-        prosecutionTotal =
-            List.map (courtTotal Prosecution) ballots |> List.sum
-
-        defenseTotal =
-            List.map (courtTotal Defense) ballots |> List.sum
-    in
-    if prosecutionTotal > defenseTotal then
-        ProsecutionWins
-
-    else if defenseTotal > prosecutionTotal then
-        DefenseWins
+    if List.isEmpty ballots then
+        Err [ Error "Cannot determine verdict from empty ballot list" ]
 
     else
-        CourtTotalTied
+        let
+            prosecutionTotal =
+                List.map (courtTotal Prosecution) ballots |> List.sum
+
+            defenseTotal =
+                List.map (courtTotal Defense) ballots |> List.sum
+        in
+        if prosecutionTotal > defenseTotal then
+            Ok ProsecutionWins
+
+        else if defenseTotal > prosecutionTotal then
+            Ok DefenseWins
+
+        else
+            Ok CourtTotalTied
 
 
 prelimVerdictWithPresider :
     PresiderBallot
     -> List VerifiedBallot
-    -> Side
+    -> Result (List Error) Side
 prelimVerdictWithPresider presider ballots =
-    case prelimVerdict ballots of
-        ProsecutionWins ->
-            Prosecution
+    prelimVerdict ballots
+        |> Result.map
+            (\verdict ->
+                case verdict of
+                    ProsecutionWins ->
+                        Prosecution
 
-        DefenseWins ->
-            Defense
+                    DefenseWins ->
+                        Defense
 
-        CourtTotalTied ->
-            PresiderBallot.winner presider
+                    CourtTotalTied ->
+                        PresiderBallot.winner presider
+            )

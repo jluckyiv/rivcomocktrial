@@ -6,6 +6,7 @@ module ElimResult exposing
     , scorecardResult
     )
 
+import Error exposing (Error(..))
 import PresiderBallot exposing (PresiderBallot)
 import PrelimResult
 import Side exposing (Side(..))
@@ -43,39 +44,49 @@ type ElimVerdict
     | ScorecardsTied
 
 
-elimVerdict : List VerifiedBallot -> ElimVerdict
+elimVerdict :
+    List VerifiedBallot
+    -> Result (List Error) ElimVerdict
 elimVerdict ballots =
-    let
-        results =
-            List.map scorecardResult ballots
-
-        pWins =
-            List.length (List.filter ((==) ProsecutionWon) results)
-
-        dWins =
-            List.length (List.filter ((==) DefenseWon) results)
-    in
-    if pWins > dWins then
-        ProsecutionAdvances
-
-    else if dWins > pWins then
-        DefenseAdvances
+    if List.isEmpty ballots then
+        Err [ Error "Cannot determine verdict from empty ballot list" ]
 
     else
-        ScorecardsTied
+        let
+            results =
+                List.map scorecardResult ballots
+
+            pWins =
+                List.length (List.filter ((==) ProsecutionWon) results)
+
+            dWins =
+                List.length (List.filter ((==) DefenseWon) results)
+        in
+        if pWins > dWins then
+            Ok ProsecutionAdvances
+
+        else if dWins > pWins then
+            Ok DefenseAdvances
+
+        else
+            Ok ScorecardsTied
 
 
 elimVerdictWithPresider :
     PresiderBallot
     -> List VerifiedBallot
-    -> Side
+    -> Result (List Error) Side
 elimVerdictWithPresider presider ballots =
-    case elimVerdict ballots of
-        ProsecutionAdvances ->
-            Prosecution
+    elimVerdict ballots
+        |> Result.map
+            (\verdict ->
+                case verdict of
+                    ProsecutionAdvances ->
+                        Prosecution
 
-        DefenseAdvances ->
-            Defense
+                    DefenseAdvances ->
+                        Defense
 
-        ScorecardsTied ->
-            PresiderBallot.winner presider
+                    ScorecardsTied ->
+                        PresiderBallot.winner presider
+            )

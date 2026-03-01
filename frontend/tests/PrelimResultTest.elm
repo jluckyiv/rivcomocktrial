@@ -111,7 +111,7 @@ verdictSuite =
                     ]
                 ]
                     |> PrelimResult.prelimVerdict
-                    |> Expect.equal ProsecutionWins
+                    |> Expect.equal (Ok ProsecutionWins)
         , test "higher Defense Court Total → DefenseWins" <|
             \_ ->
                 [ ballot
@@ -120,7 +120,7 @@ verdictSuite =
                     ]
                 ]
                     |> PrelimResult.prelimVerdict
-                    |> Expect.equal DefenseWins
+                    |> Expect.equal (Ok DefenseWins)
         , test "equal Court Totals → CourtTotalTied" <|
             \_ ->
                 [ ballot
@@ -129,7 +129,7 @@ verdictSuite =
                     ]
                 ]
                     |> PrelimResult.prelimVerdict
-                    |> Expect.equal CourtTotalTied
+                    |> Expect.equal (Ok CourtTotalTied)
         , test "sums across multiple ballots" <|
             \_ ->
                 [ ballot
@@ -142,7 +142,13 @@ verdictSuite =
                     ]
                 ]
                     |> PrelimResult.prelimVerdict
-                    |> Expect.equal DefenseWins
+                    |> Expect.equal (Ok DefenseWins)
+        , test "rejects empty ballot list" <|
+            \_ ->
+                []
+                    |> PrelimResult.prelimVerdict
+                    |> isErr
+                    |> Expect.equal True
         ]
 
 
@@ -163,7 +169,7 @@ presiderSuite =
                         PresiderBallot.for Defense
                 in
                 PrelimResult.prelimVerdictWithPresider presider ballots
-                    |> Expect.equal Defense
+                    |> Expect.equal (Ok Defense)
         , test "returns Court Total winner when not tied" <|
             \_ ->
                 let
@@ -178,5 +184,22 @@ presiderSuite =
                         PresiderBallot.for Defense
                 in
                 PrelimResult.prelimVerdictWithPresider presider ballots
-                    |> Expect.equal Prosecution
+                    |> Expect.equal (Ok Prosecution)
+        , test "rejects empty ballot list" <|
+            \_ ->
+                PrelimResult.prelimVerdictWithPresider
+                    (PresiderBallot.for Prosecution)
+                    []
+                    |> isErr
+                    |> Expect.equal True
         ]
+
+
+isErr : Result e a -> Bool
+isErr result =
+    case result of
+        Ok _ ->
+            False
+
+        Err _ ->
+            True

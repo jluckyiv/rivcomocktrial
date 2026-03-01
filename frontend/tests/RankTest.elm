@@ -120,23 +120,33 @@ rankPointsSuite =
         [ test "1st of 5 = 5 points" <|
             \_ ->
                 Rank.rankPoints 5 (rank 1)
-                    |> Expect.equal 5
+                    |> Expect.equal (Ok 5)
         , test "5th of 5 = 1 point" <|
             \_ ->
                 Rank.rankPoints 5 (rank 5)
-                    |> Expect.equal 1
+                    |> Expect.equal (Ok 1)
         , test "3rd of 5 = 3 points" <|
             \_ ->
                 Rank.rankPoints 5 (rank 3)
-                    |> Expect.equal 3
+                    |> Expect.equal (Ok 3)
         , test "1st of 3 = 3 points" <|
             \_ ->
                 Rank.rankPoints 3 (rank 1)
-                    |> Expect.equal 3
+                    |> Expect.equal (Ok 3)
         , test "3rd of 3 = 1 point" <|
             \_ ->
                 Rank.rankPoints 3 (rank 3)
-                    |> Expect.equal 1
+                    |> Expect.equal (Ok 1)
+        , test "rejects zero count" <|
+            \_ ->
+                Rank.rankPoints 0 (rank 1)
+                    |> isErr
+                    |> Expect.equal True
+        , test "rejects negative count" <|
+            \_ ->
+                Rank.rankPoints -1 (rank 1)
+                    |> isErr
+                    |> Expect.equal True
         ]
 
 

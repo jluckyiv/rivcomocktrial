@@ -94,27 +94,33 @@ verdictSuite =
             \_ ->
                 [ pWins, pWins, dWins ]
                     |> ElimResult.elimVerdict
-                    |> Expect.equal ProsecutionAdvances
+                    |> Expect.equal (Ok ProsecutionAdvances)
         , test "majority D → DefenseAdvances" <|
             \_ ->
                 [ dWins, dWins, pWins ]
                     |> ElimResult.elimVerdict
-                    |> Expect.equal DefenseAdvances
+                    |> Expect.equal (Ok DefenseAdvances)
         , test "equal wins → ScorecardsTied" <|
             \_ ->
                 [ pWins, dWins ]
                     |> ElimResult.elimVerdict
-                    |> Expect.equal ScorecardsTied
+                    |> Expect.equal (Ok ScorecardsTied)
         , test "tied scorecards count toward neither" <|
             \_ ->
                 [ pWins, dWins, tied ]
                     |> ElimResult.elimVerdict
-                    |> Expect.equal ScorecardsTied
+                    |> Expect.equal (Ok ScorecardsTied)
         , test "3-2 split → majority advances" <|
             \_ ->
                 [ pWins, pWins, pWins, dWins, dWins ]
                     |> ElimResult.elimVerdict
-                    |> Expect.equal ProsecutionAdvances
+                    |> Expect.equal (Ok ProsecutionAdvances)
+        , test "rejects empty ballot list" <|
+            \_ ->
+                []
+                    |> ElimResult.elimVerdict
+                    |> isErr
+                    |> Expect.equal True
         ]
 
 
@@ -126,11 +132,28 @@ presiderSuite =
                 ElimResult.elimVerdictWithPresider
                     (PresiderBallot.for Defense)
                     [ pWins, dWins ]
-                    |> Expect.equal Defense
+                    |> Expect.equal (Ok Defense)
         , test "returns majority winner when not tied" <|
             \_ ->
                 ElimResult.elimVerdictWithPresider
                     (PresiderBallot.for Defense)
                     [ pWins, pWins, dWins ]
-                    |> Expect.equal Prosecution
+                    |> Expect.equal (Ok Prosecution)
+        , test "rejects empty ballot list" <|
+            \_ ->
+                ElimResult.elimVerdictWithPresider
+                    (PresiderBallot.for Prosecution)
+                    []
+                    |> isErr
+                    |> Expect.equal True
         ]
+
+
+isErr : Result e a -> Bool
+isErr result =
+    case result of
+        Ok _ ->
+            False
+
+        Err _ ->
+            True
