@@ -1,6 +1,6 @@
-module TestHelpers exposing (teamA, teamB)
+module TestHelpers exposing (applicant, teamA, teamB)
 
-import Coach exposing (TeacherCoach)
+import Coach exposing (TeacherCoach, TeacherCoachApplicant)
 import District
 import School
 import Student
@@ -32,6 +32,17 @@ teamB =
     , students = []
     , teacherCoach = coach "Bob" "Jones"
     , attorneyCoach = Nothing
+    }
+
+
+applicant : String -> String -> TeacherCoachApplicant
+applicant first last =
+    { name =
+        { first = first
+        , last = last
+        , preferred = Nothing
+        }
+    , email = "test@example.com"
     }
 
 
