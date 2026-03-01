@@ -9,6 +9,7 @@ import Html.Events as Events
 import Http
 import Layouts
 import Page exposing (Page)
+import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Shared
 import View exposing (View)
@@ -26,43 +27,53 @@ page user shared route =
 
 
 
+-- TYPES
+
+
+type FormContext
+    = Creating
+    | Editing String
+
+
+type alias StudentForm =
+    { name : String, school : String }
+
+
+type FormState
+    = FormHidden
+    | FormOpen FormContext StudentForm (Maybe String)
+    | FormSaving FormContext StudentForm
+
+
+type BulkState
+    = BulkIdle
+    | BulkEditing String
+    | BulkSaving String
+    | BulkFailed String String
+
+
+
 -- MODEL
 
 
 type alias Model =
-    { students : List Student
+    { students : RemoteData (List Student)
     , schools : List School
-    , loading : Bool
-    , error : Maybe String
-    , showForm : Bool
-    , formName : String
-    , formSchool : String
-    , formSaving : Bool
-    , editingId : Maybe String
+    , form : FormState
+    , bulk : BulkState
     , deleting : Maybe String
     , filterSchool : String
-    , bulkText : String
-    , bulkSaving : Bool
-    , bulkError : Maybe String
     }
 
 
 init : Auth.User -> () -> ( Model, Effect Msg )
 init user _ =
-    ( { students = []
+    ( { students = Loading
       , schools = []
-      , loading = True
-      , error = Nothing
-      , showForm = False
-      , formName = ""
-      , formSchool = ""
-      , formSaving = False
-      , editingId = Nothing
+      , form = FormHidden
+      , bulk = BulkIdle
       , deleting = Nothing
       , filterSchool = ""
-      , bulkText = ""
-      , bulkSaving = False
-      , bulkError = Nothing
       }
     , Effect.batch
         [ Effect.sendCmd (Api.listStudents user.token GotStudents)
@@ -97,10 +108,10 @@ update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
 update user msg model =
     case msg of
         GotStudents (Ok response) ->
-            ( { model | students = response.items, loading = False }, Effect.none )
+            ( { model | students = Succeeded response.items }, Effect.none )
 
         GotStudents (Err _) ->
-            ( { model | loading = False, error = Just "Failed to load students." }, Effect.none )
+            ( { model | students = Failed "Failed to load students." }, Effect.none )
 
         GotSchools (Ok response) ->
             ( { model | schools = response.items }, Effect.none )
@@ -112,40 +123,45 @@ update user msg model =
             ( { model | filterSchool = val }, Effect.none )
 
         ShowCreateForm ->
-            ( { model | showForm = True, editingId = Nothing, formName = "", formSchool = model.filterSchool }, Effect.none )
+            ( { model | form = FormOpen Creating { name = "", school = model.filterSchool } Nothing }, Effect.none )
 
         EditStudent s ->
-            ( { model | showForm = True, editingId = Just s.id, formName = s.name, formSchool = s.school }, Effect.none )
+            ( { model | form = FormOpen (Editing s.id) { name = s.name, school = s.school } Nothing }, Effect.none )
 
         CancelForm ->
-            ( { model | showForm = False, editingId = Nothing }, Effect.none )
+            ( { model | form = FormHidden }, Effect.none )
 
         FormNameChanged val ->
-            ( { model | formName = val }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | name = val }) model.form }, Effect.none )
 
         FormSchoolChanged val ->
-            ( { model | formSchool = val }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | school = val }) model.form }, Effect.none )
 
         SaveStudent ->
-            let
-                data =
-                    { name = model.formName, school = model.formSchool }
+            case model.form of
+                FormOpen context formData _ ->
+                    let
+                        data =
+                            { name = formData.name, school = formData.school }
 
-                cmd =
-                    case model.editingId of
-                        Just id ->
-                            Api.updateStudent user.token id data GotSaveResponse
+                        cmd =
+                            case context of
+                                Editing id ->
+                                    Api.updateStudent user.token id data GotSaveResponse
 
-                        Nothing ->
-                            Api.createStudent user.token data GotSaveResponse
-            in
-            ( { model | formSaving = True }, Effect.sendCmd cmd )
+                                Creating ->
+                                    Api.createStudent user.token data GotSaveResponse
+                    in
+                    ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
+
+                _ ->
+                    ( model, Effect.none )
 
         GotSaveResponse (Ok student) ->
             let
-                updatedList =
-                    case model.editingId of
-                        Just _ ->
+                updateStudents context students =
+                    case context of
+                        Editing _ ->
                             List.map
                                 (\s ->
                                     if s.id == student.id then
@@ -154,15 +170,30 @@ update user msg model =
                                     else
                                         s
                                 )
-                                model.students
+                                students
 
-                        Nothing ->
-                            model.students ++ [ student ]
+                        Creating ->
+                            students ++ [ student ]
             in
-            ( { model | students = updatedList, showForm = False, editingId = Nothing, formSaving = False }, Effect.none )
+            case model.form of
+                FormSaving context _ ->
+                    ( { model
+                        | students = RemoteData.map (updateStudents context) model.students
+                        , form = FormHidden
+                      }
+                    , Effect.none
+                    )
+
+                _ ->
+                    ( model, Effect.none )
 
         GotSaveResponse (Err _) ->
-            ( { model | formSaving = False, error = Just "Failed to save student." }, Effect.none )
+            case model.form of
+                FormSaving context formData ->
+                    ( { model | form = FormOpen context formData (Just "Failed to save student.") }, Effect.none )
+
+                _ ->
+                    ( model, Effect.none )
 
         DeleteStudent id ->
             ( { model | deleting = Just id }
@@ -170,53 +201,92 @@ update user msg model =
             )
 
         GotDeleteResponse id (Ok _) ->
-            ( { model | students = List.filter (\s -> s.id /= id) model.students, deleting = Nothing }, Effect.none )
+            ( { model
+                | students = RemoteData.map (List.filter (\s -> s.id /= id)) model.students
+                , deleting = Nothing
+              }
+            , Effect.none
+            )
 
         GotDeleteResponse _ (Err _) ->
-            ( { model | deleting = Nothing, error = Just "Failed to delete student." }, Effect.none )
+            ( { model | deleting = Nothing }, Effect.none )
 
         BulkTextChanged val ->
-            ( { model | bulkText = val, bulkError = Nothing }, Effect.none )
+            ( { model | bulk = BulkEditing val }, Effect.none )
 
         BulkImport ->
-            let
-                lines =
-                    String.lines model.bulkText
-                        |> List.map String.trim
-                        |> List.filter (\l -> l /= "")
-
-                parsed =
-                    List.filterMap (parseBulkLine model.schools) lines
-
-                errors =
-                    List.length lines - List.length parsed
-            in
-            if List.isEmpty parsed then
-                ( { model | bulkError = Just "No valid lines found. Format: Name, School Name" }, Effect.none )
-
-            else if errors > 0 then
-                ( { model | bulkError = Just (String.fromInt errors ++ " line(s) could not be parsed. Check school names match exactly.") }, Effect.none )
-
-            else
-                ( { model | bulkSaving = True, bulkError = Nothing }
-                , Effect.batch
-                    (List.map
-                        (\data -> Effect.sendCmd (Api.createStudent user.token data GotBulkResponse))
-                        parsed
-                    )
-                )
+            handleBulkImport user model
 
         GotBulkResponse (Ok student) ->
             ( { model
-                | students = model.students ++ [ student ]
-                , bulkSaving = False
-                , bulkText = ""
+                | students = RemoteData.map (\list -> list ++ [ student ]) model.students
+                , bulk = BulkIdle
               }
             , Effect.none
             )
 
         GotBulkResponse (Err _) ->
-            ( { model | bulkSaving = False, bulkError = Just "Failed to create some students." }, Effect.none )
+            case model.bulk of
+                BulkSaving val ->
+                    ( { model | bulk = BulkFailed val "Failed to create some students." }, Effect.none )
+
+                _ ->
+                    ( { model | bulk = BulkFailed "" "Failed to create some students." }, Effect.none )
+
+
+
+-- HELPERS
+
+
+updateFormField : (StudentForm -> StudentForm) -> FormState -> FormState
+updateFormField transform state =
+    case state of
+        FormOpen context formData error ->
+            FormOpen context (transform formData) error
+
+        _ ->
+            state
+
+
+handleBulkImport : Auth.User -> Model -> ( Model, Effect Msg )
+handleBulkImport user model =
+    let
+        bulkText =
+            case model.bulk of
+                BulkEditing val ->
+                    val
+
+                BulkFailed val _ ->
+                    val
+
+                _ ->
+                    ""
+
+        lines =
+            String.lines bulkText
+                |> List.map String.trim
+                |> List.filter (\l -> l /= "")
+
+        parsed =
+            List.filterMap (parseBulkLine model.schools) lines
+
+        errors =
+            List.length lines - List.length parsed
+    in
+    if List.isEmpty parsed then
+        ( { model | bulk = BulkFailed bulkText "No valid lines found. Format: Name, School Name" }, Effect.none )
+
+    else if errors > 0 then
+        ( { model | bulk = BulkFailed bulkText (String.fromInt errors ++ " line(s) could not be parsed. Check school names match exactly.") }, Effect.none )
+
+    else
+        ( { model | bulk = BulkSaving bulkText }
+        , Effect.batch
+            (List.map
+                (\data -> Effect.sendCmd (Api.createStudent user.token data GotBulkResponse))
+                parsed
+            )
+        )
 
 
 
@@ -291,89 +361,61 @@ view model =
                     ]
                 ]
             ]
-        , viewError model.error
-        , if model.showForm then
-            viewForm model
-
-          else
-            text ""
-        , viewBulkInput model
-        , if model.loading then
-            div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
-
-          else
-            viewTable model
+        , viewForm model.form model.schools
+        , viewBulkInput model.bulk
+        , viewStudents model.students model.schools model.deleting model.filterSchool
         ]
     }
 
 
-viewBulkInput : Model -> Html Msg
-viewBulkInput model =
+viewStudents : RemoteData (List Student) -> List School -> Maybe String -> String -> Html Msg
+viewStudents students schools deleting filterSchool =
+    case students of
+        NotAsked ->
+            text ""
+
+        Loading ->
+            div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
+
+        Failed err ->
+            div [ Attr.class "notification is-danger" ] [ text err ]
+
+        Succeeded list ->
+            viewTable list schools deleting filterSchool
+
+
+viewForm : FormState -> List School -> Html Msg
+viewForm state schools =
+    case state of
+        FormHidden ->
+            text ""
+
+        FormOpen context formData error ->
+            viewFormBox context formData error False schools
+
+        FormSaving context formData ->
+            viewFormBox context formData Nothing True schools
+
+
+viewFormBox : FormContext -> StudentForm -> Maybe String -> Bool -> List School -> Html Msg
+viewFormBox context formData error saving schools =
     div [ Attr.class "box mb-5" ]
-        [ h2 [ Attr.class "subtitle" ] [ text "Bulk Import" ]
-        , p [ Attr.class "help mb-3" ]
-            [ text "One student per line. Format: "
-            , code [] [ text "Name, School Name" ]
-            , text " (school name must match exactly)"
+        [ h2 [ Attr.class "subtitle" ]
+            [ text
+                (case context of
+                    Editing _ ->
+                        "Edit Student"
+
+                    Creating ->
+                        "New Student"
+                )
             ]
-        , div [ Attr.class "field" ]
-            [ div [ Attr.class "control" ]
-                [ textarea
-                    [ Attr.class "textarea"
-                    , Attr.rows 6
-                    , Attr.placeholder "Jane Doe, Lincoln High\nJohn Smith, Lincoln High\nAlex Johnson, Kennedy Middle"
-                    , Attr.value model.bulkText
-                    , Events.onInput BulkTextChanged
-                    ]
-                    []
-                ]
-            ]
-        , case model.bulkError of
+        , case error of
             Just err ->
                 div [ Attr.class "notification is-danger is-light" ] [ text err ]
 
             Nothing ->
                 text ""
-        , div [ Attr.class "field" ]
-            [ button
-                [ Attr.class
-                    (if model.bulkSaving then
-                        "button is-info is-loading"
-
-                     else
-                        "button is-info"
-                    )
-                , Events.onClick BulkImport
-                , Attr.disabled (String.trim model.bulkText == "")
-                ]
-                [ text "Import" ]
-            ]
-        ]
-
-
-viewError : Maybe String -> Html Msg
-viewError maybeError =
-    case maybeError of
-        Just err ->
-            div [ Attr.class "notification is-danger" ] [ text err ]
-
-        Nothing ->
-            text ""
-
-
-viewForm : Model -> Html Msg
-viewForm model =
-    div [ Attr.class "box mb-5" ]
-        [ h2 [ Attr.class "subtitle" ]
-            [ text
-                (case model.editingId of
-                    Just _ ->
-                        "Edit Student"
-
-                    Nothing ->
-                        "New Student"
-                )
-            ]
         , Html.form [ Events.onSubmit SaveStudent ]
             [ div [ Attr.class "columns" ]
                 [ div [ Attr.class "column" ]
@@ -382,7 +424,7 @@ viewForm model =
                         , div [ Attr.class "control" ]
                             [ input
                                 [ Attr.class "input"
-                                , Attr.value model.formName
+                                , Attr.value formData.name
                                 , Events.onInput FormNameChanged
                                 , Attr.required True
                                 ]
@@ -399,10 +441,10 @@ viewForm model =
                                     (option [ Attr.value "" ] [ text "Select school..." ]
                                         :: List.map
                                             (\s ->
-                                                option [ Attr.value s.id, Attr.selected (model.formSchool == s.id) ]
+                                                option [ Attr.value s.id, Attr.selected (formData.school == s.id) ]
                                                     [ text s.name ]
                                             )
-                                            model.schools
+                                            schools
                                     )
                                 ]
                             ]
@@ -413,7 +455,7 @@ viewForm model =
                 [ div [ Attr.class "control" ]
                     [ button
                         [ Attr.class
-                            (if model.formSaving then
+                            (if saving then
                                 "button is-primary is-loading"
 
                              else
@@ -432,18 +474,77 @@ viewForm model =
         ]
 
 
-viewTable : Model -> Html Msg
-viewTable model =
+viewBulkInput : BulkState -> Html Msg
+viewBulkInput state =
+    let
+        ( bulkText, bulkError, saving ) =
+            case state of
+                BulkIdle ->
+                    ( "", Nothing, False )
+
+                BulkEditing val ->
+                    ( val, Nothing, False )
+
+                BulkSaving val ->
+                    ( val, Nothing, True )
+
+                BulkFailed val err ->
+                    ( val, Just err, False )
+    in
+    div [ Attr.class "box mb-5" ]
+        [ h2 [ Attr.class "subtitle" ] [ text "Bulk Import" ]
+        , p [ Attr.class "help mb-3" ]
+            [ text "One student per line. Format: "
+            , code [] [ text "Name, School Name" ]
+            , text " (school name must match exactly)"
+            ]
+        , div [ Attr.class "field" ]
+            [ div [ Attr.class "control" ]
+                [ textarea
+                    [ Attr.class "textarea"
+                    , Attr.rows 6
+                    , Attr.placeholder "Jane Doe, Lincoln High\nJohn Smith, Lincoln High\nAlex Johnson, Kennedy Middle"
+                    , Attr.value bulkText
+                    , Events.onInput BulkTextChanged
+                    ]
+                    []
+                ]
+            ]
+        , case bulkError of
+            Just err ->
+                div [ Attr.class "notification is-danger is-light" ] [ text err ]
+
+            Nothing ->
+                text ""
+        , div [ Attr.class "field" ]
+            [ button
+                [ Attr.class
+                    (if saving then
+                        "button is-info is-loading"
+
+                     else
+                        "button is-info"
+                    )
+                , Events.onClick BulkImport
+                , Attr.disabled (String.trim bulkText == "")
+                ]
+                [ text "Import" ]
+            ]
+        ]
+
+
+viewTable : List Student -> List School -> Maybe String -> String -> Html Msg
+viewTable students schools deleting filterSchool =
     let
         filtered =
-            if model.filterSchool == "" then
-                model.students
+            if filterSchool == "" then
+                students
 
             else
-                List.filter (\s -> s.school == model.filterSchool) model.students
+                List.filter (\s -> s.school == filterSchool) students
 
         schoolName id =
-            List.filter (\s -> s.id == id) model.schools
+            List.filter (\s -> s.id == id) schools
                 |> List.head
                 |> Maybe.map .name
                 |> Maybe.withDefault id
@@ -461,31 +562,30 @@ viewTable model =
                     , th [] [ text "Actions" ]
                     ]
                 ]
-            , tbody []
-                (List.map
-                    (\s ->
-                        tr []
-                            [ td [] [ text s.name ]
-                            , td [] [ text (schoolName s.school) ]
-                            , td []
-                                [ div [ Attr.class "buttons are-small" ]
-                                    [ button [ Attr.class "button is-info is-outlined", Events.onClick (EditStudent s) ]
-                                        [ text "Edit" ]
-                                    , button
-                                        [ Attr.class
-                                            (if model.deleting == Just s.id then
-                                                "button is-danger is-outlined is-loading"
-
-                                             else
-                                                "button is-danger is-outlined"
-                                            )
-                                        , Events.onClick (DeleteStudent s.id)
-                                        ]
-                                        [ text "Delete" ]
-                                    ]
-                                ]
-                            ]
-                    )
-                    filtered
-                )
+            , tbody [] (List.map (viewRow deleting schoolName) filtered)
             ]
+
+
+viewRow : Maybe String -> (String -> String) -> Student -> Html Msg
+viewRow deleting schoolName s =
+    tr []
+        [ td [] [ text s.name ]
+        , td [] [ text (schoolName s.school) ]
+        , td []
+            [ div [ Attr.class "buttons are-small" ]
+                [ button [ Attr.class "button is-info is-outlined", Events.onClick (EditStudent s) ]
+                    [ text "Edit" ]
+                , button
+                    [ Attr.class
+                        (if deleting == Just s.id then
+                            "button is-danger is-outlined is-loading"
+
+                         else
+                            "button is-danger is-outlined"
+                        )
+                    , Events.onClick (DeleteStudent s.id)
+                    ]
+                    [ text "Delete" ]
+                ]
+            ]
+        ]

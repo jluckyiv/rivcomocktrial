@@ -9,6 +9,7 @@ import Html.Events as Events
 import Http
 import Layouts
 import Page exposing (Page)
+import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Shared
 import View exposing (View)
@@ -26,49 +27,59 @@ page user shared route =
 
 
 
+-- TYPES
+
+
+type FormContext
+    = Creating
+    | Editing String
+
+
+type alias TeamForm =
+    { tournament : String
+    , school : String
+    , teamNumber : String
+    , name : String
+    }
+
+
+type FormState
+    = FormHidden
+    | FormOpen FormContext TeamForm (Maybe String)
+    | FormSaving FormContext TeamForm
+
+
+type BulkState
+    = BulkIdle
+    | BulkEditing String
+    | BulkSaving String
+    | BulkFailed String String
+
+
+
 -- MODEL
 
 
 type alias Model =
-    { teams : List Team
+    { teams : RemoteData (List Team)
     , tournaments : List Tournament
     , schools : List School
-    , loading : Bool
-    , error : Maybe String
-    , showForm : Bool
-    , formTournament : String
-    , formSchool : String
-    , formTeamNumber : String
-    , formName : String
-    , formSaving : Bool
-    , editingId : Maybe String
+    , form : FormState
+    , bulk : BulkState
     , deleting : Maybe String
     , filterTournament : String
-    , bulkText : String
-    , bulkSaving : Bool
-    , bulkError : Maybe String
     }
 
 
 init : Auth.User -> () -> ( Model, Effect Msg )
 init user _ =
-    ( { teams = []
+    ( { teams = Loading
       , tournaments = []
       , schools = []
-      , loading = True
-      , error = Nothing
-      , showForm = False
-      , formTournament = ""
-      , formSchool = ""
-      , formTeamNumber = ""
-      , formName = ""
-      , formSaving = False
-      , editingId = Nothing
+      , form = FormHidden
+      , bulk = BulkIdle
       , deleting = Nothing
       , filterTournament = ""
-      , bulkText = ""
-      , bulkSaving = False
-      , bulkError = Nothing
       }
     , Effect.batch
         [ Effect.sendCmd (Api.listTeams user.token GotTeams)
@@ -107,10 +118,10 @@ update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
 update user msg model =
     case msg of
         GotTeams (Ok response) ->
-            ( { model | teams = response.items, loading = False }, Effect.none )
+            ( { model | teams = Succeeded response.items }, Effect.none )
 
         GotTeams (Err _) ->
-            ( { model | loading = False, error = Just "Failed to load teams." }, Effect.none )
+            ( { model | teams = Failed "Failed to load teams." }, Effect.none )
 
         GotTournaments (Ok response) ->
             ( { model | tournaments = response.items }, Effect.none )
@@ -129,67 +140,76 @@ update user msg model =
 
         ShowCreateForm ->
             ( { model
-                | showForm = True
-                , editingId = Nothing
-                , formTournament = model.filterTournament
-                , formSchool = ""
-                , formTeamNumber = ""
-                , formName = ""
+                | form =
+                    FormOpen Creating
+                        { tournament = model.filterTournament
+                        , school = ""
+                        , teamNumber = ""
+                        , name = ""
+                        }
+                        Nothing
               }
             , Effect.none
             )
 
         EditTeam t ->
             ( { model
-                | showForm = True
-                , editingId = Just t.id
-                , formTournament = t.tournament
-                , formSchool = t.school
-                , formTeamNumber = String.fromInt t.teamNumber
-                , formName = t.name
+                | form =
+                    FormOpen (Editing t.id)
+                        { tournament = t.tournament
+                        , school = t.school
+                        , teamNumber = String.fromInt t.teamNumber
+                        , name = t.name
+                        }
+                        Nothing
               }
             , Effect.none
             )
 
         CancelForm ->
-            ( { model | showForm = False, editingId = Nothing }, Effect.none )
+            ( { model | form = FormHidden }, Effect.none )
 
         FormTournamentChanged val ->
-            ( { model | formTournament = val }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | tournament = val }) model.form }, Effect.none )
 
         FormSchoolChanged val ->
-            ( { model | formSchool = val }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | school = val }) model.form }, Effect.none )
 
         FormTeamNumberChanged val ->
-            ( { model | formTeamNumber = val }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | teamNumber = val }) model.form }, Effect.none )
 
         FormNameChanged val ->
-            ( { model | formName = val }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | name = val }) model.form }, Effect.none )
 
         SaveTeam ->
-            let
-                data =
-                    { tournament = model.formTournament
-                    , school = model.formSchool
-                    , teamNumber = String.toInt model.formTeamNumber |> Maybe.withDefault 0
-                    , name = model.formName
-                    }
+            case model.form of
+                FormOpen context formData _ ->
+                    let
+                        data =
+                            { tournament = formData.tournament
+                            , school = formData.school
+                            , teamNumber = String.toInt formData.teamNumber |> Maybe.withDefault 0
+                            , name = formData.name
+                            }
 
-                cmd =
-                    case model.editingId of
-                        Just id ->
-                            Api.updateTeam user.token id data GotSaveResponse
+                        cmd =
+                            case context of
+                                Editing id ->
+                                    Api.updateTeam user.token id data GotSaveResponse
 
-                        Nothing ->
-                            Api.createTeam user.token data GotSaveResponse
-            in
-            ( { model | formSaving = True }, Effect.sendCmd cmd )
+                                Creating ->
+                                    Api.createTeam user.token data GotSaveResponse
+                    in
+                    ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
+
+                _ ->
+                    ( model, Effect.none )
 
         GotSaveResponse (Ok team) ->
             let
-                updatedList =
-                    case model.editingId of
-                        Just _ ->
+                updateTeams context teams =
+                    case context of
+                        Editing _ ->
                             List.map
                                 (\t ->
                                     if t.id == team.id then
@@ -198,15 +218,30 @@ update user msg model =
                                     else
                                         t
                                 )
-                                model.teams
+                                teams
 
-                        Nothing ->
-                            model.teams ++ [ team ]
+                        Creating ->
+                            teams ++ [ team ]
             in
-            ( { model | teams = updatedList, showForm = False, editingId = Nothing, formSaving = False }, Effect.none )
+            case model.form of
+                FormSaving context _ ->
+                    ( { model
+                        | teams = RemoteData.map (updateTeams context) model.teams
+                        , form = FormHidden
+                      }
+                    , Effect.none
+                    )
+
+                _ ->
+                    ( model, Effect.none )
 
         GotSaveResponse (Err _) ->
-            ( { model | formSaving = False, error = Just "Failed to save team." }, Effect.none )
+            case model.form of
+                FormSaving context formData ->
+                    ( { model | form = FormOpen context formData (Just "Failed to save team.") }, Effect.none )
+
+                _ ->
+                    ( model, Effect.none )
 
         DeleteTeam id ->
             ( { model | deleting = Just id }
@@ -214,67 +249,111 @@ update user msg model =
             )
 
         GotDeleteResponse id (Ok _) ->
-            ( { model | teams = List.filter (\t -> t.id /= id) model.teams, deleting = Nothing }, Effect.none )
+            ( { model
+                | teams = RemoteData.map (List.filter (\t -> t.id /= id)) model.teams
+                , deleting = Nothing
+              }
+            , Effect.none
+            )
 
         GotDeleteResponse _ (Err _) ->
-            ( { model | deleting = Nothing, error = Just "Failed to delete team." }, Effect.none )
+            ( { model | deleting = Nothing }, Effect.none )
 
         BulkTextChanged val ->
-            ( { model | bulkText = val, bulkError = Nothing }, Effect.none )
+            ( { model | bulk = BulkEditing val }, Effect.none )
 
         BulkImport ->
-            if model.filterTournament == "" then
-                ( { model | bulkError = Just "Select a tournament first." }, Effect.none )
-
-            else
-                let
-                    lines =
-                        String.lines model.bulkText
-                            |> List.map String.trim
-                            |> List.filter (\l -> l /= "")
-
-                    parsed =
-                        List.filterMap (parseBulkLine model.schools) lines
-
-                    errors =
-                        List.length lines - List.length parsed
-                in
-                if List.isEmpty parsed then
-                    ( { model | bulkError = Just "No valid lines found. Format: 101 Team Name, School Name" }, Effect.none )
-
-                else if errors > 0 then
-                    ( { model | bulkError = Just (String.fromInt errors ++ " line(s) could not be parsed. Check school names match exactly.") }, Effect.none )
-
-                else
-                    ( { model | bulkSaving = True, bulkError = Nothing }
-                    , Effect.batch
-                        (List.map
-                            (\data ->
-                                Effect.sendCmd
-                                    (Api.createTeam user.token
-                                        { tournament = model.filterTournament
-                                        , school = data.school
-                                        , teamNumber = data.teamNumber
-                                        , name = data.name
-                                        }
-                                        GotBulkResponse
-                                    )
-                            )
-                            parsed
-                        )
-                    )
+            handleBulkImport user model
 
         GotBulkResponse (Ok team) ->
             ( { model
-                | teams = model.teams ++ [ team ]
-                , bulkSaving = False
-                , bulkText = ""
+                | teams = RemoteData.map (\list -> list ++ [ team ]) model.teams
+                , bulk = BulkIdle
               }
             , Effect.none
             )
 
         GotBulkResponse (Err _) ->
-            ( { model | bulkSaving = False, bulkError = Just "Failed to create some teams." }, Effect.none )
+            case model.bulk of
+                BulkSaving val ->
+                    ( { model | bulk = BulkFailed val "Failed to create some teams." }, Effect.none )
+
+                _ ->
+                    ( { model | bulk = BulkFailed "" "Failed to create some teams." }, Effect.none )
+
+
+
+-- HELPERS
+
+
+updateFormField : (TeamForm -> TeamForm) -> FormState -> FormState
+updateFormField transform state =
+    case state of
+        FormOpen context formData error ->
+            FormOpen context (transform formData) error
+
+        _ ->
+            state
+
+
+handleBulkImport : Auth.User -> Model -> ( Model, Effect Msg )
+handleBulkImport user model =
+    if model.filterTournament == "" then
+        ( { model | bulk = BulkFailed (bulkTextFromState model.bulk) "Select a tournament first." }, Effect.none )
+
+    else
+        let
+            bulkText =
+                bulkTextFromState model.bulk
+
+            lines =
+                String.lines bulkText
+                    |> List.map String.trim
+                    |> List.filter (\l -> l /= "")
+
+            parsed =
+                List.filterMap (parseBulkLine model.schools) lines
+
+            errors =
+                List.length lines - List.length parsed
+        in
+        if List.isEmpty parsed then
+            ( { model | bulk = BulkFailed bulkText "No valid lines found. Format: 101 Team Name, School Name" }, Effect.none )
+
+        else if errors > 0 then
+            ( { model | bulk = BulkFailed bulkText (String.fromInt errors ++ " line(s) could not be parsed. Check school names match exactly.") }, Effect.none )
+
+        else
+            ( { model | bulk = BulkSaving bulkText }
+            , Effect.batch
+                (List.map
+                    (\data ->
+                        Effect.sendCmd
+                            (Api.createTeam user.token
+                                { tournament = model.filterTournament
+                                , school = data.school
+                                , teamNumber = data.teamNumber
+                                , name = data.name
+                                }
+                                GotBulkResponse
+                            )
+                    )
+                    parsed
+                )
+            )
+
+
+bulkTextFromState : BulkState -> String
+bulkTextFromState state =
+    case state of
+        BulkEditing val ->
+            val
+
+        BulkFailed val _ ->
+            val
+
+        _ ->
+            ""
 
 
 
@@ -363,90 +442,61 @@ view model =
                     ]
                 ]
             ]
-        , viewError model.error
-        , if model.showForm then
-            viewForm model
-
-          else
-            text ""
-        , viewBulkInput model
-        , if model.loading then
-            div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
-
-          else
-            viewTable model
+        , viewForm model.form model.tournaments model.schools
+        , viewBulkInput model.bulk model.filterTournament
+        , viewTeams model.teams model.tournaments model.schools model.deleting model.filterTournament
         ]
     }
 
 
-viewBulkInput : Model -> Html Msg
-viewBulkInput model =
+viewTeams : RemoteData (List Team) -> List Tournament -> List School -> Maybe String -> String -> Html Msg
+viewTeams teams tournaments schools deleting filterTournament =
+    case teams of
+        NotAsked ->
+            text ""
+
+        Loading ->
+            div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
+
+        Failed err ->
+            div [ Attr.class "notification is-danger" ] [ text err ]
+
+        Succeeded list ->
+            viewTable list tournaments schools deleting filterTournament
+
+
+viewForm : FormState -> List Tournament -> List School -> Html Msg
+viewForm state tournaments schools =
+    case state of
+        FormHidden ->
+            text ""
+
+        FormOpen context formData error ->
+            viewFormBox context formData error False tournaments schools
+
+        FormSaving context formData ->
+            viewFormBox context formData Nothing True tournaments schools
+
+
+viewFormBox : FormContext -> TeamForm -> Maybe String -> Bool -> List Tournament -> List School -> Html Msg
+viewFormBox context formData error saving tournaments schools =
     div [ Attr.class "box mb-5" ]
-        [ h2 [ Attr.class "subtitle" ] [ text "Bulk Import" ]
-        , p [ Attr.class "help mb-3" ]
-            [ text "One team per line. Format: "
-            , code [] [ text "{number} {name}, {school_name}" ]
-            , br [] []
-            , text "Teams are added to the selected tournament filter."
+        [ h2 [ Attr.class "subtitle" ]
+            [ text
+                (case context of
+                    Editing _ ->
+                        "Edit Team"
+
+                    Creating ->
+                        "New Team"
+                )
             ]
-        , div [ Attr.class "field" ]
-            [ div [ Attr.class "control" ]
-                [ textarea
-                    [ Attr.class "textarea"
-                    , Attr.rows 6
-                    , Attr.placeholder "101 Lions A, Lincoln High\n102 Lions B, Lincoln High\n201 Eagles, Kennedy Middle"
-                    , Attr.value model.bulkText
-                    , Events.onInput BulkTextChanged
-                    ]
-                    []
-                ]
-            ]
-        , case model.bulkError of
+        , case error of
             Just err ->
                 div [ Attr.class "notification is-danger is-light" ] [ text err ]
 
             Nothing ->
                 text ""
-        , div [ Attr.class "field" ]
-            [ button
-                [ Attr.class
-                    (if model.bulkSaving then
-                        "button is-info is-loading"
-
-                     else
-                        "button is-info"
-                    )
-                , Events.onClick BulkImport
-                , Attr.disabled (String.trim model.bulkText == "" || model.filterTournament == "")
-                ]
-                [ text "Import" ]
-            ]
-        ]
-
-
-viewError : Maybe String -> Html Msg
-viewError maybeError =
-    case maybeError of
-        Just err ->
-            div [ Attr.class "notification is-danger" ] [ text err ]
-
-        Nothing ->
-            text ""
-
-
-viewForm : Model -> Html Msg
-viewForm model =
-    div [ Attr.class "box mb-5" ]
-        [ h2 [ Attr.class "subtitle" ]
-            [ text
-                (case model.editingId of
-                    Just _ ->
-                        "Edit Team"
-
-                    Nothing ->
-                        "New Team"
-                )
-            ]
         , Html.form [ Events.onSubmit SaveTeam ]
             [ div [ Attr.class "columns" ]
                 [ div [ Attr.class "column" ]
@@ -458,10 +508,10 @@ viewForm model =
                                     (option [ Attr.value "" ] [ text "Select tournament..." ]
                                         :: List.map
                                             (\t ->
-                                                option [ Attr.value t.id, Attr.selected (model.formTournament == t.id) ]
+                                                option [ Attr.value t.id, Attr.selected (formData.tournament == t.id) ]
                                                     [ text (t.name ++ " (" ++ String.fromInt t.year ++ ")") ]
                                             )
-                                            model.tournaments
+                                            tournaments
                                     )
                                 ]
                             ]
@@ -476,10 +526,10 @@ viewForm model =
                                     (option [ Attr.value "" ] [ text "Select school..." ]
                                         :: List.map
                                             (\s ->
-                                                option [ Attr.value s.id, Attr.selected (model.formSchool == s.id) ]
+                                                option [ Attr.value s.id, Attr.selected (formData.school == s.id) ]
                                                     [ text s.name ]
                                             )
-                                            model.schools
+                                            schools
                                     )
                                 ]
                             ]
@@ -494,7 +544,7 @@ viewForm model =
                             [ input
                                 [ Attr.class "input"
                                 , Attr.type_ "number"
-                                , Attr.value model.formTeamNumber
+                                , Attr.value formData.teamNumber
                                 , Events.onInput FormTeamNumberChanged
                                 ]
                                 []
@@ -507,7 +557,7 @@ viewForm model =
                         , div [ Attr.class "control" ]
                             [ input
                                 [ Attr.class "input"
-                                , Attr.value model.formName
+                                , Attr.value formData.name
                                 , Events.onInput FormNameChanged
                                 ]
                                 []
@@ -519,7 +569,7 @@ viewForm model =
                 [ div [ Attr.class "control" ]
                     [ button
                         [ Attr.class
-                            (if model.formSaving then
+                            (if saving then
                                 "button is-primary is-loading"
 
                              else
@@ -538,15 +588,75 @@ viewForm model =
         ]
 
 
-viewTable : Model -> Html Msg
-viewTable model =
+viewBulkInput : BulkState -> String -> Html Msg
+viewBulkInput state filterTournament =
+    let
+        ( bulkText, bulkError, saving ) =
+            case state of
+                BulkIdle ->
+                    ( "", Nothing, False )
+
+                BulkEditing val ->
+                    ( val, Nothing, False )
+
+                BulkSaving val ->
+                    ( val, Nothing, True )
+
+                BulkFailed val err ->
+                    ( val, Just err, False )
+    in
+    div [ Attr.class "box mb-5" ]
+        [ h2 [ Attr.class "subtitle" ] [ text "Bulk Import" ]
+        , p [ Attr.class "help mb-3" ]
+            [ text "One team per line. Format: "
+            , code [] [ text "{number} {name}, {school_name}" ]
+            , br [] []
+            , text "Teams are added to the selected tournament filter."
+            ]
+        , div [ Attr.class "field" ]
+            [ div [ Attr.class "control" ]
+                [ textarea
+                    [ Attr.class "textarea"
+                    , Attr.rows 6
+                    , Attr.placeholder "101 Lions A, Lincoln High\n102 Lions B, Lincoln High\n201 Eagles, Kennedy Middle"
+                    , Attr.value bulkText
+                    , Events.onInput BulkTextChanged
+                    ]
+                    []
+                ]
+            ]
+        , case bulkError of
+            Just err ->
+                div [ Attr.class "notification is-danger is-light" ] [ text err ]
+
+            Nothing ->
+                text ""
+        , div [ Attr.class "field" ]
+            [ button
+                [ Attr.class
+                    (if saving then
+                        "button is-info is-loading"
+
+                     else
+                        "button is-info"
+                    )
+                , Events.onClick BulkImport
+                , Attr.disabled (String.trim bulkText == "" || filterTournament == "")
+                ]
+                [ text "Import" ]
+            ]
+        ]
+
+
+viewTable : List Team -> List Tournament -> List School -> Maybe String -> String -> Html Msg
+viewTable teams tournaments schools deleting filterTournament =
     let
         filtered =
-            if model.filterTournament == "" then
-                model.teams
+            if filterTournament == "" then
+                teams
 
             else
-                List.filter (\t -> t.tournament == model.filterTournament) model.teams
+                List.filter (\t -> t.tournament == filterTournament) teams
 
         findName items id =
             List.filter (\item -> item.id == id) items
@@ -572,30 +682,38 @@ viewTable model =
             , tbody []
                 (List.map
                     (\t ->
-                        tr []
-                            [ td [] [ text (String.fromInt t.teamNumber) ]
-                            , td [] [ text t.name ]
-                            , td [] [ text (findName (List.map (\s -> { id = s.id, name = s.name }) model.schools) t.school) ]
-                            , td [] [ text (findName (List.map (\tn -> { id = tn.id, name = tn.name }) model.tournaments) t.tournament) ]
-                            , td []
-                                [ div [ Attr.class "buttons are-small" ]
-                                    [ button [ Attr.class "button is-info is-outlined", Events.onClick (EditTeam t) ]
-                                        [ text "Edit" ]
-                                    , button
-                                        [ Attr.class
-                                            (if model.deleting == Just t.id then
-                                                "button is-danger is-outlined is-loading"
-
-                                             else
-                                                "button is-danger is-outlined"
-                                            )
-                                        , Events.onClick (DeleteTeam t.id)
-                                        ]
-                                        [ text "Delete" ]
-                                    ]
-                                ]
-                            ]
+                        viewRow deleting
+                            (findName (List.map (\s -> { id = s.id, name = s.name }) schools))
+                            (findName (List.map (\tn -> { id = tn.id, name = tn.name }) tournaments))
+                            t
                     )
                     filtered
                 )
             ]
+
+
+viewRow : Maybe String -> (String -> String) -> (String -> String) -> Team -> Html Msg
+viewRow deleting schoolName tournamentName t =
+    tr []
+        [ td [] [ text (String.fromInt t.teamNumber) ]
+        , td [] [ text t.name ]
+        , td [] [ text (schoolName t.school) ]
+        , td [] [ text (tournamentName t.tournament) ]
+        , td []
+            [ div [ Attr.class "buttons are-small" ]
+                [ button [ Attr.class "button is-info is-outlined", Events.onClick (EditTeam t) ]
+                    [ text "Edit" ]
+                , button
+                    [ Attr.class
+                        (if deleting == Just t.id then
+                            "button is-danger is-outlined is-loading"
+
+                         else
+                            "button is-danger is-outlined"
+                        )
+                    , Events.onClick (DeleteTeam t.id)
+                    ]
+                    [ text "Delete" ]
+                ]
+            ]
+        ]

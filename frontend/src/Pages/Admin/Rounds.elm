@@ -9,6 +9,7 @@ import Html.Events as Events
 import Http
 import Layouts
 import Page exposing (Page)
+import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Route.Path
 import Shared
@@ -27,21 +28,36 @@ page user shared route =
 
 
 
+-- TYPES
+
+
+type FormContext
+    = Creating
+    | Editing String
+
+
+type alias RoundForm =
+    { number : String
+    , date : String
+    , roundType : String
+    , tournament : String
+    }
+
+
+type FormState
+    = FormHidden
+    | FormOpen FormContext RoundForm (Maybe String)
+    | FormSaving FormContext RoundForm
+
+
+
 -- MODEL
 
 
 type alias Model =
-    { rounds : List Round
+    { rounds : RemoteData (List Round)
     , tournaments : List Tournament
-    , loading : Bool
-    , error : Maybe String
-    , showForm : Bool
-    , formNumber : String
-    , formDate : String
-    , formType : String
-    , formTournament : String
-    , formSaving : Bool
-    , editingId : Maybe String
+    , form : FormState
     , deleting : Maybe String
     , filterTournament : String
     }
@@ -49,17 +65,9 @@ type alias Model =
 
 init : Auth.User -> () -> ( Model, Effect Msg )
 init user _ =
-    ( { rounds = []
+    ( { rounds = Loading
       , tournaments = []
-      , loading = True
-      , error = Nothing
-      , showForm = False
-      , formNumber = ""
-      , formDate = ""
-      , formType = "preliminary"
-      , formTournament = ""
-      , formSaving = False
-      , editingId = Nothing
+      , form = FormHidden
       , deleting = Nothing
       , filterTournament = ""
       }
@@ -97,10 +105,10 @@ update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
 update user msg model =
     case msg of
         GotRounds (Ok response) ->
-            ( { model | rounds = response.items, loading = False }, Effect.none )
+            ( { model | rounds = Succeeded response.items }, Effect.none )
 
         GotRounds (Err _) ->
-            ( { model | loading = False, error = Just "Failed to load rounds." }, Effect.none )
+            ( { model | rounds = Failed "Failed to load rounds." }, Effect.none )
 
         GotTournaments (Ok response) ->
             ( { model | tournaments = response.items }, Effect.none )
@@ -113,68 +121,77 @@ update user msg model =
 
         ShowCreateForm ->
             ( { model
-                | showForm = True
-                , editingId = Nothing
-                , formNumber = ""
-                , formDate = ""
-                , formType = "preliminary"
-                , formTournament = model.filterTournament
+                | form =
+                    FormOpen Creating
+                        { number = ""
+                        , date = ""
+                        , roundType = "preliminary"
+                        , tournament = model.filterTournament
+                        }
+                        Nothing
               }
             , Effect.none
             )
 
         EditRound r ->
             ( { model
-                | showForm = True
-                , editingId = Just r.id
-                , formNumber = String.fromInt r.number
-                , formDate = r.date
-                , formType = r.roundType
-                , formTournament = r.tournament
+                | form =
+                    FormOpen (Editing r.id)
+                        { number = String.fromInt r.number
+                        , date = r.date
+                        , roundType = r.roundType
+                        , tournament = r.tournament
+                        }
+                        Nothing
               }
             , Effect.none
             )
 
         CancelForm ->
-            ( { model | showForm = False, editingId = Nothing }, Effect.none )
+            ( { model | form = FormHidden }, Effect.none )
 
         FormNumberChanged val ->
-            ( { model | formNumber = val }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | number = val }) model.form }, Effect.none )
 
         FormDateChanged val ->
-            ( { model | formDate = val }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | date = val }) model.form }, Effect.none )
 
         FormTypeChanged val ->
-            ( { model | formType = val }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | roundType = val }) model.form }, Effect.none )
 
         FormTournamentChanged val ->
-            ( { model | formTournament = val }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | tournament = val }) model.form }, Effect.none )
 
         SaveRound ->
-            let
-                data =
-                    { number = String.toInt model.formNumber |> Maybe.withDefault 0
-                    , date = model.formDate
-                    , roundType = model.formType
-                    , published = False
-                    , tournament = model.formTournament
-                    }
+            case model.form of
+                FormOpen context formData _ ->
+                    let
+                        data =
+                            { number = String.toInt formData.number |> Maybe.withDefault 0
+                            , date = formData.date
+                            , roundType = formData.roundType
+                            , published = False
+                            , tournament = formData.tournament
+                            }
 
-                cmd =
-                    case model.editingId of
-                        Just id ->
-                            Api.updateRound user.token id data GotSaveResponse
+                        cmd =
+                            case context of
+                                Editing id ->
+                                    Api.updateRound user.token id data GotSaveResponse
 
-                        Nothing ->
-                            Api.createRound user.token data GotSaveResponse
-            in
-            ( { model | formSaving = True }, Effect.sendCmd cmd )
+                                Creating ->
+                                    Api.createRound user.token data GotSaveResponse
+                    in
+                    ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
+
+                _ ->
+                    ( model, Effect.none )
 
         GotSaveResponse (Ok round) ->
             let
-                updatedList =
-                    case model.editingId of
-                        Just _ ->
+                updateRounds context rounds =
+                    case context of
+                        Editing _ ->
                             List.map
                                 (\r ->
                                     if r.id == round.id then
@@ -183,15 +200,30 @@ update user msg model =
                                     else
                                         r
                                 )
-                                model.rounds
+                                rounds
 
-                        Nothing ->
-                            model.rounds ++ [ round ]
+                        Creating ->
+                            rounds ++ [ round ]
             in
-            ( { model | rounds = updatedList, showForm = False, editingId = Nothing, formSaving = False }, Effect.none )
+            case model.form of
+                FormSaving context _ ->
+                    ( { model
+                        | rounds = RemoteData.map (updateRounds context) model.rounds
+                        , form = FormHidden
+                      }
+                    , Effect.none
+                    )
+
+                _ ->
+                    ( model, Effect.none )
 
         GotSaveResponse (Err _) ->
-            ( { model | formSaving = False, error = Just "Failed to save round." }, Effect.none )
+            case model.form of
+                FormSaving context formData ->
+                    ( { model | form = FormOpen context formData (Just "Failed to save round.") }, Effect.none )
+
+                _ ->
+                    ( model, Effect.none )
 
         TogglePublished round ->
             let
@@ -208,13 +240,15 @@ update user msg model =
         GotToggleResponse (Ok round) ->
             ( { model
                 | rounds =
-                    List.map
-                        (\r ->
-                            if r.id == round.id then
-                                round
+                    RemoteData.map
+                        (List.map
+                            (\r ->
+                                if r.id == round.id then
+                                    round
 
-                            else
-                                r
+                                else
+                                    r
+                            )
                         )
                         model.rounds
               }
@@ -222,7 +256,7 @@ update user msg model =
             )
 
         GotToggleResponse (Err _) ->
-            ( { model | error = Just "Failed to update published status." }, Effect.none )
+            ( model, Effect.none )
 
         DeleteRound id ->
             ( { model | deleting = Just id }
@@ -230,10 +264,29 @@ update user msg model =
             )
 
         GotDeleteResponse id (Ok _) ->
-            ( { model | rounds = List.filter (\r -> r.id /= id) model.rounds, deleting = Nothing }, Effect.none )
+            ( { model
+                | rounds = RemoteData.map (List.filter (\r -> r.id /= id)) model.rounds
+                , deleting = Nothing
+              }
+            , Effect.none
+            )
 
         GotDeleteResponse _ (Err _) ->
-            ( { model | deleting = Nothing, error = Just "Failed to delete round." }, Effect.none )
+            ( { model | deleting = Nothing }, Effect.none )
+
+
+
+-- HELPERS
+
+
+updateFormField : (RoundForm -> RoundForm) -> FormState -> FormState
+updateFormField transform state =
+    case state of
+        FormOpen context formData error ->
+            FormOpen context (transform formData) error
+
+        _ ->
+            state
 
 
 
@@ -278,44 +331,60 @@ view model =
                     ]
                 ]
             ]
-        , viewError model.error
-        , if model.showForm then
-            viewForm model
-
-          else
-            text ""
-        , if model.loading then
-            div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
-
-          else
-            viewTable model
+        , viewForm model.form model.tournaments
+        , viewRounds model.rounds model.tournaments model.deleting model.filterTournament
         ]
     }
 
 
-viewError : Maybe String -> Html Msg
-viewError maybeError =
-    case maybeError of
-        Just err ->
-            div [ Attr.class "notification is-danger" ] [ text err ]
-
-        Nothing ->
+viewRounds : RemoteData (List Round) -> List Tournament -> Maybe String -> String -> Html Msg
+viewRounds rounds tournaments deleting filterTournament =
+    case rounds of
+        NotAsked ->
             text ""
 
+        Loading ->
+            div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
 
-viewForm : Model -> Html Msg
-viewForm model =
+        Failed err ->
+            div [ Attr.class "notification is-danger" ] [ text err ]
+
+        Succeeded list ->
+            viewTable list tournaments deleting filterTournament
+
+
+viewForm : FormState -> List Tournament -> Html Msg
+viewForm state tournaments =
+    case state of
+        FormHidden ->
+            text ""
+
+        FormOpen context formData error ->
+            viewFormBox context formData error False tournaments
+
+        FormSaving context formData ->
+            viewFormBox context formData Nothing True tournaments
+
+
+viewFormBox : FormContext -> RoundForm -> Maybe String -> Bool -> List Tournament -> Html Msg
+viewFormBox context formData error saving tournaments =
     div [ Attr.class "box mb-5" ]
         [ h2 [ Attr.class "subtitle" ]
             [ text
-                (case model.editingId of
-                    Just _ ->
+                (case context of
+                    Editing _ ->
                         "Edit Round"
 
-                    Nothing ->
+                    Creating ->
                         "New Round"
                 )
             ]
+        , case error of
+            Just err ->
+                div [ Attr.class "notification is-danger is-light" ] [ text err ]
+
+            Nothing ->
+                text ""
         , Html.form [ Events.onSubmit SaveRound ]
             [ div [ Attr.class "columns" ]
                 [ div [ Attr.class "column" ]
@@ -327,10 +396,10 @@ viewForm model =
                                     (option [ Attr.value "" ] [ text "Select tournament..." ]
                                         :: List.map
                                             (\t ->
-                                                option [ Attr.value t.id, Attr.selected (model.formTournament == t.id) ]
+                                                option [ Attr.value t.id, Attr.selected (formData.tournament == t.id) ]
                                                     [ text (t.name ++ " (" ++ String.fromInt t.year ++ ")") ]
                                             )
-                                            model.tournaments
+                                            tournaments
                                     )
                                 ]
                             ]
@@ -343,7 +412,7 @@ viewForm model =
                             [ input
                                 [ Attr.class "input"
                                 , Attr.type_ "number"
-                                , Attr.value model.formNumber
+                                , Attr.value formData.number
                                 , Events.onInput FormNumberChanged
                                 ]
                                 []
@@ -356,8 +425,8 @@ viewForm model =
                         , div [ Attr.class "control" ]
                             [ div [ Attr.class "select is-fullwidth" ]
                                 [ select [ Events.onInput FormTypeChanged ]
-                                    [ option [ Attr.value "preliminary", Attr.selected (model.formType == "preliminary") ] [ text "Preliminary" ]
-                                    , option [ Attr.value "elimination", Attr.selected (model.formType == "elimination") ] [ text "Elimination" ]
+                                    [ option [ Attr.value "preliminary", Attr.selected (formData.roundType == "preliminary") ] [ text "Preliminary" ]
+                                    , option [ Attr.value "elimination", Attr.selected (formData.roundType == "elimination") ] [ text "Elimination" ]
                                     ]
                                 ]
                             ]
@@ -369,7 +438,7 @@ viewForm model =
                         , div [ Attr.class "control" ]
                             [ input
                                 [ Attr.class "input"
-                                , Attr.value model.formDate
+                                , Attr.value formData.date
                                 , Attr.placeholder "e.g. Feb 15, 2025"
                                 , Events.onInput FormDateChanged
                                 ]
@@ -382,7 +451,7 @@ viewForm model =
                 [ div [ Attr.class "control" ]
                     [ button
                         [ Attr.class
-                            (if model.formSaving then
+                            (if saving then
                                 "button is-primary is-loading"
 
                              else
@@ -401,21 +470,21 @@ viewForm model =
         ]
 
 
-viewTable : Model -> Html Msg
-viewTable model =
+viewTable : List Round -> List Tournament -> Maybe String -> String -> Html Msg
+viewTable rounds tournaments deleting filterTournament =
     let
         filtered =
-            if model.filterTournament == "" then
-                model.rounds
+            if filterTournament == "" then
+                rounds
 
             else
-                List.filter (\r -> r.tournament == model.filterTournament) model.rounds
+                List.filter (\r -> r.tournament == filterTournament) rounds
 
         sorted =
             List.sortBy .number filtered
 
         findTournamentName id =
-            List.filter (\t -> t.id == id) model.tournaments
+            List.filter (\t -> t.id == id) tournaments
                 |> List.head
                 |> Maybe.map .name
                 |> Maybe.withDefault id
@@ -436,61 +505,60 @@ viewTable model =
                     , th [] [ text "Actions" ]
                     ]
                 ]
-            , tbody []
-                (List.map
-                    (\r ->
-                        tr []
-                            [ td [] [ text (String.fromInt r.number) ]
-                            , td [] [ text (capitalize r.roundType) ]
-                            , td [] [ text r.date ]
-                            , td [] [ text (findTournamentName r.tournament) ]
-                            , td []
-                                [ button
-                                    [ Attr.class
-                                        (if r.published then
-                                            "button is-small is-success"
-
-                                         else
-                                            "button is-small is-light"
-                                        )
-                                    , Events.onClick (TogglePublished r)
-                                    ]
-                                    [ text
-                                        (if r.published then
-                                            "Published"
-
-                                         else
-                                            "Draft"
-                                        )
-                                    ]
-                                ]
-                            , td []
-                                [ div [ Attr.class "buttons are-small" ]
-                                    [ a
-                                        [ Attr.class "button is-link is-outlined"
-                                        , Attr.href ("/admin/pairings?round=" ++ r.id)
-                                        ]
-                                        [ text "Pairings" ]
-                                    , button [ Attr.class "button is-info is-outlined", Events.onClick (EditRound r) ]
-                                        [ text "Edit" ]
-                                    , button
-                                        [ Attr.class
-                                            (if model.deleting == Just r.id then
-                                                "button is-danger is-outlined is-loading"
-
-                                             else
-                                                "button is-danger is-outlined"
-                                            )
-                                        , Events.onClick (DeleteRound r.id)
-                                        ]
-                                        [ text "Delete" ]
-                                    ]
-                                ]
-                            ]
-                    )
-                    sorted
-                )
+            , tbody [] (List.map (viewRow deleting findTournamentName) sorted)
             ]
+
+
+viewRow : Maybe String -> (String -> String) -> Round -> Html Msg
+viewRow deleting findTournamentName r =
+    tr []
+        [ td [] [ text (String.fromInt r.number) ]
+        , td [] [ text (capitalize r.roundType) ]
+        , td [] [ text r.date ]
+        , td [] [ text (findTournamentName r.tournament) ]
+        , td []
+            [ button
+                [ Attr.class
+                    (if r.published then
+                        "button is-small is-success"
+
+                     else
+                        "button is-small is-light"
+                    )
+                , Events.onClick (TogglePublished r)
+                ]
+                [ text
+                    (if r.published then
+                        "Published"
+
+                     else
+                        "Draft"
+                    )
+                ]
+            ]
+        , td []
+            [ div [ Attr.class "buttons are-small" ]
+                [ a
+                    [ Attr.class "button is-link is-outlined"
+                    , Attr.href ("/admin/pairings?round=" ++ r.id)
+                    ]
+                    [ text "Pairings" ]
+                , button [ Attr.class "button is-info is-outlined", Events.onClick (EditRound r) ]
+                    [ text "Edit" ]
+                , button
+                    [ Attr.class
+                        (if deleting == Just r.id then
+                            "button is-danger is-outlined is-loading"
+
+                         else
+                            "button is-danger is-outlined"
+                        )
+                    , Events.onClick (DeleteRound r.id)
+                    ]
+                    [ text "Delete" ]
+                ]
+            ]
+        ]
 
 
 capitalize : String -> String

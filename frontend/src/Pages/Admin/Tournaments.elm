@@ -9,6 +9,7 @@ import Html.Events as Events
 import Http
 import Layouts
 import Page exposing (Page)
+import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Route.Path
 import Shared
@@ -27,38 +28,44 @@ page user shared route =
 
 
 
+-- TYPES
+
+
+type FormContext
+    = Creating
+    | Editing String
+
+
+type alias TournamentForm =
+    { name : String
+    , year : String
+    , prelimRounds : String
+    , elimRounds : String
+    , status : String
+    }
+
+
+type FormState
+    = FormHidden
+    | FormOpen FormContext TournamentForm (Maybe String)
+    | FormSaving FormContext TournamentForm
+
+
+
 -- MODEL
 
 
 type alias Model =
-    { tournaments : List Tournament
-    , loading : Bool
-    , error : Maybe String
-    , showForm : Bool
-    , formName : String
-    , formYear : String
-    , formPrelimRounds : String
-    , formElimRounds : String
-    , formStatus : String
-    , formSaving : Bool
-    , editingId : Maybe String
+    { tournaments : RemoteData (List Tournament)
+    , form : FormState
     , deleting : Maybe String
     }
 
 
 init : Auth.User -> () -> ( Model, Effect Msg )
 init user _ =
-    ( { tournaments = []
-      , loading = True
-      , error = Nothing
-      , showForm = False
-      , formName = ""
-      , formYear = ""
-      , formPrelimRounds = "4"
-      , formElimRounds = "3"
-      , formStatus = "draft"
-      , formSaving = False
-      , editingId = Nothing
+    ( { tournaments = Loading
+      , form = FormHidden
       , deleting = Nothing
       }
     , Effect.sendCmd (Api.listTournaments user.token GotTournaments)
@@ -89,88 +96,89 @@ update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
 update user msg model =
     case msg of
         GotTournaments (Ok response) ->
-            ( { model | tournaments = response.items, loading = False }
-            , Effect.none
-            )
+            ( { model | tournaments = Succeeded response.items }, Effect.none )
 
         GotTournaments (Err _) ->
-            ( { model | loading = False, error = Just "Failed to load tournaments." }
-            , Effect.none
-            )
+            ( { model | tournaments = Failed "Failed to load tournaments." }, Effect.none )
 
         ShowCreateForm ->
             ( { model
-                | showForm = True
-                , editingId = Nothing
-                , formName = ""
-                , formYear = ""
-                , formPrelimRounds = "4"
-                , formElimRounds = "3"
-                , formStatus = "draft"
+                | form =
+                    FormOpen Creating
+                        { name = ""
+                        , year = ""
+                        , prelimRounds = "4"
+                        , elimRounds = "3"
+                        , status = "draft"
+                        }
+                        Nothing
               }
             , Effect.none
             )
 
         EditTournament t ->
             ( { model
-                | showForm = True
-                , editingId = Just t.id
-                , formName = t.name
-                , formYear = String.fromInt t.year
-                , formPrelimRounds = String.fromInt t.numPreliminaryRounds
-                , formElimRounds = String.fromInt t.numEliminationRounds
-                , formStatus = t.status
+                | form =
+                    FormOpen (Editing t.id)
+                        { name = t.name
+                        , year = String.fromInt t.year
+                        , prelimRounds = String.fromInt t.numPreliminaryRounds
+                        , elimRounds = String.fromInt t.numEliminationRounds
+                        , status = t.status
+                        }
+                        Nothing
               }
             , Effect.none
             )
 
         CancelForm ->
-            ( { model | showForm = False, editingId = Nothing }
-            , Effect.none
-            )
+            ( { model | form = FormHidden }, Effect.none )
 
         FormNameChanged val ->
-            ( { model | formName = val }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | name = val }) model.form }, Effect.none )
 
         FormYearChanged val ->
-            ( { model | formYear = val }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | year = val }) model.form }, Effect.none )
 
         FormPrelimRoundsChanged val ->
-            ( { model | formPrelimRounds = val }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | prelimRounds = val }) model.form }, Effect.none )
 
         FormElimRoundsChanged val ->
-            ( { model | formElimRounds = val }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | elimRounds = val }) model.form }, Effect.none )
 
         FormStatusChanged val ->
-            ( { model | formStatus = val }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | status = val }) model.form }, Effect.none )
 
         SaveTournament ->
-            let
-                data =
-                    { name = model.formName
-                    , year = String.toInt model.formYear |> Maybe.withDefault 0
-                    , numPreliminaryRounds = String.toInt model.formPrelimRounds |> Maybe.withDefault 4
-                    , numEliminationRounds = String.toInt model.formElimRounds |> Maybe.withDefault 3
-                    , status = model.formStatus
-                    }
+            case model.form of
+                FormOpen context formData _ ->
+                    let
+                        data =
+                            { name = formData.name
+                            , year = String.toInt formData.year |> Maybe.withDefault 0
+                            , numPreliminaryRounds = String.toInt formData.prelimRounds |> Maybe.withDefault 4
+                            , numEliminationRounds = String.toInt formData.elimRounds |> Maybe.withDefault 3
+                            , status = formData.status
+                            }
 
-                cmd =
-                    case model.editingId of
-                        Just id ->
-                            Api.updateTournament user.token id data GotSaveResponse
+                        cmd =
+                            case context of
+                                Editing id ->
+                                    Api.updateTournament user.token id data GotSaveResponse
 
-                        Nothing ->
-                            Api.createTournament user.token data GotSaveResponse
-            in
-            ( { model | formSaving = True }
-            , Effect.sendCmd cmd
-            )
+                                Creating ->
+                                    Api.createTournament user.token data GotSaveResponse
+                    in
+                    ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
+
+                _ ->
+                    ( model, Effect.none )
 
         GotSaveResponse (Ok tournament) ->
             let
-                updatedList =
-                    case model.editingId of
-                        Just _ ->
+                updateTournaments context tournaments =
+                    case context of
+                        Editing _ ->
                             List.map
                                 (\t ->
                                     if t.id == tournament.id then
@@ -179,24 +187,30 @@ update user msg model =
                                     else
                                         t
                                 )
-                                model.tournaments
+                                tournaments
 
-                        Nothing ->
-                            model.tournaments ++ [ tournament ]
+                        Creating ->
+                            tournaments ++ [ tournament ]
             in
-            ( { model
-                | tournaments = updatedList
-                , showForm = False
-                , editingId = Nothing
-                , formSaving = False
-              }
-            , Effect.none
-            )
+            case model.form of
+                FormSaving context _ ->
+                    ( { model
+                        | tournaments = RemoteData.map (updateTournaments context) model.tournaments
+                        , form = FormHidden
+                      }
+                    , Effect.none
+                    )
+
+                _ ->
+                    ( model, Effect.none )
 
         GotSaveResponse (Err _) ->
-            ( { model | formSaving = False, error = Just "Failed to save tournament." }
-            , Effect.none
-            )
+            case model.form of
+                FormSaving context formData ->
+                    ( { model | form = FormOpen context formData (Just "Failed to save tournament.") }, Effect.none )
+
+                _ ->
+                    ( model, Effect.none )
 
         DeleteTournament id ->
             ( { model | deleting = Just id }
@@ -205,16 +219,28 @@ update user msg model =
 
         GotDeleteResponse id (Ok _) ->
             ( { model
-                | tournaments = List.filter (\t -> t.id /= id) model.tournaments
+                | tournaments = RemoteData.map (List.filter (\t -> t.id /= id)) model.tournaments
                 , deleting = Nothing
               }
             , Effect.none
             )
 
         GotDeleteResponse _ (Err _) ->
-            ( { model | deleting = Nothing, error = Just "Failed to delete tournament." }
-            , Effect.none
-            )
+            ( { model | deleting = Nothing }, Effect.none )
+
+
+
+-- HELPERS
+
+
+updateFormField : (TournamentForm -> TournamentForm) -> FormState -> FormState
+updateFormField transform state =
+    case state of
+        FormOpen context formData error ->
+            FormOpen context (transform formData) error
+
+        _ ->
+            state
 
 
 
@@ -242,44 +268,60 @@ view model =
                     [ text "New Tournament" ]
                 ]
             ]
-        , viewError model.error
-        , if model.showForm then
-            viewForm model
-
-          else
-            text ""
-        , if model.loading then
-            div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
-
-          else
-            viewTable model
+        , viewForm model.form
+        , viewTournaments model.tournaments model.deleting
         ]
     }
 
 
-viewError : Maybe String -> Html Msg
-viewError maybeError =
-    case maybeError of
-        Just err ->
-            div [ Attr.class "notification is-danger" ] [ text err ]
-
-        Nothing ->
+viewTournaments : RemoteData (List Tournament) -> Maybe String -> Html Msg
+viewTournaments tournaments deleting =
+    case tournaments of
+        NotAsked ->
             text ""
 
+        Loading ->
+            div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
 
-viewForm : Model -> Html Msg
-viewForm model =
+        Failed err ->
+            div [ Attr.class "notification is-danger" ] [ text err ]
+
+        Succeeded list ->
+            viewTable list deleting
+
+
+viewForm : FormState -> Html Msg
+viewForm state =
+    case state of
+        FormHidden ->
+            text ""
+
+        FormOpen context formData error ->
+            viewFormBox context formData error False
+
+        FormSaving context formData ->
+            viewFormBox context formData Nothing True
+
+
+viewFormBox : FormContext -> TournamentForm -> Maybe String -> Bool -> Html Msg
+viewFormBox context formData error saving =
     div [ Attr.class "box mb-5" ]
         [ h2 [ Attr.class "subtitle" ]
             [ text
-                (case model.editingId of
-                    Just _ ->
+                (case context of
+                    Editing _ ->
                         "Edit Tournament"
 
-                    Nothing ->
+                    Creating ->
                         "New Tournament"
                 )
             ]
+        , case error of
+            Just err ->
+                div [ Attr.class "notification is-danger is-light" ] [ text err ]
+
+            Nothing ->
+                text ""
         , Html.form [ Events.onSubmit SaveTournament ]
             [ div [ Attr.class "columns" ]
                 [ div [ Attr.class "column" ]
@@ -288,7 +330,7 @@ viewForm model =
                         , div [ Attr.class "control" ]
                             [ input
                                 [ Attr.class "input"
-                                , Attr.value model.formName
+                                , Attr.value formData.name
                                 , Events.onInput FormNameChanged
                                 , Attr.required True
                                 ]
@@ -303,7 +345,7 @@ viewForm model =
                             [ input
                                 [ Attr.class "input"
                                 , Attr.type_ "number"
-                                , Attr.value model.formYear
+                                , Attr.value formData.year
                                 , Events.onInput FormYearChanged
                                 , Attr.required True
                                 ]
@@ -320,7 +362,7 @@ viewForm model =
                             [ input
                                 [ Attr.class "input"
                                 , Attr.type_ "number"
-                                , Attr.value model.formPrelimRounds
+                                , Attr.value formData.prelimRounds
                                 , Events.onInput FormPrelimRoundsChanged
                                 ]
                                 []
@@ -334,7 +376,7 @@ viewForm model =
                             [ input
                                 [ Attr.class "input"
                                 , Attr.type_ "number"
-                                , Attr.value model.formElimRounds
+                                , Attr.value formData.elimRounds
                                 , Events.onInput FormElimRoundsChanged
                                 ]
                                 []
@@ -347,10 +389,10 @@ viewForm model =
                         , div [ Attr.class "control" ]
                             [ div [ Attr.class "select is-fullwidth" ]
                                 [ select [ Events.onInput FormStatusChanged ]
-                                    [ option [ Attr.value "draft", Attr.selected (model.formStatus == "draft") ] [ text "Draft" ]
-                                    , option [ Attr.value "registration", Attr.selected (model.formStatus == "registration") ] [ text "Registration" ]
-                                    , option [ Attr.value "active", Attr.selected (model.formStatus == "active") ] [ text "Active" ]
-                                    , option [ Attr.value "completed", Attr.selected (model.formStatus == "completed") ] [ text "Completed" ]
+                                    [ option [ Attr.value "draft", Attr.selected (formData.status == "draft") ] [ text "Draft" ]
+                                    , option [ Attr.value "registration", Attr.selected (formData.status == "registration") ] [ text "Registration" ]
+                                    , option [ Attr.value "active", Attr.selected (formData.status == "active") ] [ text "Active" ]
+                                    , option [ Attr.value "completed", Attr.selected (formData.status == "completed") ] [ text "Completed" ]
                                     ]
                                 ]
                             ]
@@ -361,7 +403,7 @@ viewForm model =
                 [ div [ Attr.class "control" ]
                     [ button
                         [ Attr.class
-                            (if model.formSaving then
+                            (if saving then
                                 "button is-primary is-loading"
 
                              else
@@ -380,9 +422,9 @@ viewForm model =
         ]
 
 
-viewTable : Model -> Html Msg
-viewTable model =
-    if List.isEmpty model.tournaments then
+viewTable : List Tournament -> Maybe String -> Html Msg
+viewTable tournaments deleting =
+    if List.isEmpty tournaments then
         div [ Attr.class "has-text-centered has-text-grey" ]
             [ p [] [ text "No tournaments yet. Create one to get started." ] ]
 
@@ -397,12 +439,12 @@ viewTable model =
                     , th [] [ text "Actions" ]
                     ]
                 ]
-            , tbody [] (List.map (viewRow model) model.tournaments)
+            , tbody [] (List.map (viewRow deleting) tournaments)
             ]
 
 
-viewRow : Model -> Tournament -> Html Msg
-viewRow model t =
+viewRow : Maybe String -> Tournament -> Html Msg
+viewRow deleting t =
     tr []
         [ td [] [ text t.name ]
         , td [] [ text (String.fromInt t.year) ]
@@ -414,7 +456,7 @@ viewRow model t =
                     [ text "Edit" ]
                 , button
                     [ Attr.class
-                        (if model.deleting == Just t.id then
+                        (if deleting == Just t.id then
                             "button is-danger is-outlined is-loading"
 
                          else
