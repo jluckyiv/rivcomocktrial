@@ -89,7 +89,7 @@ competition begins.
 | District.elm   | District, District.Name         |
 | School.elm     | School, School.Name             |
 | Student.elm    | Student, Student.Name, Pronouns |
-| Coach.elm      | TeacherCoach, AttorneyCoach      |
+| Coach.elm      | TeacherCoachApplicant, TeacherCoach, AttorneyCoach |
 | Email.elm      | Email                           |
 | Team.elm       | Team, Team.Number               |
 | Side.elm       | Side (Prosecution \| Defense)   |
@@ -107,12 +107,16 @@ competition begins.
   unrepresentable
 - `Assignment a` (`NotAssigned | Assigned a`) replaces
   `Maybe` with domain language
+- Coach state promotion: `TeacherCoachApplicant` →
+  `TeacherCoach` via `verify`. Same fields, different
+  types — compiler prevents unverified coaches on
+  teams. `AttorneyCoach` has no verification step.
 
-**Tests:** 76 total.
+**Tests:** 76 total (Layer 1 original) + 2 Coach.
 
 ---
 
-## Layer 2: Competition Structure — IN PROGRESS
+## Layer 2: Competition Structure — DONE
 
 The tournament, its rounds, and what happens in each
 trial. Organizational entities meet competition rules.
@@ -195,10 +199,28 @@ filled. This is the domain saying "we're ready." A
 round can't start until every Pairing promotes to a
 Trial.
 
-### Roster.elm — NOT STARTED
+### Witness.elm — DONE
+
+Opaque type wrapping a string — the character name
+(e.g., "Jordan Riley"). Tournament-level data: admin
+defines 4 prosecution + 4 defense witnesses when
+creating the tournament.
+
+```elm
+type Witness = Witness String
+
+fromString : String -> Witness
+toString : Witness -> String
+```
+
+`toString` is a function, not a field accessor — the
+internal representation is hidden. `WitnessNumber` is
+not a domain concept — list position = number.
+
+### Roster.elm — DONE
 
 A roster assigns students to roles for a specific
-round and team. The most complex module in this layer.
+round and team.
 
 ```elm
 type RoleAssignment
@@ -230,73 +252,42 @@ reference the witness directly, not by number.
 - Students must be on the team's eligible list.
 
 **Validation:** correct count per role, no duplicate
-students.
+students. Deferred — depends on exact count rules.
 
 ### Summary
 
-| Module         | Status      | Key Pattern              |
-| -------------- | ----------- | ------------------------ |
-| Tournament.elm | Done        | Status as sum type       |
-| Round.elm      | Done        | Variants over Int        |
-| Courtroom.elm  | Done        | Opaque wrapper           |
-| Judge.elm      | Done        | Placeholder              |
-| Assignment.elm | Done        | Domain language          |
-| Pairing.elm    | Done        | Pre-resolved state       |
-| Trial.elm      | Done        | Fully-resolved state     |
-| Roster.elm     | Not started | Sum type per role        |
+| Module         | Status | Key Pattern              |
+| -------------- | ------ | ------------------------ |
+| Tournament.elm | Done   | Status as sum type       |
+| Round.elm      | Done   | Variants over Int        |
+| Courtroom.elm  | Done   | Opaque wrapper           |
+| Judge.elm      | Done   | Placeholder              |
+| Assignment.elm | Done   | Domain language          |
+| Pairing.elm    | Done   | Pre-resolved state       |
+| Trial.elm      | Done   | Fully-resolved state     |
+| Witness.elm    | Done   | Opaque wrapper           |
+| Roster.elm     | Done   | Sum type per role        |
 
-**Tests:** 103 total (76 Layer 1 + 27 Layer 2).
+**Tests:** 113 total (78 Layer 1 + 35 Layer 2).
 
 ---
 
-## Layer 3: Scoring
+## Layer 3: Scoring — DONE
 
 How individual presentations are evaluated. Scoring
 is per **presentation**, not per role — an attorney
 who does opening and closing gets two separate scores.
 
-### SubmittedBallot → VerifiedBallot
+### SubmittedBallot.elm — DONE
 
-**States are types, not fields.** A submitted ballot
-and a verified ballot are different types because they
-carry different data and participate in different
-workflows.
+Immutable scorer input. Contains scored presentations.
+Metadata (scorer, submittedAt) deferred until auth/
+time APIs are available.
 
 ```elm
--- What the scorer enters. Immutable after submission.
 type alias SubmittedBallot =
-    { scorer : ScorerInfo
-    , presentations : List ScoredPresentation
-    , ranks : Ranks
-    , submittedAt : Time.Posix
-    }
+    { presentations : List ScoredPresentation }
 
--- Admin-reviewed. Links to original for audit trail.
-type alias VerifiedBallot =
-    { original : SubmittedBallot
-    , presentations : List ScoredPresentation
-    , ranks : Ranks
-    , verifiedBy : AdminId
-    , verifiedAt : Time.Posix
-    }
-```
-
-**Why two types instead of a status field:**
-- `SubmittedBallot` is immutable — never overwritten.
-  The raw data as entered is always preserved.
-- `VerifiedBallot` may have corrections. It links to
-  the original for audit trail.
-- Functions that compute results accept only
-  `VerifiedBallot`. It's a compile error to compute
-  standings from unverified data.
-- A round can't close until all ballots are verified —
-  enforced by requiring `List VerifiedBallot`.
-
-Motivated by real 2026 data issues: R1 Dept 2G score
-entry errors ("10" captured as "1"), R2 Dept 52
-duplicate submission.
-
-```elm
 type ScoredPresentation
     = Pretrial Side Student Points
     | Opening Side Student Points
@@ -306,13 +297,43 @@ type ScoredPresentation
     | WitnessExamination Side Student Points
     | ClerkPerformance Student Points
     | BailiffPerformance Student Points
-
-type Weight = Single | Double
 ```
 
-**Weighting:** Pretrial x2, Closing x2, all others x1.
+**Points:** Opaque type, 1–10 via smart constructor.
+**Weight:** Pretrial x2, Closing x2, all others x1.
+Derived from variant, not stored.
+**Side:** Clerk→Prosecution, Bailiff→Defense. Derived
+via `side` function — a scoring rule, not a property.
 
-### PresiderBallot
+### VerifiedBallot.elm — DONE
+
+Admin-reviewed. Links to original for audit trail.
+
+```elm
+type alias VerifiedBallot =
+    { original : SubmittedBallot
+    , presentations : List ScoredPresentation
+    }
+
+verify : SubmittedBallot -> VerifiedBallot
+verifyWithCorrections :
+    SubmittedBallot
+    -> List ScoredPresentation
+    -> VerifiedBallot
+```
+
+**Why two types instead of a status field:**
+- `SubmittedBallot` is immutable — never overwritten.
+- `VerifiedBallot` may have corrections. Original
+  preserved for audit trail.
+- Functions that compute results accept only
+  `VerifiedBallot`. Compile error to use unverified.
+- A round can't close until all ballots are verified.
+
+Motivated by real 2026 data issues: R1 Dept 2G score
+entry error ("10" → "1"), R2 Dept 52 duplicate.
+
+### PresiderBallot.elm — DONE
 
 Separate type — not a scored ballot. The presiding
 judge selects a side, used only on ties.
@@ -320,43 +341,65 @@ judge selects a side, used only on ties.
 ```elm
 type alias PresiderBallot =
     { winner : Side }
+
+for : Side -> PresiderBallot
+winner : PresiderBallot -> Side
 ```
 
-### Rank
+### Rank.elm — DONE
 
-Scorers rank participants by category. Separate from
-point scoring.
+Scorers rank participants by nomination category.
+Separate from point scoring — drives individual
+awards.
 
 ```elm
-type RankCategory
-    = AttorneyRanking      -- up to 5, minimum 3
-    | NonAttorneyRanking   -- up to 5, minimum 3
+type Rank = Rank Int  -- 1–5, smart constructor
+
+type NominationCategory
+    = Advocate       -- attorneys + pretrial
+    | NonAdvocate    -- witnesses + clerk + bailiff
+
+type alias Nomination =
+    { role : Role
+    , student : Student
+    , rank : Rank
+    }
+
+nominationCategory : Role -> NominationCategory
+rankPoints : Int -> Rank -> Int
+-- (count + 1) - rank: 1st of 5 = 5 pts
 ```
+
+**Discovery from 2026 ballot:** Two nomination pools
+(Advocate, NonAdvocate) derived from Role. Min/max
+nomination count parameterized (currently 3–5, likely
+to change). Our app uses dropdowns of eligible
+performers, not free-text names.
 
 **Playoff note:** Playoff ballots use attorney-only
 ranks. This may mean rank categories vary by phase,
 or playoffs use a different ballot type entirely.
-The types will tell us when we implement.
 
 ### Summary
 
-| Type              | Role                           |
-| ----------------- | ------------------------------ |
-| SubmittedBallot   | Immutable scorer input         |
-| VerifiedBallot    | Admin-reviewed, audit-linked   |
-| PresiderBallot    | Tiebreaker side selection      |
-| ScoredPresentation | One score for one performance |
-| Rank              | Participant ranking per ballot |
+| Module             | Status | Key Pattern              |
+| ------------------ | ------ | ------------------------ |
+| SubmittedBallot.elm | Done  | Immutable scorer input   |
+| VerifiedBallot.elm | Done   | State promotion + audit  |
+| PresiderBallot.elm | Done   | Tiebreaker side select   |
+| Rank.elm           | Done   | Smart constructor + nomination |
+
+**Tests:** 51 total Layer 3.
 
 ---
 
-## Layer 4: Results (Computed)
+## Layer 4: Results (Computed) — DONE
 
 Pure functions over Layer 3 data. No new persistent
 state — everything here is derived from verified
 ballots.
 
-### PrelimResult
+### PrelimResult.elm — DONE
 
 Prelim winner is determined by aggregate Court Totals
 across all scorers. Different type from ElimResult
@@ -369,9 +412,9 @@ type PrelimVerdict
     | DefenseWins       -- higher Court Total
     | CourtTotalTied    -- presider decides
 
+courtTotal : Side -> VerifiedBallot -> Int
 prelimVerdict :
     List VerifiedBallot -> PrelimVerdict
-
 prelimVerdictWithPresider :
     PresiderBallot
     -> List VerifiedBallot
@@ -380,22 +423,26 @@ prelimVerdictWithPresider :
 
 Only accepts `VerifiedBallot` — compile-time guarantee
 that unverified data can't produce results.
+`courtTotal` exposed as building block for Standings.
 
-### ElimResult
+### ElimResult.elm — DONE
 
 Elim winner is determined by scorecard majority —
 each scorer's ballot is independently a win, loss, or
 tie. (Rule 5.5L)
 
 ```elm
-type ElimVerdict
-    = ProsecutionAdvances   -- majority of scorecards
-    | DefenseAdvances       -- majority of scorecards
-    | ScorecardsTied        -- presider decides
+type ScorecardResult
+    = ProsecutionWon | DefenseWon | ScorecardTied
 
+type ElimVerdict
+    = ProsecutionAdvances
+    | DefenseAdvances
+    | ScorecardsTied
+
+scorecardResult : VerifiedBallot -> ScorecardResult
 elimVerdict :
     List VerifiedBallot -> ElimVerdict
-
 elimVerdictWithPresider :
     PresiderBallot
     -> List VerifiedBallot
@@ -409,16 +456,20 @@ functions have different signatures and semantics.
 Collapsing them into one type would require a phase
 parameter that the type system can enforce instead.
 
-### Standings
+`scorecardResult` reuses `PrelimResult.courtTotal` —
+same per-ballot logic, different aggregation.
+
+### Standings.elm — DONE
 
 Team rankings across rounds. Tiebreakers are modeled
 as types, not hardcoded.
 
 ```elm
 type Tiebreaker
-    = CumulativePercentage
-    | PointDifferential
-    | HeadToHead
+    = ByWins
+    | ByCumulativePercentage
+    | ByPointDifferential
+    | ByHeadToHead
     -- extensible as rules change
 
 type alias RankingStrategy =
@@ -427,9 +478,15 @@ type alias RankingStrategy =
 type alias TeamRecord =
     { wins : Int
     , losses : Int
-    , cumulativePointsFor : Int
-    , cumulativePointsAgainst : Int
+    , pointsFor : Int
+    , pointsAgainst : Int
     }
+
+cumulativePercentage : TeamRecord -> Float
+rank :
+    RankingStrategy
+    -> List ( team, TeamRecord )
+    -> List ( team, TeamRecord )
 ```
 
 **Ranking order** (current rules, 5.5E/5.5M):
@@ -438,21 +495,10 @@ type alias TeamRecord =
 
 Strength of schedule is NOT a factor. (Rule 5.5M)
 
-The `RankingStrategy` type makes tiebreaker priority
-explicit and configurable. Adding a new tiebreaker
-means adding a variant — the compiler forces you to
-handle it everywhere.
+`rank` is generic over team type. `ByHeadToHead` is
+a placeholder (returns EQ) — needs pairing history.
 
-```elm
-cumulativePercentage : TeamRecord -> Float
-
-rank :
-    RankingStrategy
-    -> List ( Team, TeamRecord )
-    -> List ( Team, TeamRecord )
-```
-
-### Awards
+### Awards.elm — DONE (types; scoring algorithm deferred)
 
 Individual awards from preliminary rounds only
 (R1–R4). Presented countywide after R4.
@@ -469,15 +515,20 @@ type alias AwardCriteria =
     List AwardTiebreaker
 
 type AwardTiebreaker
-    = ByRank          -- rank position across ballots
-    | ByRawScore      -- raw point totals
-    | ByMedianDelta   -- distance from ballot median
+    = ByRankPoints     -- rank points across ballots
+    | ByRawScore       -- raw point totals
+    | ByMedianDelta    -- distance from ballot median
     -- extensible as criteria are finalized
+
+nominationCategory :
+    AwardCategory -> NominationCategory
 ```
 
 Same pattern as team tiebreakers — criteria as types,
 strategy as an ordered list. The compiler enforces
-exhaustive handling.
+exhaustive handling. `nominationCategory` links award
+categories to the Advocate/NonAdvocate nomination
+pools from Rank.
 
 **Status:** Criteria in flux. What we know:
 - Based on ballot ranks (min/max configurable,
@@ -510,12 +561,14 @@ Rank). The combination logic belongs here in Layer 4.
 
 ### Summary
 
-| Type            | Accepts              | Computes           |
-| --------------- | -------------------- | ------------------ |
-| PrelimResult    | List VerifiedBallot  | Court Total winner |
-| ElimResult      | List VerifiedBallot  | Scorecard majority |
-| Standings       | List PrelimResult    | Team rankings      |
-| Awards          | List VerifiedBallot  | Individual awards  |
+| Module           | Status | Key Pattern              |
+| ---------------- | ------ | ------------------------ |
+| PrelimResult.elm | Done   | Court Total aggregate    |
+| ElimResult.elm   | Done   | Scorecard majority       |
+| Standings.elm    | Done   | Configurable tiebreakers |
+| Awards.elm       | Done   | Types; algorithm deferred |
+
+**Tests:** 35 total Layer 4.
 
 ---
 
@@ -567,7 +620,7 @@ TDD: write failing tests, implement types and
 functions, refactor. No persistence, no UI — pure
 domain logic.
 
-### Done (103 tests)
+### Done (199 tests)
 1. District, School, Student, Coach, Email, Team,
    Side, Role — Layer 1 organizational types
 2. Assignment — generic reusable type
@@ -576,31 +629,39 @@ domain logic.
 5. Courtroom — opaque Name wrapper
 6. Judge — placeholder
 7. Pairing, Trial — state promotion via fromPairing
-
-### Next
-8. Roster — RoleAssignment, AttorneyDuty, validation
-   (witness as list position, not number)
-9. SubmittedBallot — ScoredPresentation, weight,
-   totals, immutable scorer input
-10. VerifiedBallot — promotion from Submitted,
+8. Coach state promotion — TeacherCoachApplicant →
+   TeacherCoach via verify
+9. Witness — opaque type, tournament-level data
+10. Roster — RoleAssignment, AttorneyDuty, student
+    accessor
+11. SubmittedBallot — ScoredPresentation, Points
+    smart constructor, weight, side derivation
+12. VerifiedBallot — promotion from Submitted,
     audit trail, corrections
-11. PresiderBallot — tiebreaker side selection
-12. Rank — validation, category types
-13. PrelimResult — Court Total verdict from
-    List VerifiedBallot
-14. ElimResult — scorecard majority from
-    List VerifiedBallot
-15. Standings — TeamRecord, RankingStrategy,
-    configurable tiebreakers as types
-16. Awards — AwardCategory, AwardCriteria,
-    tiebreakers as types (when criteria finalized)
+13. PresiderBallot — tiebreaker side selection
+14. Rank — smart constructor, NominationCategory,
+    rankPoints, Nomination
+15. PrelimResult — courtTotal, prelimVerdict,
+    prelimVerdictWithPresider
+16. ElimResult — scorecardResult, elimVerdict,
+    elimVerdictWithPresider
+17. Standings — TeamRecord, cumulativePercentage,
+    configurable RankingStrategy
+18. Awards — AwardCategory, AwardTiebreaker,
+    nominationCategory linkage
 
-### After domain types are stable
-17. PocketBase collections — persistence mapping
-18. Admin UI — pages for each workflow step
-19. Coach UI — roster submission, score viewing
-20. Public UI — standings, bracket, results
-21. PowerMatch refactor — use domain types
+### Deferred implementation
+- Awards scoring algorithm — criteria in flux
+- Standings ByHeadToHead — needs pairing history
+- Roster validation — needs exact count rules
+- Ballot metadata (scorer, timestamps) — needs auth
+
+### Next (domain types stable)
+19. PocketBase collections — persistence mapping
+20. Admin UI — pages for each workflow step
+21. Coach UI — roster submission, score viewing
+22. Public UI — standings, bracket, results
+23. PowerMatch refactor — use domain types
 
 ---
 
@@ -628,14 +689,14 @@ Intentionally deferred:
 | -------------------- | -------------------------- |
 | Milestone 1 (done)   | Layer 1 (done)             |
 | Milestone 2 (done)   | PowerMatch (done)          |
-| Milestone 3 (roster) | Layer 2 (Roster)           |
-| Milestone 4 (ballot) | Layer 3 (all)              |
-| Milestone 5 (awards) | Layer 4 (all)              |
-| Milestone 6 (elim)   | ElimResult                 |
+| Milestone 3 (roster) | Layer 2 (done)             |
+| Milestone 4 (ballot) | Layer 3 (done)             |
+| Milestone 5 (awards) | Layer 4 (done — types)     |
+| Milestone 6 (elim)   | ElimResult (done)          |
 | Milestone 7 (public) | No new domain types        |
 | Milestone 8 (polish) | No new domain types        |
 
-Domain types are built before their corresponding
-persistence and UI milestones. Types first, then
-collections, then pages. The types teach us the
-domain — once they're right, the rest is plumbing.
+All domain types are complete. Next phase: persistence
+(PocketBase collections), then UI (admin pages, coach
+pages, public pages). The types teach us the domain —
+now that they're right, the rest is plumbing.
