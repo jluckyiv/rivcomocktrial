@@ -9,6 +9,7 @@ import Html.Events as Events
 import Http
 import Layouts
 import Page exposing (Page)
+import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Shared
 import View exposing (View)
@@ -26,39 +27,49 @@ page user shared route =
 
 
 
+-- TYPES
+
+
+type FormContext
+    = Creating
+    | Editing String
+
+
+type alias CourtroomForm =
+    { name : String, location : String }
+
+
+type FormState
+    = FormHidden
+    | FormOpen FormContext CourtroomForm (Maybe String)
+    | FormSaving FormContext CourtroomForm
+
+
+type BulkState
+    = BulkIdle
+    | BulkEditing String
+    | BulkSaving String
+    | BulkFailed String String
+
+
+
 -- MODEL
 
 
 type alias Model =
-    { courtrooms : List Courtroom
-    , loading : Bool
-    , error : Maybe String
-    , showForm : Bool
-    , formName : String
-    , formLocation : String
-    , formSaving : Bool
-    , editingId : Maybe String
+    { courtrooms : RemoteData (List Courtroom)
+    , form : FormState
+    , bulk : BulkState
     , deleting : Maybe String
-    , bulkText : String
-    , bulkSaving : Bool
-    , bulkError : Maybe String
     }
 
 
 init : Auth.User -> () -> ( Model, Effect Msg )
 init user _ =
-    ( { courtrooms = []
-      , loading = True
-      , error = Nothing
-      , showForm = False
-      , formName = ""
-      , formLocation = ""
-      , formSaving = False
-      , editingId = Nothing
+    ( { courtrooms = Loading
+      , form = FormHidden
+      , bulk = BulkIdle
       , deleting = Nothing
-      , bulkText = ""
-      , bulkSaving = False
-      , bulkError = Nothing
       }
     , Effect.sendCmd (Api.listCourtrooms user.token GotCourtrooms)
     )
@@ -88,46 +99,51 @@ update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
 update user msg model =
     case msg of
         GotCourtrooms (Ok response) ->
-            ( { model | courtrooms = response.items, loading = False }, Effect.none )
+            ( { model | courtrooms = Succeeded response.items }, Effect.none )
 
         GotCourtrooms (Err _) ->
-            ( { model | loading = False, error = Just "Failed to load courtrooms." }, Effect.none )
+            ( { model | courtrooms = Failed "Failed to load courtrooms." }, Effect.none )
 
         ShowCreateForm ->
-            ( { model | showForm = True, editingId = Nothing, formName = "", formLocation = "" }, Effect.none )
+            ( { model | form = FormOpen Creating { name = "", location = "" } Nothing }, Effect.none )
 
         EditCourtroom c ->
-            ( { model | showForm = True, editingId = Just c.id, formName = c.name, formLocation = c.location }, Effect.none )
+            ( { model | form = FormOpen (Editing c.id) { name = c.name, location = c.location } Nothing }, Effect.none )
 
         CancelForm ->
-            ( { model | showForm = False, editingId = Nothing }, Effect.none )
+            ( { model | form = FormHidden }, Effect.none )
 
         FormNameChanged val ->
-            ( { model | formName = val }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | name = val }) model.form }, Effect.none )
 
         FormLocationChanged val ->
-            ( { model | formLocation = val }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | location = val }) model.form }, Effect.none )
 
         SaveCourtroom ->
-            let
-                data =
-                    { name = model.formName, location = model.formLocation }
+            case model.form of
+                FormOpen context formData _ ->
+                    let
+                        data =
+                            { name = formData.name, location = formData.location }
 
-                cmd =
-                    case model.editingId of
-                        Just id ->
-                            Api.updateCourtroom user.token id data GotSaveResponse
+                        cmd =
+                            case context of
+                                Editing id ->
+                                    Api.updateCourtroom user.token id data GotSaveResponse
 
-                        Nothing ->
-                            Api.createCourtroom user.token data GotSaveResponse
-            in
-            ( { model | formSaving = True }, Effect.sendCmd cmd )
+                                Creating ->
+                                    Api.createCourtroom user.token data GotSaveResponse
+                    in
+                    ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
+
+                _ ->
+                    ( model, Effect.none )
 
         GotSaveResponse (Ok courtroom) ->
             let
-                updatedList =
-                    case model.editingId of
-                        Just _ ->
+                updateCourtrooms context courtrooms =
+                    case context of
+                        Editing _ ->
                             List.map
                                 (\c ->
                                     if c.id == courtroom.id then
@@ -136,15 +152,30 @@ update user msg model =
                                     else
                                         c
                                 )
-                                model.courtrooms
+                                courtrooms
 
-                        Nothing ->
-                            model.courtrooms ++ [ courtroom ]
+                        Creating ->
+                            courtrooms ++ [ courtroom ]
             in
-            ( { model | courtrooms = updatedList, showForm = False, editingId = Nothing, formSaving = False }, Effect.none )
+            case model.form of
+                FormSaving context _ ->
+                    ( { model
+                        | courtrooms = RemoteData.map (updateCourtrooms context) model.courtrooms
+                        , form = FormHidden
+                      }
+                    , Effect.none
+                    )
+
+                _ ->
+                    ( model, Effect.none )
 
         GotSaveResponse (Err _) ->
-            ( { model | formSaving = False, error = Just "Failed to save courtroom." }, Effect.none )
+            case model.form of
+                FormSaving context formData ->
+                    ( { model | form = FormOpen context formData (Just "Failed to save courtroom.") }, Effect.none )
+
+                _ ->
+                    ( model, Effect.none )
 
         DeleteCourtroom id ->
             ( { model | deleting = Just id }
@@ -152,53 +183,92 @@ update user msg model =
             )
 
         GotDeleteResponse id (Ok _) ->
-            ( { model | courtrooms = List.filter (\c -> c.id /= id) model.courtrooms, deleting = Nothing }, Effect.none )
+            ( { model
+                | courtrooms = RemoteData.map (List.filter (\c -> c.id /= id)) model.courtrooms
+                , deleting = Nothing
+              }
+            , Effect.none
+            )
 
         GotDeleteResponse _ (Err _) ->
-            ( { model | deleting = Nothing, error = Just "Failed to delete courtroom." }, Effect.none )
+            ( { model | deleting = Nothing }, Effect.none )
 
         BulkTextChanged val ->
-            ( { model | bulkText = val, bulkError = Nothing }, Effect.none )
+            ( { model | bulk = BulkEditing val }, Effect.none )
 
         BulkImport ->
-            let
-                lines =
-                    String.lines model.bulkText
-                        |> List.map String.trim
-                        |> List.filter (\l -> l /= "")
-
-                parsed =
-                    List.filterMap parseBulkLine lines
-
-                errors =
-                    List.length lines - List.length parsed
-            in
-            if List.isEmpty parsed then
-                ( { model | bulkError = Just "No valid lines found. Format: Name, Location" }, Effect.none )
-
-            else if errors > 0 then
-                ( { model | bulkError = Just (String.fromInt errors ++ " line(s) could not be parsed. Format: Name, Location") }, Effect.none )
-
-            else
-                ( { model | bulkSaving = True, bulkError = Nothing }
-                , Effect.batch
-                    (List.map
-                        (\data -> Effect.sendCmd (Api.createCourtroom user.token data GotBulkResponse))
-                        parsed
-                    )
-                )
+            handleBulkImport user model
 
         GotBulkResponse (Ok courtroom) ->
             ( { model
-                | courtrooms = model.courtrooms ++ [ courtroom ]
-                , bulkSaving = False
-                , bulkText = ""
+                | courtrooms = RemoteData.map (\list -> list ++ [ courtroom ]) model.courtrooms
+                , bulk = BulkIdle
               }
             , Effect.none
             )
 
         GotBulkResponse (Err _) ->
-            ( { model | bulkSaving = False, bulkError = Just "Failed to create some courtrooms." }, Effect.none )
+            case model.bulk of
+                BulkSaving val ->
+                    ( { model | bulk = BulkFailed val "Failed to create some courtrooms." }, Effect.none )
+
+                _ ->
+                    ( { model | bulk = BulkFailed "" "Failed to create some courtrooms." }, Effect.none )
+
+
+
+-- HELPERS
+
+
+updateFormField : (CourtroomForm -> CourtroomForm) -> FormState -> FormState
+updateFormField transform state =
+    case state of
+        FormOpen context formData error ->
+            FormOpen context (transform formData) error
+
+        _ ->
+            state
+
+
+handleBulkImport : Auth.User -> Model -> ( Model, Effect Msg )
+handleBulkImport user model =
+    let
+        bulkText =
+            case model.bulk of
+                BulkEditing val ->
+                    val
+
+                BulkFailed val _ ->
+                    val
+
+                _ ->
+                    ""
+
+        lines =
+            String.lines bulkText
+                |> List.map String.trim
+                |> List.filter (\l -> l /= "")
+
+        parsed =
+            List.filterMap parseBulkLine lines
+
+        errors =
+            List.length lines - List.length parsed
+    in
+    if List.isEmpty parsed then
+        ( { model | bulk = BulkFailed bulkText "No valid lines found. Format: Name, Location" }, Effect.none )
+
+    else if errors > 0 then
+        ( { model | bulk = BulkFailed bulkText (String.fromInt errors ++ " line(s) could not be parsed. Format: Name, Location") }, Effect.none )
+
+    else
+        ( { model | bulk = BulkSaving bulkText }
+        , Effect.batch
+            (List.map
+                (\data -> Effect.sendCmd (Api.createCourtroom user.token data GotBulkResponse))
+                parsed
+            )
+        )
 
 
 
@@ -251,89 +321,61 @@ view model =
                     [ text "New Courtroom" ]
                 ]
             ]
-        , viewError model.error
-        , if model.showForm then
-            viewForm model
-
-          else
-            text ""
-        , viewBulkInput model
-        , if model.loading then
-            div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
-
-          else
-            viewTable model
+        , viewForm model.form
+        , viewBulkInput model.bulk
+        , viewCourtrooms model.courtrooms model.deleting
         ]
     }
 
 
-viewBulkInput : Model -> Html Msg
-viewBulkInput model =
+viewCourtrooms : RemoteData (List Courtroom) -> Maybe String -> Html Msg
+viewCourtrooms courtrooms deleting =
+    case courtrooms of
+        NotAsked ->
+            text ""
+
+        Loading ->
+            div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
+
+        Failed err ->
+            div [ Attr.class "notification is-danger" ] [ text err ]
+
+        Succeeded list ->
+            viewTable list deleting
+
+
+viewForm : FormState -> Html Msg
+viewForm state =
+    case state of
+        FormHidden ->
+            text ""
+
+        FormOpen context formData error ->
+            viewFormBox context formData error False
+
+        FormSaving context formData ->
+            viewFormBox context formData Nothing True
+
+
+viewFormBox : FormContext -> CourtroomForm -> Maybe String -> Bool -> Html Msg
+viewFormBox context formData error saving =
     div [ Attr.class "box mb-5" ]
-        [ h2 [ Attr.class "subtitle" ] [ text "Bulk Import" ]
-        , p [ Attr.class "help mb-3" ]
-            [ text "One courtroom per line. Format: "
-            , code [] [ text "Name, Location" ]
-            , text " (location is optional)"
+        [ h2 [ Attr.class "subtitle" ]
+            [ text
+                (case context of
+                    Editing _ ->
+                        "Edit Courtroom"
+
+                    Creating ->
+                        "New Courtroom"
+                )
             ]
-        , div [ Attr.class "field" ]
-            [ div [ Attr.class "control" ]
-                [ textarea
-                    [ Attr.class "textarea"
-                    , Attr.rows 6
-                    , Attr.placeholder "Dept 1, 2nd Floor\nDept 2, 3rd Floor\nDept 3"
-                    , Attr.value model.bulkText
-                    , Events.onInput BulkTextChanged
-                    ]
-                    []
-                ]
-            ]
-        , case model.bulkError of
+        , case error of
             Just err ->
                 div [ Attr.class "notification is-danger is-light" ] [ text err ]
 
             Nothing ->
                 text ""
-        , div [ Attr.class "field" ]
-            [ button
-                [ Attr.class
-                    (if model.bulkSaving then
-                        "button is-info is-loading"
-
-                     else
-                        "button is-info"
-                    )
-                , Events.onClick BulkImport
-                , Attr.disabled (String.trim model.bulkText == "")
-                ]
-                [ text "Import" ]
-            ]
-        ]
-
-
-viewError : Maybe String -> Html Msg
-viewError maybeError =
-    case maybeError of
-        Just err ->
-            div [ Attr.class "notification is-danger" ] [ text err ]
-
-        Nothing ->
-            text ""
-
-
-viewForm : Model -> Html Msg
-viewForm model =
-    div [ Attr.class "box mb-5" ]
-        [ h2 [ Attr.class "subtitle" ]
-            [ text
-                (case model.editingId of
-                    Just _ ->
-                        "Edit Courtroom"
-
-                    Nothing ->
-                        "New Courtroom"
-                )
-            ]
         , Html.form [ Events.onSubmit SaveCourtroom ]
             [ div [ Attr.class "columns" ]
                 [ div [ Attr.class "column" ]
@@ -342,7 +384,7 @@ viewForm model =
                         , div [ Attr.class "control" ]
                             [ input
                                 [ Attr.class "input"
-                                , Attr.value model.formName
+                                , Attr.value formData.name
                                 , Events.onInput FormNameChanged
                                 , Attr.required True
                                 ]
@@ -356,7 +398,7 @@ viewForm model =
                         , div [ Attr.class "control" ]
                             [ input
                                 [ Attr.class "input"
-                                , Attr.value model.formLocation
+                                , Attr.value formData.location
                                 , Events.onInput FormLocationChanged
                                 ]
                                 []
@@ -368,7 +410,7 @@ viewForm model =
                 [ div [ Attr.class "control" ]
                     [ button
                         [ Attr.class
-                            (if model.formSaving then
+                            (if saving then
                                 "button is-primary is-loading"
 
                              else
@@ -387,9 +429,68 @@ viewForm model =
         ]
 
 
-viewTable : Model -> Html Msg
-viewTable model =
-    if List.isEmpty model.courtrooms then
+viewBulkInput : BulkState -> Html Msg
+viewBulkInput state =
+    let
+        ( bulkText, bulkError, saving ) =
+            case state of
+                BulkIdle ->
+                    ( "", Nothing, False )
+
+                BulkEditing val ->
+                    ( val, Nothing, False )
+
+                BulkSaving val ->
+                    ( val, Nothing, True )
+
+                BulkFailed val err ->
+                    ( val, Just err, False )
+    in
+    div [ Attr.class "box mb-5" ]
+        [ h2 [ Attr.class "subtitle" ] [ text "Bulk Import" ]
+        , p [ Attr.class "help mb-3" ]
+            [ text "One courtroom per line. Format: "
+            , code [] [ text "Name, Location" ]
+            , text " (location is optional)"
+            ]
+        , div [ Attr.class "field" ]
+            [ div [ Attr.class "control" ]
+                [ textarea
+                    [ Attr.class "textarea"
+                    , Attr.rows 6
+                    , Attr.placeholder "Dept 1, 2nd Floor\nDept 2, 3rd Floor\nDept 3"
+                    , Attr.value bulkText
+                    , Events.onInput BulkTextChanged
+                    ]
+                    []
+                ]
+            ]
+        , case bulkError of
+            Just err ->
+                div [ Attr.class "notification is-danger is-light" ] [ text err ]
+
+            Nothing ->
+                text ""
+        , div [ Attr.class "field" ]
+            [ button
+                [ Attr.class
+                    (if saving then
+                        "button is-info is-loading"
+
+                     else
+                        "button is-info"
+                    )
+                , Events.onClick BulkImport
+                , Attr.disabled (String.trim bulkText == "")
+                ]
+                [ text "Import" ]
+            ]
+        ]
+
+
+viewTable : List Courtroom -> Maybe String -> Html Msg
+viewTable courtrooms deleting =
+    if List.isEmpty courtrooms then
         div [ Attr.class "has-text-centered has-text-grey" ]
             [ p [] [ text "No courtrooms yet. Add one to get started." ] ]
 
@@ -402,31 +503,30 @@ viewTable model =
                     , th [] [ text "Actions" ]
                     ]
                 ]
-            , tbody []
-                (List.map
-                    (\c ->
-                        tr []
-                            [ td [] [ text c.name ]
-                            , td [] [ text c.location ]
-                            , td []
-                                [ div [ Attr.class "buttons are-small" ]
-                                    [ button [ Attr.class "button is-info is-outlined", Events.onClick (EditCourtroom c) ]
-                                        [ text "Edit" ]
-                                    , button
-                                        [ Attr.class
-                                            (if model.deleting == Just c.id then
-                                                "button is-danger is-outlined is-loading"
-
-                                             else
-                                                "button is-danger is-outlined"
-                                            )
-                                        , Events.onClick (DeleteCourtroom c.id)
-                                        ]
-                                        [ text "Delete" ]
-                                    ]
-                                ]
-                            ]
-                    )
-                    model.courtrooms
-                )
+            , tbody [] (List.map (viewRow deleting) courtrooms)
             ]
+
+
+viewRow : Maybe String -> Courtroom -> Html Msg
+viewRow deleting c =
+    tr []
+        [ td [] [ text c.name ]
+        , td [] [ text c.location ]
+        , td []
+            [ div [ Attr.class "buttons are-small" ]
+                [ button [ Attr.class "button is-info is-outlined", Events.onClick (EditCourtroom c) ]
+                    [ text "Edit" ]
+                , button
+                    [ Attr.class
+                        (if deleting == Just c.id then
+                            "button is-danger is-outlined is-loading"
+
+                         else
+                            "button is-danger is-outlined"
+                        )
+                    , Events.onClick (DeleteCourtroom c.id)
+                    ]
+                    [ text "Delete" ]
+                ]
+            ]
+        ]
