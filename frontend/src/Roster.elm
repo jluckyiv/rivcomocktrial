@@ -9,6 +9,7 @@ module Roster exposing
 
 import Error exposing (Error(..))
 import Student exposing (Student)
+import Validate
 import Witness exposing (Witness)
 
 
@@ -33,11 +34,12 @@ type Roster
 
 create : List RoleAssignment -> Result (List Error) Roster
 create list =
-    if List.isEmpty list then
-        Err [ Error "Roster cannot be empty" ]
-
-    else
-        Ok (Roster list)
+    Validate.validate
+        (Validate.ifEmptyList identity
+            (Error "Roster cannot be empty")
+        )
+        list
+        |> Result.map (Validate.fromValid >> Roster)
 
 
 assignments : Roster -> List RoleAssignment

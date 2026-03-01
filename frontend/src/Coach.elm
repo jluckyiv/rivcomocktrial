@@ -18,6 +18,7 @@ module Coach exposing
 
 import Email exposing (Email)
 import Error exposing (Error(..))
+import Validate
 
 
 type Name
@@ -33,14 +34,19 @@ nameFromStrings first last =
         trimmedLast =
             String.trim last
     in
-    if String.isEmpty trimmedFirst then
-        Err [ Error "First name cannot be blank" ]
-
-    else if String.isEmpty trimmedLast then
-        Err [ Error "Last name cannot be blank" ]
-
-    else
-        Ok (Name { first = trimmedFirst, last = trimmedLast })
+    Validate.validate
+        (Validate.all
+            [ Validate.ifBlank Tuple.first
+                (Error "First name cannot be blank")
+            , Validate.ifBlank Tuple.second
+                (Error "Last name cannot be blank")
+            ]
+        )
+        ( trimmedFirst, trimmedLast )
+        |> Result.map
+            (\_ ->
+                Name { first = trimmedFirst, last = trimmedLast }
+            )
 
 
 nameToString : Name -> String

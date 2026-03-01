@@ -10,6 +10,7 @@ import Error exposing (Error(..))
 import PresiderBallot exposing (PresiderBallot)
 import PrelimResult
 import Side exposing (Side(..))
+import Validate
 import VerifiedBallot exposing (VerifiedBallot)
 
 
@@ -48,28 +49,36 @@ elimVerdict :
     List VerifiedBallot
     -> Result (List Error) ElimVerdict
 elimVerdict ballots =
-    if List.isEmpty ballots then
-        Err [ Error "Cannot determine verdict from empty ballot list" ]
+    Validate.validate
+        (Validate.ifEmptyList identity
+            (Error "Cannot determine verdict from empty ballot list")
+        )
+        ballots
+        |> Result.andThen
+            (\valid ->
+                let
+                    validBallots =
+                        Validate.fromValid valid
+                in
+                let
+                    results =
+                        List.map scorecardResult validBallots
 
-    else
-        let
-            results =
-                List.map scorecardResult ballots
+                    pWins =
+                        List.length (List.filter ((==) ProsecutionWon) results)
 
-            pWins =
-                List.length (List.filter ((==) ProsecutionWon) results)
+                    dWins =
+                        List.length (List.filter ((==) DefenseWon) results)
+                in
+                if pWins > dWins then
+                    Ok ProsecutionAdvances
 
-            dWins =
-                List.length (List.filter ((==) DefenseWon) results)
-        in
-        if pWins > dWins then
-            Ok ProsecutionAdvances
+                else if dWins > pWins then
+                    Ok DefenseAdvances
 
-        else if dWins > pWins then
-            Ok DefenseAdvances
-
-        else
-            Ok ScorecardsTied
+                else
+                    Ok ScorecardsTied
+            )
 
 
 elimVerdictWithPresider :

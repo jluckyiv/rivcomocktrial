@@ -14,6 +14,7 @@ import Error exposing (Error(..))
 import Courtroom exposing (Courtroom)
 import Judge exposing (Judge)
 import Team exposing (Team)
+import Validate
 
 
 type Pairing
@@ -27,17 +28,20 @@ type Pairing
 
 create : Team -> Team -> Result (List Error) Pairing
 create p d =
-    if p == d then
-        Err [ Error "Cannot pair a team against itself" ]
-
-    else
-        Ok
-            (Pairing
-                { prosecution = p
-                , defense = d
-                , courtroom = NotAssigned
-                , judge = NotAssigned
-                }
+    Validate.validate
+        (Validate.ifTrue
+            (\( pros, def ) -> pros == def)
+            (Error "Cannot pair a team against itself")
+        )
+        ( p, d )
+        |> Result.map
+            (\_ ->
+                Pairing
+                    { prosecution = p
+                    , defense = d
+                    , courtroom = NotAssigned
+                    , judge = NotAssigned
+                    }
             )
 
 

@@ -9,6 +9,7 @@ import Error exposing (Error(..))
 import PresiderBallot exposing (PresiderBallot)
 import Side exposing (Side(..))
 import SubmittedBallot
+import Validate
 import VerifiedBallot exposing (VerifiedBallot)
 
 
@@ -30,25 +31,33 @@ prelimVerdict :
     List VerifiedBallot
     -> Result (List Error) PrelimVerdict
 prelimVerdict ballots =
-    if List.isEmpty ballots then
-        Err [ Error "Cannot determine verdict from empty ballot list" ]
+    Validate.validate
+        (Validate.ifEmptyList identity
+            (Error "Cannot determine verdict from empty ballot list")
+        )
+        ballots
+        |> Result.andThen
+            (\valid ->
+                let
+                    validBallots =
+                        Validate.fromValid valid
+                in
+                let
+                    prosecutionTotal =
+                        List.map (courtTotal Prosecution) validBallots |> List.sum
 
-    else
-        let
-            prosecutionTotal =
-                List.map (courtTotal Prosecution) ballots |> List.sum
+                    defenseTotal =
+                        List.map (courtTotal Defense) validBallots |> List.sum
+                in
+                if prosecutionTotal > defenseTotal then
+                    Ok ProsecutionWins
 
-            defenseTotal =
-                List.map (courtTotal Defense) ballots |> List.sum
-        in
-        if prosecutionTotal > defenseTotal then
-            Ok ProsecutionWins
+                else if defenseTotal > prosecutionTotal then
+                    Ok DefenseWins
 
-        else if defenseTotal > prosecutionTotal then
-            Ok DefenseWins
-
-        else
-            Ok CourtTotalTied
+                else
+                    Ok CourtTotalTied
+            )
 
 
 prelimVerdictWithPresider :
