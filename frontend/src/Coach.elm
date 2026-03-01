@@ -1,7 +1,7 @@
 module Coach exposing (AttorneyCoach, TeacherCoach)
 
 import Email exposing (Email)
-import Name exposing (Name)
+import Student exposing (Name)
 
 
 type alias TeacherCoach =

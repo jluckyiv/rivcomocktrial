@@ -1,9 +1,13 @@
-module School exposing (School)
+module School exposing (Name(..), School)
 
 import District exposing (District)
 
 
+type Name
+    = Name String
+
+
 type alias School =
-    { name : String
+    { name : Name
     , district : District
     }

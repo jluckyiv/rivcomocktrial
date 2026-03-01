@@ -1,31 +1,31 @@
 module PronounsTest exposing (..)
 
 import Expect
-import Pronouns exposing (Pronouns(..))
+import Student exposing (Pronouns(..))
 import Test exposing (Test, describe, test)
 
 
 toStringTests : Test
 toStringTests =
-    describe "toString"
+    describe "pronounsToString"
         [ test "HeHim" <|
             \_ ->
                 HeHim
-                    |> Pronouns.toString
+                    |> Student.pronounsToString
                     |> Expect.equal "he/him"
         , test "SheHer" <|
             \_ ->
                 SheHer
-                    |> Pronouns.toString
+                    |> Student.pronounsToString
                     |> Expect.equal "she/her"
         , test "TheyThem" <|
             \_ ->
                 TheyThem
-                    |> Pronouns.toString
+                    |> Student.pronounsToString
                     |> Expect.equal "they/them"
         , test "Other with custom string" <|
             \_ ->
                 Other "ze/zir"
-                    |> Pronouns.toString
+                    |> Student.pronounsToString
                     |> Expect.equal "ze/zir"
         ]

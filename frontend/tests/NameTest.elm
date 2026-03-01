@@ -1,7 +1,7 @@
 module NameTest exposing (..)
 
 import Expect
-import Name exposing (Name)
+import Student exposing (Name)
 import Test exposing (Test, describe, test)
 
 
@@ -11,12 +11,12 @@ displayNameTests =
         [ test "returns first name when no preferred name" <|
             \_ ->
                 { first = "Robert", last = "Smith", preferred = Nothing }
-                    |> Name.displayName
+                    |> Student.displayName
                     |> Expect.equal "Robert"
         , test "returns preferred name when set" <|
             \_ ->
                 { first = "Robert", last = "Smith", preferred = Just "Bob" }
-                    |> Name.displayName
+                    |> Student.displayName
                     |> Expect.equal "Bob"
         ]
 
@@ -27,11 +27,11 @@ fullNameTests =
         [ test "returns first and last when no preferred name" <|
             \_ ->
                 { first = "Robert", last = "Smith", preferred = Nothing }
-                    |> Name.fullName
+                    |> Student.fullName
                     |> Expect.equal "Robert Smith"
         , test "returns preferred and last when preferred is set" <|
             \_ ->
                 { first = "Robert", last = "Smith", preferred = Just "Bob" }
-                    |> Name.fullName
+                    |> Student.fullName
                     |> Expect.equal "Bob Smith"
         ]
