@@ -10,6 +10,15 @@ import Html.Events as Events
 import Http
 import Layouts
 import Page exposing (Page)
+import PowerMatch
+    exposing
+        ( CrossBracketStrategy(..)
+        , PowerMatchResult
+        , ProposedPairing
+        , SideCount
+        , hasPlayed
+        , sideHistory
+        )
 import Route exposing (Route)
 import Route.Path
 import Shared
@@ -34,25 +43,6 @@ page user shared route =
 type InputMode
     = DropdownMode
     | BulkTextMode
-
-
-type alias SideCount =
-    { prosecution : Int
-    , defense : Int
-    }
-
-
-type alias PowerMatchResult =
-    { pairings : List ProposedPairing
-    , warnings : List String
-    , bye : Maybe String
-    }
-
-
-type alias ProposedPairing =
-    { prosecutionTeam : String
-    , defenseTeam : String
-    }
 
 
 type alias BulkParsedPairing =
@@ -407,8 +397,15 @@ update user msg model =
 
         GeneratePowerMatch ->
             let
+                rankedTeams =
+                    rankTeams model.teams
+
                 result =
-                    powerMatch model.teams model.allTrials model.trials
+                    PowerMatch.powerMatch
+                        HighHigh
+                        rankedTeams
+                        model.allTrials
+                        model.trials
             in
             ( { model | powerMatchResult = Just result }, Effect.none )
 
@@ -441,140 +438,21 @@ update user msg model =
 
 
 
--- POWER MATCHING
+-- RANKING
 
 
-hasPlayed : List Trial -> String -> String -> Bool
-hasPlayed trials teamA teamB =
-    List.any
-        (\t ->
-            (t.prosecutionTeam == teamA && t.defenseTeam == teamB)
-                || (t.prosecutionTeam == teamB && t.defenseTeam == teamA)
-        )
-        trials
-
-
-sideHistory : List Trial -> String -> SideCount
-sideHistory trials teamId =
-    List.foldl
-        (\t acc ->
-            if t.prosecutionTeam == teamId then
-                { acc | prosecution = acc.prosecution + 1 }
-
-            else if t.defenseTeam == teamId then
-                { acc | defense = acc.defense + 1 }
-
-            else
-                acc
-        )
-        { prosecution = 0, defense = 0 }
-        trials
-
-
-powerMatch : List Team -> List Trial -> List Trial -> PowerMatchResult
-powerMatch teams allTrials currentRoundTrials =
-    let
-        -- Filter out teams already paired in this round
-        pairedTeamIds =
-            List.concatMap (\t -> [ t.prosecutionTeam, t.defenseTeam ]) currentRoundTrials
-
-        availableTeams =
-            List.filter (\t -> not (List.member t.id pairedTeamIds)) teams
-
-        -- Sort by side balance (fewer prosecution appearances first)
-        sortedTeams =
-            List.sortBy
-                (\t ->
-                    let
-                        sides =
-                            sideHistory allTrials t.id
-                    in
-                    sides.prosecution - sides.defense
-                )
-                availableTeams
-
-        -- Handle bye for odd team count
-        ( teamsToMatch, bye ) =
-            if modBy 2 (List.length sortedTeams) == 1 then
-                ( List.take (List.length sortedTeams - 1) sortedTeams
-                , List.drop (List.length sortedTeams - 1) sortedTeams
-                    |> List.head
-                    |> Maybe.map .id
-                )
-
-            else
-                ( sortedTeams, Nothing )
-
-        -- Simple greedy pairing: take first, find best opponent
-        pairings =
-            greedyPair allTrials teamsToMatch []
-
-        warnings =
-            List.filterMap
-                (\p ->
-                    if hasPlayed allTrials p.prosecutionTeam p.defenseTeam then
-                        Just ("Rematch: " ++ p.prosecutionTeam ++ " vs " ++ p.defenseTeam)
-
-                    else
-                        Nothing
-                )
-                pairings
-    in
-    { pairings = pairings
-    , warnings = warnings
-    , bye = bye
-    }
-
-
-greedyPair : List Trial -> List Team -> List ProposedPairing -> List ProposedPairing
-greedyPair allTrials remaining acc =
-    case remaining of
-        [] ->
-            List.reverse acc
-
-        [ _ ] ->
-            List.reverse acc
-
-        first :: rest ->
-            let
-                -- Find best opponent: prefer non-rematch
-                bestOpponent =
-                    rest
-                        |> List.sortBy
-                            (\t ->
-                                if hasPlayed allTrials first.id t.id then
-                                    1
-
-                                else
-                                    0
-                            )
-                        |> List.head
-            in
-            case bestOpponent of
-                Just opp ->
-                    let
-                        firstSides =
-                            sideHistory allTrials first.id
-
-                        oppSides =
-                            sideHistory allTrials opp.id
-
-                        ( pTeam, dTeam ) =
-                            if firstSides.prosecution <= oppSides.prosecution then
-                                ( first.id, opp.id )
-
-                            else
-                                ( opp.id, first.id )
-
-                        newRemaining =
-                            List.filter (\t -> t.id /= opp.id) rest
-                    in
-                    greedyPair allTrials
-                        newRemaining
-                        ({ prosecutionTeam = pTeam, defenseTeam = dTeam } :: acc)
-
-                Nothing ->
-                    List.reverse acc
+rankTeams : List Team -> List PowerMatch.RankedTeam
+rankTeams teams =
+    teams
+        |> List.sortBy .teamNumber
+        |> List.indexedMap
+            (\i team ->
+                { team = team
+                , wins = 0
+                , losses = 0
+                , rank = i + 1
+                }
+            )
 
 
 
@@ -937,15 +815,6 @@ viewPowerMatchSection model =
                                 ++ List.map
                                     (\w -> div [ Attr.class "notification is-warning is-light" ] [ text w ])
                                     result.warnings
-                                ++ (case result.bye of
-                                        Just byeTeamId ->
-                                            [ div [ Attr.class "notification is-info is-light" ]
-                                                [ text ("Bye: " ++ teamLabel model.teams byeTeamId) ]
-                                            ]
-
-                                        Nothing ->
-                                            []
-                                   )
                                 ++ [ table [ Attr.class "table is-fullwidth" ]
                                         [ thead []
                                             [ tr []
