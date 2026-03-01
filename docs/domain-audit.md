@@ -240,55 +240,28 @@ friction without preventing any real invalid state
 (any combination of valid `Role` + `Student` + `Rank`
 is a valid nomination).
 
-`rankPoints` — consider a `NomineeCount` type or
-guard: `rankPoints : Int -> Rank -> Maybe Int` where
-count must be positive. Or accept this as an internal
-computation where the caller (the awards module)
-always provides a valid count.
+`rankPoints` now guarded — returns
+`Result (List Error) Int`, rejects non-positive count.
 
-**Severity:** Low.
+**Severity:** Low. (Done in Tier 4.)
 
 ---
 
 ## Layer 4: Results (Computed)
 
-### PrelimResult.elm
+### PrelimResult.elm — DONE (Tier 4, commit cd37320)
 
-**Current:** `PrelimVerdict(..)` exposed. Pure
-functions over `VerifiedBallot`.
-
-**Problem:** `prelimVerdict []` returns
-`CourtTotalTied`. An empty ballot list silently
-produces a "tie" — this is a bug that produces
-correct-looking but meaningless results.
-
-**Fix:**
-```elm
-prelimVerdict : List VerifiedBallot
-    -> Maybe PrelimVerdict
--- Nothing on empty list
-
--- or use a NonEmpty list type:
-prelimVerdict : ( VerifiedBallot, List VerifiedBallot )
-    -> PrelimVerdict
-```
-
-`PrelimVerdict(..)` should stay exposed — it's an
-output enum for pattern matching.
-
-**Severity:** Medium. Silent wrong answers are worse
-than crashes.
+`prelimVerdict` and `prelimVerdictWithPresider` now
+return `Result (List Error)`, rejecting empty ballot
+lists. `PrelimVerdict(..)` still exposed (output enum).
 
 ---
 
-### ElimResult.elm
+### ElimResult.elm — DONE (Tier 4, commit cd37320)
 
-**Current:** Same pattern as PrelimResult. `elimVerdict
-[]` returns `ScorecardsTied`.
-
-**Fix:** Same — return `Maybe` or require non-empty.
-
-**Severity:** Medium.
+`elimVerdict` and `elimVerdictWithPresider` now return
+`Result (List Error)`, rejecting empty ballot lists.
+`ElimVerdict(..)` still exposed (output enum).
 
 ---
 
@@ -356,9 +329,17 @@ resolved in Tiers 1–3.
 17. ~~PresiderBallot~~ — already done in Tier 1
 18. ~~TeamRecord~~ — opaque (computed only)
 
-### Tier 4: Function-level guards (TODO)
-19. **prelimVerdict / elimVerdict** — guard empty lists
-20. **Rank.rankPoints** — guard negative count
+### Tier 4: DONE (commit cd37320, 318 tests)
+19. ~~prelimVerdict / elimVerdict~~ — guard empty lists
+20. ~~Rank.rankPoints~~ — guard non-positive count
+
+## Follow-up
+
+- **elm-validate consistency** (issue #29): Migrate
+  all manual `if/else` validators to elm-validate for
+  consistent error accumulation.
+- **Roster composition validation**: Full count/role
+  enforcement deferred to its own issue.
 
 ---
 
