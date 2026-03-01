@@ -5,7 +5,9 @@ module Api exposing
     , listTeams, createTeam, updateTeam, deleteTeam
     , listStudents, createStudent, updateStudent, deleteStudent
     , listCourtrooms, createCourtroom, updateCourtroom, deleteCourtroom
-    , Tournament, School, Team, Student, Courtroom
+    , listRounds, createRound, updateRound, deleteRound
+    , listTrials, listTrialsByRound, createTrial, updateTrial, deleteTrial
+    , Tournament, School, Team, Student, Courtroom, Round, Trial
     , ListResponse
     )
 
@@ -63,6 +65,29 @@ type alias Courtroom =
     { id : String
     , name : String
     , location : String
+    , created : String
+    , updated : String
+    }
+
+
+type alias Round =
+    { id : String
+    , number : Int
+    , date : String
+    , roundType : String
+    , published : Bool
+    , tournament : String
+    , created : String
+    , updated : String
+    }
+
+
+type alias Trial =
+    { id : String
+    , round : String
+    , prosecutionTeam : String
+    , defenseTeam : String
+    , courtroom : String
     , created : String
     , updated : String
     }
@@ -136,6 +161,31 @@ courtroomDecoder =
         (Decode.field "updated" Decode.string)
 
 
+roundDecoder : Decoder Round
+roundDecoder =
+    Decode.map8 Round
+        (Decode.field "id" Decode.string)
+        (fieldWithDefault "number" Decode.int 0)
+        (fieldWithDefault "date" Decode.string "")
+        (fieldWithDefault "type" Decode.string "preliminary")
+        (fieldWithDefault "published" Decode.bool False)
+        (Decode.field "tournament" Decode.string)
+        (Decode.field "created" Decode.string)
+        (Decode.field "updated" Decode.string)
+
+
+trialDecoder : Decoder Trial
+trialDecoder =
+    Decode.map7 Trial
+        (Decode.field "id" Decode.string)
+        (Decode.field "round" Decode.string)
+        (Decode.field "prosecution_team" Decode.string)
+        (Decode.field "defense_team" Decode.string)
+        (fieldWithDefault "courtroom" Decode.string "")
+        (Decode.field "created" Decode.string)
+        (Decode.field "updated" Decode.string)
+
+
 listResponseDecoder : Decoder a -> Decoder (ListResponse a)
 listResponseDecoder itemDecoder =
     Decode.map5 ListResponse
@@ -204,6 +254,28 @@ encodeCourtroom c =
 
 
 
+encodeRound : { number : Int, date : String, roundType : String, published : Bool, tournament : String } -> Encode.Value
+encodeRound r =
+    Encode.object
+        [ ( "number", Encode.int r.number )
+        , ( "date", Encode.string r.date )
+        , ( "type", Encode.string r.roundType )
+        , ( "published", Encode.bool r.published )
+        , ( "tournament", Encode.string r.tournament )
+        ]
+
+
+encodeTrial : { round : String, prosecutionTeam : String, defenseTeam : String, courtroom : String } -> Encode.Value
+encodeTrial t =
+    Encode.object
+        [ ( "round", Encode.string t.round )
+        , ( "prosecution_team", Encode.string t.prosecutionTeam )
+        , ( "defense_team", Encode.string t.defenseTeam )
+        , ( "courtroom", Encode.string t.courtroom )
+        ]
+
+
+
 -- AUTH
 
 
@@ -237,6 +309,19 @@ listRecords token collection itemDecoder toMsg =
         { method = "GET"
         , headers = [ authHeader token ]
         , url = "/api/collections/" ++ collection ++ "/records?perPage=200"
+        , body = Http.emptyBody
+        , expect = Http.expectJson toMsg (listResponseDecoder itemDecoder)
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+listRecordsFiltered : String -> String -> String -> Decoder a -> (Result Http.Error (ListResponse a) -> msg) -> Cmd msg
+listRecordsFiltered token collection filter itemDecoder toMsg =
+    Http.request
+        { method = "GET"
+        , headers = [ authHeader token ]
+        , url = "/api/collections/" ++ collection ++ "/records?perPage=200&filter=" ++ filter
         , body = Http.emptyBody
         , expect = Http.expectJson toMsg (listResponseDecoder itemDecoder)
         , timeout = Nothing
@@ -401,3 +486,56 @@ updateCourtroom token id data =
 deleteCourtroom : String -> String -> (Result Http.Error () -> msg) -> Cmd msg
 deleteCourtroom token id =
     deleteRecord token "courtrooms" id
+
+
+
+-- ROUNDS
+
+
+listRounds : String -> (Result Http.Error (ListResponse Round) -> msg) -> Cmd msg
+listRounds token =
+    listRecords token "rounds" roundDecoder
+
+
+createRound : String -> { number : Int, date : String, roundType : String, published : Bool, tournament : String } -> (Result Http.Error Round -> msg) -> Cmd msg
+createRound token data =
+    createRecord token "rounds" (encodeRound data) roundDecoder
+
+
+updateRound : String -> String -> { number : Int, date : String, roundType : String, published : Bool, tournament : String } -> (Result Http.Error Round -> msg) -> Cmd msg
+updateRound token id data =
+    updateRecord token "rounds" id (encodeRound data) roundDecoder
+
+
+deleteRound : String -> String -> (Result Http.Error () -> msg) -> Cmd msg
+deleteRound token id =
+    deleteRecord token "rounds" id
+
+
+
+-- TRIALS
+
+
+listTrials : String -> (Result Http.Error (ListResponse Trial) -> msg) -> Cmd msg
+listTrials token =
+    listRecords token "trials" trialDecoder
+
+
+listTrialsByRound : String -> String -> (Result Http.Error (ListResponse Trial) -> msg) -> Cmd msg
+listTrialsByRound token roundId =
+    listRecordsFiltered token "trials" ("round='" ++ roundId ++ "'") trialDecoder
+
+
+createTrial : String -> { round : String, prosecutionTeam : String, defenseTeam : String, courtroom : String } -> (Result Http.Error Trial -> msg) -> Cmd msg
+createTrial token data =
+    createRecord token "trials" (encodeTrial data) trialDecoder
+
+
+updateTrial : String -> String -> { round : String, prosecutionTeam : String, defenseTeam : String, courtroom : String } -> (Result Http.Error Trial -> msg) -> Cmd msg
+updateTrial token id data =
+    updateRecord token "trials" id (encodeTrial data) trialDecoder
+
+
+deleteTrial : String -> String -> (Result Http.Error () -> msg) -> Cmd msg
+deleteTrial token id =
+    deleteRecord token "trials" id

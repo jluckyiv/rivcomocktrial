@@ -41,6 +41,9 @@ type alias Model =
     , editingId : Maybe String
     , deleting : Maybe String
     , filterSchool : String
+    , bulkText : String
+    , bulkSaving : Bool
+    , bulkError : Maybe String
     }
 
 
@@ -57,6 +60,9 @@ init user _ =
       , editingId = Nothing
       , deleting = Nothing
       , filterSchool = ""
+      , bulkText = ""
+      , bulkSaving = False
+      , bulkError = Nothing
       }
     , Effect.batch
         [ Effect.sendCmd (Api.listStudents user.token GotStudents)
@@ -82,6 +88,9 @@ type Msg
     | GotSaveResponse (Result Http.Error Student)
     | DeleteStudent String
     | GotDeleteResponse String (Result Http.Error ())
+    | BulkTextChanged String
+    | BulkImport
+    | GotBulkResponse (Result Http.Error Student)
 
 
 update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
@@ -166,6 +175,79 @@ update user msg model =
         GotDeleteResponse _ (Err _) ->
             ( { model | deleting = Nothing, error = Just "Failed to delete student." }, Effect.none )
 
+        BulkTextChanged val ->
+            ( { model | bulkText = val, bulkError = Nothing }, Effect.none )
+
+        BulkImport ->
+            let
+                lines =
+                    String.lines model.bulkText
+                        |> List.map String.trim
+                        |> List.filter (\l -> l /= "")
+
+                parsed =
+                    List.filterMap (parseBulkLine model.schools) lines
+
+                errors =
+                    List.length lines - List.length parsed
+            in
+            if List.isEmpty parsed then
+                ( { model | bulkError = Just "No valid lines found. Format: Name, School Name" }, Effect.none )
+
+            else if errors > 0 then
+                ( { model | bulkError = Just (String.fromInt errors ++ " line(s) could not be parsed. Check school names match exactly.") }, Effect.none )
+
+            else
+                ( { model | bulkSaving = True, bulkError = Nothing }
+                , Effect.batch
+                    (List.map
+                        (\data -> Effect.sendCmd (Api.createStudent user.token data GotBulkResponse))
+                        parsed
+                    )
+                )
+
+        GotBulkResponse (Ok student) ->
+            ( { model
+                | students = model.students ++ [ student ]
+                , bulkSaving = False
+                , bulkText = ""
+              }
+            , Effect.none
+            )
+
+        GotBulkResponse (Err _) ->
+            ( { model | bulkSaving = False, bulkError = Just "Failed to create some students." }, Effect.none )
+
+
+
+-- BULK PARSING
+
+
+parseBulkLine : List School -> String -> Maybe { name : String, school : String }
+parseBulkLine schools line =
+    case String.split "," line |> List.map String.trim of
+        [ name, schoolName ] ->
+            if name /= "" then
+                let
+                    schoolId =
+                        schools
+                            |> List.filter (\s -> String.toLower s.name == String.toLower schoolName)
+                            |> List.head
+                            |> Maybe.map .id
+                            |> Maybe.withDefault ""
+                in
+                if schoolId /= "" then
+                    Just { name = name, school = schoolId }
+
+                else
+                    Nothing
+
+            else
+                Nothing
+
+        _ ->
+            Nothing
+
 
 
 -- SUBSCRIPTIONS
@@ -215,6 +297,7 @@ view model =
 
           else
             text ""
+        , viewBulkInput model
         , if model.loading then
             div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
 
@@ -222,6 +305,50 @@ view model =
             viewTable model
         ]
     }
+
+
+viewBulkInput : Model -> Html Msg
+viewBulkInput model =
+    div [ Attr.class "box mb-5" ]
+        [ h2 [ Attr.class "subtitle" ] [ text "Bulk Import" ]
+        , p [ Attr.class "help mb-3" ]
+            [ text "One student per line. Format: "
+            , code [] [ text "Name, School Name" ]
+            , text " (school name must match exactly)"
+            ]
+        , div [ Attr.class "field" ]
+            [ div [ Attr.class "control" ]
+                [ textarea
+                    [ Attr.class "textarea"
+                    , Attr.rows 6
+                    , Attr.placeholder "Jane Doe, Lincoln High\nJohn Smith, Lincoln High\nAlex Johnson, Kennedy Middle"
+                    , Attr.value model.bulkText
+                    , Events.onInput BulkTextChanged
+                    ]
+                    []
+                ]
+            ]
+        , case model.bulkError of
+            Just err ->
+                div [ Attr.class "notification is-danger is-light" ] [ text err ]
+
+            Nothing ->
+                text ""
+        , div [ Attr.class "field" ]
+            [ button
+                [ Attr.class
+                    (if model.bulkSaving then
+                        "button is-info is-loading"
+
+                     else
+                        "button is-info"
+                    )
+                , Events.onClick BulkImport
+                , Attr.disabled (String.trim model.bulkText == "")
+                ]
+                [ text "Import" ]
+            ]
+        ]
 
 
 viewError : Maybe String -> Html Msg

@@ -44,6 +44,9 @@ type alias Model =
     , editingId : Maybe String
     , deleting : Maybe String
     , filterTournament : String
+    , bulkText : String
+    , bulkSaving : Bool
+    , bulkError : Maybe String
     }
 
 
@@ -63,6 +66,9 @@ init user _ =
       , editingId = Nothing
       , deleting = Nothing
       , filterTournament = ""
+      , bulkText = ""
+      , bulkSaving = False
+      , bulkError = Nothing
       }
     , Effect.batch
         [ Effect.sendCmd (Api.listTeams user.token GotTeams)
@@ -92,6 +98,9 @@ type Msg
     | GotSaveResponse (Result Http.Error Team)
     | DeleteTeam String
     | GotDeleteResponse String (Result Http.Error ())
+    | BulkTextChanged String
+    | BulkImport
+    | GotBulkResponse (Result Http.Error Team)
 
 
 update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
@@ -210,6 +219,107 @@ update user msg model =
         GotDeleteResponse _ (Err _) ->
             ( { model | deleting = Nothing, error = Just "Failed to delete team." }, Effect.none )
 
+        BulkTextChanged val ->
+            ( { model | bulkText = val, bulkError = Nothing }, Effect.none )
+
+        BulkImport ->
+            if model.filterTournament == "" then
+                ( { model | bulkError = Just "Select a tournament first." }, Effect.none )
+
+            else
+                let
+                    lines =
+                        String.lines model.bulkText
+                            |> List.map String.trim
+                            |> List.filter (\l -> l /= "")
+
+                    parsed =
+                        List.filterMap (parseBulkLine model.schools) lines
+
+                    errors =
+                        List.length lines - List.length parsed
+                in
+                if List.isEmpty parsed then
+                    ( { model | bulkError = Just "No valid lines found. Format: 101 Team Name, School Name" }, Effect.none )
+
+                else if errors > 0 then
+                    ( { model | bulkError = Just (String.fromInt errors ++ " line(s) could not be parsed. Check school names match exactly.") }, Effect.none )
+
+                else
+                    ( { model | bulkSaving = True, bulkError = Nothing }
+                    , Effect.batch
+                        (List.map
+                            (\data ->
+                                Effect.sendCmd
+                                    (Api.createTeam user.token
+                                        { tournament = model.filterTournament
+                                        , school = data.school
+                                        , teamNumber = data.teamNumber
+                                        , name = data.name
+                                        }
+                                        GotBulkResponse
+                                    )
+                            )
+                            parsed
+                        )
+                    )
+
+        GotBulkResponse (Ok team) ->
+            ( { model
+                | teams = model.teams ++ [ team ]
+                , bulkSaving = False
+                , bulkText = ""
+              }
+            , Effect.none
+            )
+
+        GotBulkResponse (Err _) ->
+            ( { model | bulkSaving = False, bulkError = Just "Failed to create some teams." }, Effect.none )
+
+
+
+-- BULK PARSING
+
+
+parseBulkLine : List School -> String -> Maybe { teamNumber : Int, name : String, school : String }
+parseBulkLine schools line =
+    -- Format: {number} {name}, {school_name}
+    case String.split "," line |> List.map String.trim of
+        [ numAndName, schoolName ] ->
+            let
+                schoolId =
+                    schools
+                        |> List.filter (\s -> String.toLower s.name == String.toLower schoolName)
+                        |> List.head
+                        |> Maybe.map .id
+                        |> Maybe.withDefault ""
+
+                parts =
+                    String.words numAndName
+            in
+            case parts of
+                numStr :: nameParts ->
+                    case String.toInt numStr of
+                        Just num ->
+                            if schoolId /= "" then
+                                Just
+                                    { teamNumber = num
+                                    , name = String.join " " nameParts
+                                    , school = schoolId
+                                    }
+
+                            else
+                                Nothing
+
+                        Nothing ->
+                            Nothing
+
+                _ ->
+                    Nothing
+
+        _ ->
+            Nothing
+
 
 
 -- SUBSCRIPTIONS
@@ -259,6 +369,7 @@ view model =
 
           else
             text ""
+        , viewBulkInput model
         , if model.loading then
             div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
 
@@ -266,6 +377,51 @@ view model =
             viewTable model
         ]
     }
+
+
+viewBulkInput : Model -> Html Msg
+viewBulkInput model =
+    div [ Attr.class "box mb-5" ]
+        [ h2 [ Attr.class "subtitle" ] [ text "Bulk Import" ]
+        , p [ Attr.class "help mb-3" ]
+            [ text "One team per line. Format: "
+            , code [] [ text "{number} {name}, {school_name}" ]
+            , br [] []
+            , text "Teams are added to the selected tournament filter."
+            ]
+        , div [ Attr.class "field" ]
+            [ div [ Attr.class "control" ]
+                [ textarea
+                    [ Attr.class "textarea"
+                    , Attr.rows 6
+                    , Attr.placeholder "101 Lions A, Lincoln High\n102 Lions B, Lincoln High\n201 Eagles, Kennedy Middle"
+                    , Attr.value model.bulkText
+                    , Events.onInput BulkTextChanged
+                    ]
+                    []
+                ]
+            ]
+        , case model.bulkError of
+            Just err ->
+                div [ Attr.class "notification is-danger is-light" ] [ text err ]
+
+            Nothing ->
+                text ""
+        , div [ Attr.class "field" ]
+            [ button
+                [ Attr.class
+                    (if model.bulkSaving then
+                        "button is-info is-loading"
+
+                     else
+                        "button is-info"
+                    )
+                , Events.onClick BulkImport
+                , Attr.disabled (String.trim model.bulkText == "" || model.filterTournament == "")
+                ]
+                [ text "Import" ]
+            ]
+        ]
 
 
 viewError : Maybe String -> Html Msg
