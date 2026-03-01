@@ -11,6 +11,7 @@ module Rank exposing
 import Error exposing (Error(..))
 import Role exposing (Role(..))
 import Student exposing (Student)
+import Validate
 
 
 type Rank
@@ -19,11 +20,18 @@ type Rank
 
 fromInt : Int -> Result (List Error) Rank
 fromInt n =
-    if n >= 1 && n <= 5 then
-        Ok (Rank n)
+    Validate.validate
+        (Validate.fromErrors
+            (\v ->
+                if v >= 1 && v <= 5 then
+                    []
 
-    else
-        Err [ Error ("Rank must be 1–5, got " ++ String.fromInt n) ]
+                else
+                    [ Error ("Rank must be 1–5, got " ++ String.fromInt v) ]
+            )
+        )
+        n
+        |> Result.map (Validate.fromValid >> Rank)
 
 
 toInt : Rank -> Int
@@ -66,11 +74,18 @@ nominationCategory role =
 
 rankPoints : Int -> Rank -> Result (List Error) Int
 rankPoints count rank =
-    if count >= 1 then
-        Ok (count + 1 - toInt rank)
+    Validate.validate
+        (Validate.fromErrors
+            (\c ->
+                if c >= 1 then
+                    []
 
-    else
-        Err [ Error ("Nominee count must be positive, got " ++ String.fromInt count) ]
+                else
+                    [ Error ("Nominee count must be positive, got " ++ String.fromInt c) ]
+            )
+        )
+        count
+        |> Result.map (\valid -> Validate.fromValid valid + 1 - toInt rank)
 
 
 type alias Nomination =

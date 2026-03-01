@@ -55,11 +55,18 @@ type Number
 
 numberFromInt : Int -> Result (List Error) Number
 numberFromInt n =
-    if n >= 1 then
-        Ok (Number n)
+    Validate.validate
+        (Validate.fromErrors
+            (\v ->
+                if v >= 1 then
+                    []
 
-    else
-        Err [ Error ("Team number must be positive, got " ++ String.fromInt n) ]
+                else
+                    [ Error ("Team number must be positive, got " ++ String.fromInt v) ]
+            )
+        )
+        n
+        |> Result.map (Validate.fromValid >> Number)
 
 
 numberToInt : Number -> Int

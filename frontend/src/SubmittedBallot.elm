@@ -17,6 +17,7 @@ module SubmittedBallot exposing
 import Error exposing (Error(..))
 import Side exposing (Side(..))
 import Student exposing (Student)
+import Validate
 
 
 type Points
@@ -25,11 +26,18 @@ type Points
 
 fromInt : Int -> Result (List Error) Points
 fromInt n =
-    if n >= 1 && n <= 10 then
-        Ok (Points n)
+    Validate.validate
+        (Validate.fromErrors
+            (\v ->
+                if v >= 1 && v <= 10 then
+                    []
 
-    else
-        Err [ Error ("Points must be 1–10, got " ++ String.fromInt n) ]
+                else
+                    [ Error ("Points must be 1–10, got " ++ String.fromInt v) ]
+            )
+        )
+        n
+        |> Result.map (Validate.fromValid >> Points)
 
 
 toInt : Points -> Int
@@ -54,12 +62,12 @@ type SubmittedBallot
 
 create : List ScoredPresentation -> Result (List Error) SubmittedBallot
 create list =
-    case list of
-        [] ->
-            Err [ Error "Ballot must have at least one presentation" ]
-
-        _ ->
-            Ok (SubmittedBallot list)
+    Validate.validate
+        (Validate.ifEmptyList identity
+            (Error "Ballot must have at least one presentation")
+        )
+        list
+        |> Result.map (Validate.fromValid >> SubmittedBallot)
 
 
 presentations : SubmittedBallot -> List ScoredPresentation

@@ -57,11 +57,18 @@ type Year
 
 yearFromInt : Int -> Result (List Error) Year
 yearFromInt n =
-    if n >= 2000 && n <= 2100 then
-        Ok (Year n)
+    Validate.validate
+        (Validate.fromErrors
+            (\v ->
+                if v >= 2000 && v <= 2100 then
+                    []
 
-    else
-        Err [ Error ("Year must be between 2000 and 2100, got " ++ String.fromInt n) ]
+                else
+                    [ Error ("Year must be between 2000 and 2100, got " ++ String.fromInt v) ]
+            )
+        )
+        n
+        |> Result.map (Validate.fromValid >> Year)
 
 
 yearToInt : Year -> Int
@@ -78,29 +85,31 @@ type Config
 
 configFromInts : Int -> Int -> Result (List Error) Config
 configFromInts prelim elim =
-    let
-        prelimError =
-            if prelim >= 1 then
-                []
+    Validate.validate
+        (Validate.all
+            [ Validate.fromErrors
+                (\( p, _ ) ->
+                    if p >= 1 then
+                        []
 
-            else
-                [ Error ("Preliminary rounds must be positive, got " ++ String.fromInt prelim) ]
+                    else
+                        [ Error ("Preliminary rounds must be positive, got " ++ String.fromInt p) ]
+                )
+            , Validate.fromErrors
+                (\( _, e ) ->
+                    if e >= 1 then
+                        []
 
-        elimError =
-            if elim >= 1 then
-                []
-
-            else
-                [ Error ("Elimination rounds must be positive, got " ++ String.fromInt elim) ]
-
-        errors =
-            prelimError ++ elimError
-    in
-    if List.isEmpty errors then
-        Ok (Config { numPreliminaryRounds = prelim, numEliminationRounds = elim })
-
-    else
-        Err errors
+                    else
+                        [ Error ("Elimination rounds must be positive, got " ++ String.fromInt e) ]
+                )
+            ]
+        )
+        ( prelim, elim )
+        |> Result.map
+            (\_ ->
+                Config { numPreliminaryRounds = prelim, numEliminationRounds = elim }
+            )
 
 
 prelimRounds : Config -> Int
