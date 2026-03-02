@@ -3,6 +3,7 @@ module Pages.Admin.Tournaments exposing (Model, Msg, page)
 import Api exposing (Tournament)
 import Auth
 import Effect exposing (Effect)
+import Error exposing (Error(..))
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
@@ -13,6 +14,7 @@ import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Route.Path
 import Shared
+import Tournament
 import View exposing (View)
 
 
@@ -47,7 +49,7 @@ type alias TournamentForm =
 
 type FormState
     = FormHidden
-    | FormOpen FormContext TournamentForm (Maybe String)
+    | FormOpen FormContext TournamentForm (List String)
     | FormSaving FormContext TournamentForm
 
 
@@ -111,7 +113,7 @@ update user msg model =
                         , elimRounds = "3"
                         , status = "draft"
                         }
-                        Nothing
+                        []
               }
             , Effect.none
             )
@@ -126,7 +128,7 @@ update user msg model =
                         , elimRounds = String.fromInt t.numEliminationRounds
                         , status = t.status
                         }
-                        Nothing
+                        []
               }
             , Effect.none
             )
@@ -152,24 +154,21 @@ update user msg model =
         SaveTournament ->
             case model.form of
                 FormOpen context formData _ ->
-                    let
-                        data =
-                            { name = formData.name
-                            , year = String.toInt formData.year |> Maybe.withDefault 0
-                            , numPreliminaryRounds = String.toInt formData.prelimRounds |> Maybe.withDefault 4
-                            , numEliminationRounds = String.toInt formData.elimRounds |> Maybe.withDefault 3
-                            , status = formData.status
-                            }
+                    case validateForm formData of
+                        Err errors ->
+                            ( { model | form = FormOpen context formData errors }, Effect.none )
 
-                        cmd =
-                            case context of
-                                Editing id ->
-                                    Api.updateTournament user.token id data GotSaveResponse
+                        Ok data ->
+                            let
+                                cmd =
+                                    case context of
+                                        Editing id ->
+                                            Api.updateTournament user.token id data GotSaveResponse
 
-                                Creating ->
-                                    Api.createTournament user.token data GotSaveResponse
-                    in
-                    ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
+                                        Creating ->
+                                            Api.createTournament user.token data GotSaveResponse
+                            in
+                            ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
 
                 _ ->
                     ( model, Effect.none )
@@ -207,7 +206,7 @@ update user msg model =
         GotSaveResponse (Err _) ->
             case model.form of
                 FormSaving context formData ->
-                    ( { model | form = FormOpen context formData (Just "Failed to save tournament.") }, Effect.none )
+                    ( { model | form = FormOpen context formData [ "Failed to save tournament." ] }, Effect.none )
 
                 _ ->
                     ( model, Effect.none )
@@ -233,11 +232,89 @@ update user msg model =
 -- HELPERS
 
 
+type alias ValidatedTournament =
+    { name : String
+    , year : Int
+    , numPreliminaryRounds : Int
+    , numEliminationRounds : Int
+    , status : String
+    }
+
+
+validateForm : TournamentForm -> Result (List String) ValidatedTournament
+validateForm formData =
+    let
+        parseIntField label raw =
+            case String.toInt raw of
+                Just n ->
+                    Ok n
+
+                Nothing ->
+                    Err [ label ++ " must be a number" ]
+
+        collectErrors results =
+            List.concatMap
+                (\r ->
+                    case r of
+                        Err errs ->
+                            errs
+
+                        Ok _ ->
+                            []
+                )
+                results
+
+        toStrings =
+            List.map (\(Error msg) -> msg)
+
+        yearResult =
+            parseIntField "Year" formData.year
+
+        prelimResult =
+            parseIntField "Preliminary rounds" formData.prelimRounds
+
+        elimResult =
+            parseIntField "Elimination rounds" formData.elimRounds
+
+        nameValidation =
+            Tournament.nameFromString formData.name |> Result.mapError toStrings
+
+        yearValidation =
+            yearResult |> Result.andThen (Tournament.yearFromInt >> Result.mapError toStrings)
+
+        configValidation =
+            Result.map2 (\p e -> ( p, e )) prelimResult elimResult
+                |> Result.andThen (\( p, e ) -> Tournament.configFromInts p e |> Result.mapError toStrings)
+
+        statusValidation =
+            Tournament.statusFromString formData.status |> Result.mapError toStrings
+
+        allErrors =
+            collectErrors [ nameValidation |> Result.map (\_ -> ()), yearValidation |> Result.map (\_ -> ()), configValidation |> Result.map (\_ -> ()), statusValidation |> Result.map (\_ -> ()) ]
+    in
+    if List.isEmpty allErrors then
+        case ( yearResult, prelimResult, elimResult ) of
+            ( Ok y, Ok p, Ok e ) ->
+                Ok
+                    { name = String.trim formData.name
+                    , year = y
+                    , numPreliminaryRounds = p
+                    , numEliminationRounds = e
+                    , status = formData.status
+                    }
+
+            _ ->
+                Err allErrors
+
+    else
+        Err allErrors
+
+
 updateFormField : (TournamentForm -> TournamentForm) -> FormState -> FormState
 updateFormField transform state =
     case state of
-        FormOpen context formData error ->
-            FormOpen context (transform formData) error
+        FormOpen context formData _ ->
+            FormOpen context (transform formData) []
 
         _ ->
             state
@@ -296,15 +373,15 @@ viewForm state =
         FormHidden ->
             text ""
 
-        FormOpen context formData error ->
-            viewFormBox context formData error False
+        FormOpen context formData errors ->
+            viewFormBox context formData errors False
 
         FormSaving context formData ->
-            viewFormBox context formData Nothing True
+            viewFormBox context formData [] True
 
 
-viewFormBox : FormContext -> TournamentForm -> Maybe String -> Bool -> Html Msg
-viewFormBox context formData error saving =
+viewFormBox : FormContext -> TournamentForm -> List String -> Bool -> Html Msg
+viewFormBox context formData errors saving =
     div [ Attr.class "box mb-5" ]
         [ h2 [ Attr.class "subtitle" ]
             [ text
@@ -316,12 +393,7 @@ viewFormBox context formData error saving =
                         "New Tournament"
                 )
             ]
-        , case error of
-            Just err ->
-                div [ Attr.class "notification is-danger is-light" ] [ text err ]
-
-            Nothing ->
-                text ""
+        , viewErrors errors
         , Html.form [ Events.onSubmit SaveTournament ]
             [ div [ Attr.class "columns" ]
                 [ div [ Attr.class "column" ]
@@ -420,6 +492,16 @@ viewFormBox context formData error saving =
                 ]
             ]
         ]
+
+
+viewErrors : List String -> Html msg
+viewErrors errors =
+    if List.isEmpty errors then
+        text ""
+
+    else
+        div [ Attr.class "notification is-danger is-light" ]
+            [ ul [] (List.map (\e -> li [] [ text e ]) errors) ]
 
 
 viewTable : List Tournament -> Maybe String -> Html Msg
