@@ -2,7 +2,9 @@ module Pages.Admin.Schools exposing (Model, Msg, page)
 
 import Api exposing (School)
 import Auth
+import District
 import Effect exposing (Effect)
+import Error exposing (Error(..))
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
@@ -11,6 +13,7 @@ import Layouts
 import Page exposing (Page)
 import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
+import School
 import Shared
 import View exposing (View)
 
@@ -41,7 +44,7 @@ type alias SchoolForm =
 
 type FormState
     = FormHidden
-    | FormOpen FormContext SchoolForm (Maybe String)
+    | FormOpen FormContext SchoolForm (List String)
     | FormSaving FormContext SchoolForm
 
 
@@ -105,10 +108,10 @@ update user msg model =
             ( { model | schools = Failed "Failed to load schools." }, Effect.none )
 
         ShowCreateForm ->
-            ( { model | form = FormOpen Creating { name = "", district = "" } Nothing }, Effect.none )
+            ( { model | form = FormOpen Creating { name = "", district = "" } [] }, Effect.none )
 
         EditSchool s ->
-            ( { model | form = FormOpen (Editing s.id) { name = s.name, district = s.district } Nothing }, Effect.none )
+            ( { model | form = FormOpen (Editing s.id) { name = s.name, district = s.district } [] }, Effect.none )
 
         CancelForm ->
             ( { model | form = FormHidden }, Effect.none )
@@ -122,19 +125,21 @@ update user msg model =
         SaveSchool ->
             case model.form of
                 FormOpen context formData _ ->
-                    let
-                        data =
-                            { name = formData.name, district = formData.district }
+                    case validateForm formData of
+                        Err errors ->
+                            ( { model | form = FormOpen context formData errors }, Effect.none )
 
-                        cmd =
-                            case context of
-                                Editing id ->
-                                    Api.updateSchool user.token id data GotSaveResponse
+                        Ok data ->
+                            let
+                                cmd =
+                                    case context of
+                                        Editing id ->
+                                            Api.updateSchool user.token id data GotSaveResponse
 
-                                Creating ->
-                                    Api.createSchool user.token data GotSaveResponse
-                    in
-                    ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
+                                        Creating ->
+                                            Api.createSchool user.token data GotSaveResponse
+                            in
+                            ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
 
                 _ ->
                     ( model, Effect.none )
@@ -172,7 +177,7 @@ update user msg model =
         GotSaveResponse (Err _) ->
             case model.form of
                 FormSaving context formData ->
-                    ( { model | form = FormOpen context formData (Just "Failed to save school.") }, Effect.none )
+                    ( { model | form = FormOpen context formData [ "Failed to save school." ] }, Effect.none )
 
                 _ ->
                     ( model, Effect.none )
@@ -220,11 +225,61 @@ update user msg model =
 -- HELPERS
 
 
+type alias ValidatedSchool =
+    { name : String, district : String }
+
+
+validateForm : SchoolForm -> Result (List String) ValidatedSchool
+validateForm formData =
+    let
+        toStrings =
+            List.map (\(Error msg) -> msg)
+
+        nameValidation =
+            School.nameFromString formData.name |> Result.mapError toStrings
+
+        districtValidation =
+            if String.trim formData.district == "" then
+                Ok ()
+
+            else
+                District.nameFromString formData.district
+                    |> Result.map (\_ -> ())
+                    |> Result.mapError toStrings
+
+        collectErrors results =
+            List.concatMap
+                (\r ->
+                    case r of
+                        Err errs ->
+                            errs
+
+                        Ok _ ->
+                            []
+                )
+                results
+
+        allErrors =
+            collectErrors
+                [ nameValidation |> Result.map (\_ -> ())
+                , districtValidation
+                ]
+    in
+    if List.isEmpty allErrors then
+        Ok
+            { name = String.trim formData.name
+            , district = String.trim formData.district
+            }
+
+    else
+        Err allErrors
+
+
 updateFormField : (SchoolForm -> SchoolForm) -> FormState -> FormState
 updateFormField transform state =
     case state of
-        FormOpen context formData error ->
-            FormOpen context (transform formData) error
+        FormOpen context formData _ ->
+            FormOpen context (transform formData) []
 
         _ ->
             state
@@ -350,15 +405,15 @@ viewForm state =
         FormHidden ->
             text ""
 
-        FormOpen context formData error ->
-            viewFormBox context formData error False
+        FormOpen context formData errors ->
+            viewFormBox context formData errors False
 
         FormSaving context formData ->
-            viewFormBox context formData Nothing True
+            viewFormBox context formData [] True
 
 
-viewFormBox : FormContext -> SchoolForm -> Maybe String -> Bool -> Html Msg
-viewFormBox context formData error saving =
+viewFormBox : FormContext -> SchoolForm -> List String -> Bool -> Html Msg
+viewFormBox context formData errors saving =
     div [ Attr.class "box mb-5" ]
         [ h2 [ Attr.class "subtitle" ]
             [ text
@@ -370,12 +425,7 @@ viewFormBox context formData error saving =
                         "New School"
                 )
             ]
-        , case error of
-            Just err ->
-                div [ Attr.class "notification is-danger is-light" ] [ text err ]
-
-            Nothing ->
-                text ""
+        , viewErrors errors
         , Html.form [ Events.onSubmit SaveSchool ]
             [ div [ Attr.class "columns" ]
                 [ div [ Attr.class "column" ]
@@ -427,6 +477,16 @@ viewFormBox context formData error saving =
                 ]
             ]
         ]
+
+
+viewErrors : List String -> Html msg
+viewErrors errors =
+    if List.isEmpty errors then
+        text ""
+
+    else
+        div [ Attr.class "notification is-danger is-light" ]
+            [ ul [] (List.map (\e -> li [] [ text e ]) errors) ]
 
 
 viewBulkInput : BulkState -> Html Msg
