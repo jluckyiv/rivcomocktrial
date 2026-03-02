@@ -15,6 +15,7 @@ suite =
         [ teamRecordSuite
         , cumulativePercentageSuite
         , rankSuite
+        , headToHeadSuite
         ]
 
 
@@ -113,6 +114,72 @@ rankSuite =
                 , ( "B", record 2 1 300 200 )
                 ]
                     |> Standings.rank [ ByWins, ByCumulativePercentage ]
+                    |> List.map Tuple.first
+                    |> Expect.equal [ "A", "B" ]
+        ]
+
+
+headToHeadLookup : List ( String, String ) -> String -> String -> Order
+headToHeadLookup winsOverList a b =
+    if List.member ( a, b ) winsOverList then
+        LT
+
+    else if List.member ( b, a ) winsOverList then
+        GT
+
+    else
+        EQ
+
+
+headToHeadSuite : Test
+headToHeadSuite =
+    describe "ByHeadToHead"
+        [ test "breaks tie between equal teams" <|
+            \_ ->
+                let
+                    h2h =
+                        ByHeadToHead (headToHeadLookup [ ( "A", "B" ) ])
+                in
+                [ ( "B", record 2 1 300 200 )
+                , ( "A", record 2 1 300 200 )
+                ]
+                    |> Standings.rank [ ByWins, h2h ]
+                    |> List.map Tuple.first
+                    |> Expect.equal [ "A", "B" ]
+        , test "falls through to next tiebreaker after EQ" <|
+            \_ ->
+                let
+                    h2h =
+                        ByHeadToHead (\_ _ -> EQ)
+                in
+                [ ( "B", record 2 1 200 300 )
+                , ( "A", record 2 1 400 200 )
+                ]
+                    |> Standings.rank [ ByWins, h2h, ByCumulativePercentage ]
+                    |> List.map Tuple.first
+                    |> Expect.equal [ "A", "B" ]
+        , test "sole strategy orders correctly" <|
+            \_ ->
+                let
+                    h2h =
+                        ByHeadToHead (headToHeadLookup [ ( "X", "Y" ) ])
+                in
+                [ ( "Y", record 0 0 0 0 )
+                , ( "X", record 0 0 0 0 )
+                ]
+                    |> Standings.rank [ h2h ]
+                    |> List.map Tuple.first
+                    |> Expect.equal [ "X", "Y" ]
+        , test "unknown matchup returns EQ preserves order" <|
+            \_ ->
+                let
+                    h2h =
+                        ByHeadToHead (headToHeadLookup [])
+                in
+                [ ( "A", record 2 1 300 200 )
+                , ( "B", record 2 1 300 200 )
+                ]
+                    |> Standings.rank [ h2h ]
                     |> List.map Tuple.first
                     |> Expect.equal [ "A", "B" ]
         ]
