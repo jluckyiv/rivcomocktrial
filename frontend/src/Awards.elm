@@ -47,11 +47,14 @@ type alias AwardCriteria =
 
 
 type alias StudentScore =
-    { student : Student, totalRankPoints : Int }
+    { student : Student
+    , category : AwardCategory
+    , totalRankPoints : Int
+    }
 
 
 scoreByRankPoints :
-    List ( Student, List Rank.Rank )
+    List ( Student, AwardCategory, List Rank.Rank )
     -> List StudentScore
 scoreByRankPoints entries =
     let
@@ -59,13 +62,17 @@ scoreByRankPoints entries =
             List.length entries
     in
     entries
-        |> List.map (scoreOneStudent count)
+        |> List.map (scoreOneEntry count)
         |> List.sortBy (\s -> negate s.totalRankPoints)
 
 
-scoreOneStudent : Int -> ( Student, List Rank.Rank ) -> StudentScore
-scoreOneStudent count ( s, ranks ) =
+scoreOneEntry :
+    Int
+    -> ( Student, AwardCategory, List Rank.Rank )
+    -> StudentScore
+scoreOneEntry count ( s, cat, ranks ) =
     { student = s
+    , category = cat
     , totalRankPoints =
         ranks
             |> List.filterMap (Rank.rankPoints count >> Result.toMaybe)

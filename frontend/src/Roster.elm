@@ -4,10 +4,12 @@ module Roster exposing
     , Roster
     , assignments
     , create
+    , side
     , student
     )
 
 import Error exposing (Error(..))
+import Side exposing (Side(..))
 import Student exposing (Student)
 import Validate
 import Witness exposing (Witness)
@@ -26,32 +28,39 @@ type RoleAssignment
     | WitnessRole Student Witness
     | ClerkRole Student
     | BailiffRole Student
+    | UnofficialTimer Student
 
 
 type Roster
-    = Roster (List RoleAssignment)
+    = Roster Side (List RoleAssignment)
 
 
-create : List RoleAssignment -> Result (List Error) Roster
-create list =
+create : Side -> List RoleAssignment -> Result (List Error) Roster
+create s list =
     Validate.validate
         (Validate.all
             [ Validate.ifEmptyList identity
                 (Error "Roster cannot be empty")
             , exactlyOne countClerks "clerk"
             , exactlyOne countBailiffs "bailiff"
-            , exactlyOne countPretorial "pretrial attorney"
+            , exactlyOne countPretrial "pretrial attorney"
             , validateWitnessCount
             , validateTrialAttorneyCount
             , validateNoDuplicateStudents
+            , validateUnofficialTimer s
             ]
         )
         list
-        |> Result.map (Validate.fromValid >> Roster)
+        |> Result.map (Validate.fromValid >> Roster s)
+
+
+side : Roster -> Side
+side (Roster s _) =
+    s
 
 
 assignments : Roster -> List RoleAssignment
-assignments (Roster list) =
+assignments (Roster _ list) =
     list
 
 
@@ -71,6 +80,9 @@ student assignment =
             s
 
         BailiffRole s ->
+            s
+
+        UnofficialTimer s ->
             s
 
 
@@ -174,7 +186,7 @@ validateNoDuplicateStudents =
 
                 -- Remove pretrial students from witness list
                 -- (pretrial-as-witness is allowed)
-                nonPretorialWitnesses =
+                nonPretrialWitnesses =
                     List.filter
                         (\s -> not (List.member s pretrialStudents))
                         witnessStudents
@@ -195,19 +207,48 @@ validateNoDuplicateStudents =
                                 BailiffRole s ->
                                     Just s
 
+                                UnofficialTimer s ->
+                                    Just s
+
                                 WitnessRole _ _ ->
                                     Nothing
                         )
                         list
 
                 allStudents =
-                    otherStudents ++ nonPretorialWitnesses
+                    otherStudents ++ nonPretrialWitnesses
             in
             if hasDuplicates allStudents then
                 [ Error "Roster has duplicate students" ]
 
             else
                 []
+        )
+
+
+validateUnofficialTimer : Side -> Validate.Validator Error (List RoleAssignment)
+validateUnofficialTimer s =
+    Validate.fromErrors
+        (\list ->
+            let
+                timerCount =
+                    countTimers list
+            in
+            if timerCount == 0 then
+                []
+
+            else if s == Defense && timerCount == 1 then
+                []
+
+            else if s /= Defense then
+                [ Error "Unofficial timer is only allowed on defense roster" ]
+
+            else
+                [ Error
+                    ("Roster may have at most 1 unofficial timer, got "
+                        ++ String.fromInt timerCount
+                    )
+                ]
         )
 
 
@@ -243,8 +284,8 @@ countBailiffs =
         >> List.length
 
 
-countPretorial : List RoleAssignment -> Int
-countPretorial =
+countPretrial : List RoleAssignment -> Int
+countPretrial =
     List.filter
         (\a ->
             case a of
@@ -277,6 +318,20 @@ countTrialAttorneys =
         (\a ->
             case a of
                 TrialAttorney _ _ ->
+                    True
+
+                _ ->
+                    False
+        )
+        >> List.length
+
+
+countTimers : List RoleAssignment -> Int
+countTimers =
+    List.filter
+        (\a ->
+            case a of
+                UnofficialTimer _ ->
                     True
 
                 _ ->

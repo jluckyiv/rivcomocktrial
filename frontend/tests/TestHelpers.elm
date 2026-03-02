@@ -32,6 +32,7 @@ import District
 import Email exposing (Email)
 import Roster exposing (AttorneyDuty(..), RoleAssignment(..), Roster)
 import School
+import Side exposing (Side(..))
 import Student
 import Team exposing (Team)
 import Witness exposing (Witness)
@@ -135,7 +136,7 @@ witness4 =
 validRoster : Roster
 validRoster =
     case
-        Roster.create
+        Roster.create Prosecution
             [ ClerkRole alice
             , BailiffRole bob
             , PretrialAttorney charlie

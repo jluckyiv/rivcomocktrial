@@ -15,6 +15,7 @@ suite =
     describe "Awards"
         [ nominationCategorySuite
         , scoreByRankPointsSuite
+        , ranksNotCombinedSuite
         ]
 
 
@@ -78,43 +79,134 @@ scoreByRankPointsSuite =
                     |> Expect.equal []
         , test "single student single rank" <|
             \_ ->
-                -- count=1, rank=1 → rankPoints = 1+1-1 = 1
                 Awards.scoreByRankPoints
-                    [ ( alice, [ rank 1 ] ) ]
+                    [ ( alice, BestClerk, [ rank 1 ] ) ]
                     |> List.map .totalRankPoints
                     |> Expect.equal [ 1 ]
         , test "multiple students sorted descending" <|
             \_ ->
-                -- alice: count=2, rank 1 → 2+1-1=2
-                -- bob:   count=2, rank 2 → 2+1-2=1
                 Awards.scoreByRankPoints
-                    [ ( bob, [ rank 2 ] )
-                    , ( alice, [ rank 1 ] )
+                    [ ( bob, BestClerk, [ rank 2 ] )
+                    , ( alice, BestBailiff, [ rank 1 ] )
                     ]
                     |> List.map .totalRankPoints
                     |> Expect.equal [ 2, 1 ]
         , test "multiple rounds accumulate" <|
             \_ ->
-                -- alice: round1 count=2 rank1=2+1-1=2, round2 count=2 rank2=2+1-2=1 → 3
-                -- bob:   round1 count=2 rank2=2+1-2=1, round2 count=2 rank1=2+1-1=2 → 3
                 Awards.scoreByRankPoints
-                    [ ( alice, [ rank 1, rank 2 ] )
-                    , ( bob, [ rank 2, rank 1 ] )
+                    [ ( alice, BestClerk, [ rank 1, rank 2 ] )
+                    , ( bob, BestBailiff, [ rank 2, rank 1 ] )
                     ]
                     |> List.map .totalRankPoints
                     |> Expect.equal [ 3, 3 ]
         , test "equal totals preserved in order" <|
             \_ ->
                 Awards.scoreByRankPoints
-                    [ ( alice, [ rank 1 ] )
-                    , ( bob, [ rank 1 ] )
+                    [ ( alice, BestClerk, [ rank 1 ] )
+                    , ( bob, BestBailiff, [ rank 1 ] )
                     ]
                     |> List.map .student
                     |> Expect.equal [ alice, bob ]
         , test "empty rank list → 0 points" <|
             \_ ->
                 Awards.scoreByRankPoints
-                    [ ( alice, [] ) ]
+                    [ ( alice, BestClerk, [] ) ]
                     |> List.map .totalRankPoints
                     |> Expect.equal [ 0 ]
+        , test "StudentScore includes category" <|
+            \_ ->
+                Awards.scoreByRankPoints
+                    [ ( alice, BestClerk, [ rank 1 ] ) ]
+                    |> List.map .category
+                    |> Expect.equal [ BestClerk ]
+        ]
+
+
+ranksNotCombinedSuite : Test
+ranksNotCombinedSuite =
+    let
+        alice =
+            TestHelpers.alice
+
+        w1 =
+            TestHelpers.witness1
+
+        w2 =
+            TestHelpers.witness2
+
+        rank n =
+            case Rank.fromInt n of
+                Ok r ->
+                    r
+
+                Err _ ->
+                    Debug.todo ("Invalid rank: " ++ String.fromInt n)
+
+        expectSeparateScores description entry1 entry2 =
+            test description <|
+                \_ ->
+                    Awards.scoreByRankPoints [ entry1, entry2 ]
+                        |> List.length
+                        |> Expect.equal 2
+    in
+    describe "ranks not combined across roles"
+        [ -- Pretrial (BestAttorney) combinations
+          expectSeparateScores
+            "pretrial + trial attorney (different sides)"
+            ( alice, BestAttorney Prosecution, [ rank 1 ] )
+            ( alice, BestAttorney Defense, [ rank 2 ] )
+        , expectSeparateScores
+            "pretrial + witness (same side)"
+            ( alice, BestAttorney Prosecution, [ rank 1 ] )
+            ( alice, BestWitness w1, [ rank 2 ] )
+        , expectSeparateScores
+            "pretrial + witness (different sides)"
+            ( alice, BestAttorney Prosecution, [ rank 1 ] )
+            ( alice, BestWitness w2, [ rank 2 ] )
+        , expectSeparateScores
+            "pretrial + clerk"
+            ( alice, BestAttorney Prosecution, [ rank 1 ] )
+            ( alice, BestClerk, [ rank 2 ] )
+        , expectSeparateScores
+            "pretrial + bailiff"
+            ( alice, BestAttorney Prosecution, [ rank 1 ] )
+            ( alice, BestBailiff, [ rank 2 ] )
+
+        -- Trial attorney combinations (not already covered)
+        , expectSeparateScores
+            "trial attorney on both sides"
+            ( alice, BestAttorney Prosecution, [ rank 1 ] )
+            ( alice, BestAttorney Defense, [ rank 2 ] )
+        , expectSeparateScores
+            "trial attorney + witness"
+            ( alice, BestAttorney Defense, [ rank 1 ] )
+            ( alice, BestWitness w1, [ rank 2 ] )
+        , expectSeparateScores
+            "trial attorney + clerk"
+            ( alice, BestAttorney Defense, [ rank 1 ] )
+            ( alice, BestClerk, [ rank 2 ] )
+        , expectSeparateScores
+            "trial attorney + bailiff"
+            ( alice, BestAttorney Defense, [ rank 1 ] )
+            ( alice, BestBailiff, [ rank 2 ] )
+
+        -- Witness combinations (not already covered)
+        , expectSeparateScores
+            "witness on both sides"
+            ( alice, BestWitness w1, [ rank 1 ] )
+            ( alice, BestWitness w2, [ rank 2 ] )
+        , expectSeparateScores
+            "witness + clerk"
+            ( alice, BestWitness w1, [ rank 1 ] )
+            ( alice, BestClerk, [ rank 2 ] )
+        , expectSeparateScores
+            "witness + bailiff"
+            ( alice, BestWitness w1, [ rank 1 ] )
+            ( alice, BestBailiff, [ rank 2 ] )
+
+        -- Clerk + bailiff
+        , expectSeparateScores
+            "clerk + bailiff"
+            ( alice, BestClerk, [ rank 1 ] )
+            ( alice, BestBailiff, [ rank 2 ] )
         ]

@@ -2,6 +2,7 @@ module RosterTest exposing (suite)
 
 import Expect
 import Roster exposing (AttorneyDuty(..), RoleAssignment(..), Roster)
+import Side exposing (Side(..))
 import Student exposing (Student)
 import Test exposing (Test, describe, test)
 import TestHelpers
@@ -66,17 +67,17 @@ suite =
         [ describe "create"
             [ test "rejects empty list" <|
                 \_ ->
-                    Roster.create []
+                    Roster.create Prosecution []
                         |> isErr
                         |> Expect.equal True
             , test "accepts valid roster" <|
                 \_ ->
-                    Roster.create validList
+                    Roster.create Prosecution validList
                         |> isOk
                         |> Expect.equal True
             , test "assignments accessor round-trips" <|
                 \_ ->
-                    Roster.create validList
+                    Roster.create Prosecution validList
                         |> Result.map Roster.assignments
                         |> Expect.equal (Ok validList)
             ]
@@ -85,27 +86,27 @@ suite =
                 \_ ->
                     validList
                         |> List.filter (not << isClerk)
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "duplicate clerk rejected" <|
                 \_ ->
                     (ClerkRole bob :: validList)
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "missing bailiff rejected" <|
                 \_ ->
                     validList
                         |> List.filter (not << isBailiff)
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "missing pretrial attorney rejected" <|
                 \_ ->
                     validList
                         |> List.filter (not << isPretrial)
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "too few witnesses rejected (2)" <|
@@ -117,13 +118,13 @@ suite =
                     , WitnessRole eve w2
                     , TrialAttorney henry Opening
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "too many witnesses rejected (5)" <|
                 \_ ->
                     (WitnessRole henry w1 :: validList)
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "3 witnesses rejected even when pretrial doubles" <|
@@ -136,7 +137,7 @@ suite =
                     , WitnessRole eve w3
                     , TrialAttorney henry Opening
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "4 witnesses with pretrial doubling accepted" <|
@@ -150,14 +151,14 @@ suite =
                     , WitnessRole frank w4
                     , TrialAttorney henry Opening
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isOk
                         |> Expect.equal True
             , test "0 trial attorneys rejected" <|
                 \_ ->
                     validList
                         |> List.filter (not << isTrialAttorney)
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "4 trial attorneys rejected" <|
@@ -174,7 +175,7 @@ suite =
                     , TrialAttorney charlie (CrossOf w2)
                     , TrialAttorney diana Closing
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "1 trial attorney accepted" <|
@@ -188,7 +189,7 @@ suite =
                     , WitnessRole grace w4
                     , TrialAttorney henry Opening
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isOk
                         |> Expect.equal True
             , test "3 trial attorneys accepted" <|
@@ -210,7 +211,7 @@ suite =
                     , TrialAttorney iris (DirectOf w1)
                     , TrialAttorney jake Closing
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isOk
                         |> Expect.equal True
             , test "duplicate student rejected" <|
@@ -224,7 +225,7 @@ suite =
                     , WitnessRole grace w4
                     , TrialAttorney henry Opening
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "pretrial attorney as witness allowed" <|
@@ -238,7 +239,7 @@ suite =
                     , WitnessRole frank w4
                     , TrialAttorney henry Opening
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isOk
                         |> Expect.equal True
             , test "trial attorney as witness rejected" <|
@@ -253,7 +254,7 @@ suite =
                     , TrialAttorney henry Opening
                     , TrialAttorney iris (DirectOf w1)
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "bailiff as witness rejected" <|
@@ -268,7 +269,7 @@ suite =
                     , TrialAttorney henry Opening
                     , TrialAttorney iris (DirectOf w1)
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "clerk as witness rejected" <|
@@ -283,7 +284,7 @@ suite =
                     , TrialAttorney henry Opening
                     , TrialAttorney iris (DirectOf w1)
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "same student in two witness roles rejected" <|
@@ -298,7 +299,7 @@ suite =
                     , TrialAttorney henry Opening
                     , TrialAttorney iris (DirectOf w1)
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "pretrial attorney as trial attorney rejected" <|
@@ -313,7 +314,7 @@ suite =
                     , TrialAttorney charlie Opening
                     , TrialAttorney iris (DirectOf w1)
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "pretrial attorney as clerk rejected" <|
@@ -328,7 +329,7 @@ suite =
                     , TrialAttorney henry Opening
                     , TrialAttorney iris (DirectOf w1)
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "pretrial attorney as bailiff rejected" <|
@@ -343,7 +344,7 @@ suite =
                     , TrialAttorney henry Opening
                     , TrialAttorney iris (DirectOf w1)
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "same student as two trial attorneys rejected" <|
@@ -358,7 +359,7 @@ suite =
                     , TrialAttorney henry Opening
                     , TrialAttorney henry (DirectOf w1)
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "trial attorney as clerk rejected" <|
@@ -373,7 +374,7 @@ suite =
                     , TrialAttorney henry Opening
                     , TrialAttorney iris (DirectOf w1)
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "trial attorney as bailiff rejected" <|
@@ -388,12 +389,12 @@ suite =
                     , TrialAttorney henry Opening
                     , TrialAttorney iris (DirectOf w1)
                     ]
-                        |> Roster.create
+                        |> Roster.create Prosecution
                         |> isErr
                         |> Expect.equal True
             , test "multiple errors accumulate" <|
                 \_ ->
-                    Roster.create [ WitnessRole alice w1 ]
+                    Roster.create Prosecution [ WitnessRole alice w1 ]
                         |> (\result ->
                                 case result of
                                     Err errors ->
@@ -430,6 +431,11 @@ suite =
                     BailiffRole alice
                         |> Roster.student
                         |> Expect.equal alice
+            , test "returns student from UnofficialTimer" <|
+                \_ ->
+                    UnofficialTimer alice
+                        |> Roster.student
+                        |> Expect.equal alice
             ]
         , describe "AttorneyDuty"
             [ test "DirectOf carries a witness" <|
@@ -456,6 +462,72 @@ suite =
                                     _ ->
                                         Expect.fail "expected CrossOf"
                            )
+            ]
+        , describe "side"
+            [ test "side accessor returns Prosecution" <|
+                \_ ->
+                    Roster.create Prosecution validList
+                        |> Result.map Roster.side
+                        |> Expect.equal (Ok Prosecution)
+            , test "side accessor returns Defense" <|
+                \_ ->
+                    Roster.create Defense validList
+                        |> Result.map Roster.side
+                        |> Expect.equal (Ok Defense)
+            ]
+        , describe "UnofficialTimer"
+            [ test "defense roster with timer accepted" <|
+                \_ ->
+                    let
+                        jake =
+                            Student.create
+                                (TestHelpers.studentName "Jake" "Long")
+                                Student.HeHim
+                    in
+                    (validList ++ [ UnofficialTimer jake ])
+                        |> Roster.create Defense
+                        |> isOk
+                        |> Expect.equal True
+            , test "prosecution roster with timer rejected" <|
+                \_ ->
+                    let
+                        jake =
+                            Student.create
+                                (TestHelpers.studentName "Jake" "Long")
+                                Student.HeHim
+                    in
+                    (validList ++ [ UnofficialTimer jake ])
+                        |> Roster.create Prosecution
+                        |> isErr
+                        |> Expect.equal True
+            , test "defense roster without timer accepted" <|
+                \_ ->
+                    Roster.create Defense validList
+                        |> isOk
+                        |> Expect.equal True
+            , test "duplicate timer student rejected" <|
+                \_ ->
+                    (validList ++ [ UnofficialTimer alice ])
+                        |> Roster.create Defense
+                        |> isErr
+                        |> Expect.equal True
+            , test "two timers rejected" <|
+                \_ ->
+                    let
+                        jake =
+                            Student.create
+                                (TestHelpers.studentName "Jake" "Long")
+                                Student.HeHim
+
+                        kim =
+                            Student.create
+                                (TestHelpers.studentName "Kim" "Lee")
+                                Student.SheHer
+                    in
+                    (validList ++ [ UnofficialTimer jake, UnofficialTimer kim ])
+                        |> Roster.create Defense
+                        |> isErr
+                        |> Expect.equal True
             ]
         ]
 
