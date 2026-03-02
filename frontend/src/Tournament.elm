@@ -15,6 +15,7 @@ module Tournament exposing
     , openRegistration
     , prelimRounds
     , status
+    , statusFromString
     , statusToString
     , tournamentName
     , year
@@ -196,6 +197,25 @@ complete (Tournament r) =
 
         other ->
             Err [ Error ("Cannot complete from " ++ statusToString other ++ " status") ]
+
+
+statusFromString : String -> Result (List Error) Status
+statusFromString raw =
+    case String.toLower (String.trim raw) of
+        "draft" ->
+            Ok Draft
+
+        "registration" ->
+            Ok Registration
+
+        "active" ->
+            Ok Active
+
+        "completed" ->
+            Ok Completed
+
+        _ ->
+            Err [ Error ("Unknown tournament status: " ++ raw) ]
 
 
 statusToString : Status -> String

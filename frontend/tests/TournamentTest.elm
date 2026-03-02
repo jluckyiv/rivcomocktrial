@@ -14,6 +14,7 @@ suite =
         , configFromIntsSuite
         , createSuite
         , stateMachineSuite
+        , statusFromStringSuite
         , statusToStringSuite
         ]
 
@@ -254,6 +255,37 @@ stateMachineSuite =
                     |> Tournament.openRegistration
                     |> Result.andThen Tournament.activate
                     |> Result.andThen Tournament.openRegistration
+                    |> isErr
+                    |> Expect.equal True
+        ]
+
+
+statusFromStringSuite : Test
+statusFromStringSuite =
+    describe "statusFromString"
+        [ test "draft round-trips" <|
+            \_ ->
+                Tournament.statusFromString "draft"
+                    |> Result.map Tournament.statusToString
+                    |> Expect.equal (Ok "Draft")
+        , test "registration round-trips" <|
+            \_ ->
+                Tournament.statusFromString "registration"
+                    |> Result.map Tournament.statusToString
+                    |> Expect.equal (Ok "Registration")
+        , test "active round-trips" <|
+            \_ ->
+                Tournament.statusFromString "active"
+                    |> Result.map Tournament.statusToString
+                    |> Expect.equal (Ok "Active")
+        , test "completed round-trips" <|
+            \_ ->
+                Tournament.statusFromString "completed"
+                    |> Result.map Tournament.statusToString
+                    |> Expect.equal (Ok "Completed")
+        , test "rejects unknown string" <|
+            \_ ->
+                Tournament.statusFromString "banana"
                     |> isErr
                     |> Expect.equal True
         ]
