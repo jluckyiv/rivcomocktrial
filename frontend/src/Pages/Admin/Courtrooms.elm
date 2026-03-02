@@ -2,7 +2,9 @@ module Pages.Admin.Courtrooms exposing (Model, Msg, page)
 
 import Api exposing (Courtroom)
 import Auth
+import Courtroom
 import Effect exposing (Effect)
+import Error exposing (Error(..))
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
@@ -41,7 +43,7 @@ type alias CourtroomForm =
 
 type FormState
     = FormHidden
-    | FormOpen FormContext CourtroomForm (Maybe String)
+    | FormOpen FormContext CourtroomForm (List String)
     | FormSaving FormContext CourtroomForm
 
 
@@ -105,10 +107,10 @@ update user msg model =
             ( { model | courtrooms = Failed "Failed to load courtrooms." }, Effect.none )
 
         ShowCreateForm ->
-            ( { model | form = FormOpen Creating { name = "", location = "" } Nothing }, Effect.none )
+            ( { model | form = FormOpen Creating { name = "", location = "" } [] }, Effect.none )
 
         EditCourtroom c ->
-            ( { model | form = FormOpen (Editing c.id) { name = c.name, location = c.location } Nothing }, Effect.none )
+            ( { model | form = FormOpen (Editing c.id) { name = c.name, location = c.location } [] }, Effect.none )
 
         CancelForm ->
             ( { model | form = FormHidden }, Effect.none )
@@ -122,19 +124,21 @@ update user msg model =
         SaveCourtroom ->
             case model.form of
                 FormOpen context formData _ ->
-                    let
-                        data =
-                            { name = formData.name, location = formData.location }
+                    case validateForm formData of
+                        Err errors ->
+                            ( { model | form = FormOpen context formData errors }, Effect.none )
 
-                        cmd =
-                            case context of
-                                Editing id ->
-                                    Api.updateCourtroom user.token id data GotSaveResponse
+                        Ok data ->
+                            let
+                                cmd =
+                                    case context of
+                                        Editing id ->
+                                            Api.updateCourtroom user.token id data GotSaveResponse
 
-                                Creating ->
-                                    Api.createCourtroom user.token data GotSaveResponse
-                    in
-                    ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
+                                        Creating ->
+                                            Api.createCourtroom user.token data GotSaveResponse
+                            in
+                            ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
 
                 _ ->
                     ( model, Effect.none )
@@ -172,7 +176,7 @@ update user msg model =
         GotSaveResponse (Err _) ->
             case model.form of
                 FormSaving context formData ->
-                    ( { model | form = FormOpen context formData (Just "Failed to save courtroom.") }, Effect.none )
+                    ( { model | form = FormOpen context formData [ "Failed to save courtroom." ] }, Effect.none )
 
                 _ ->
                     ( model, Effect.none )
@@ -220,11 +224,35 @@ update user msg model =
 -- HELPERS
 
 
+validateForm : CourtroomForm -> Result (List String) { name : String, location : String }
+validateForm formData =
+    let
+        toStrings =
+            List.map (\(Error msg) -> msg)
+
+        nameValidation =
+            Courtroom.nameFromString formData.name |> Result.mapError toStrings
+
+        allErrors =
+            case nameValidation of
+                Err errs ->
+                    errs
+
+                Ok _ ->
+                    []
+    in
+    if List.isEmpty allErrors then
+        Ok { name = String.trim formData.name, location = formData.location }
+
+    else
+        Err allErrors
+
+
 updateFormField : (CourtroomForm -> CourtroomForm) -> FormState -> FormState
 updateFormField transform state =
     case state of
-        FormOpen context formData error ->
-            FormOpen context (transform formData) error
+        FormOpen context formData _ ->
+            FormOpen context (transform formData) []
 
         _ ->
             state
@@ -350,15 +378,15 @@ viewForm state =
         FormHidden ->
             text ""
 
-        FormOpen context formData error ->
-            viewFormBox context formData error False
+        FormOpen context formData errors ->
+            viewFormBox context formData errors False
 
         FormSaving context formData ->
-            viewFormBox context formData Nothing True
+            viewFormBox context formData [] True
 
 
-viewFormBox : FormContext -> CourtroomForm -> Maybe String -> Bool -> Html Msg
-viewFormBox context formData error saving =
+viewFormBox : FormContext -> CourtroomForm -> List String -> Bool -> Html Msg
+viewFormBox context formData errors saving =
     div [ Attr.class "box mb-5" ]
         [ h2 [ Attr.class "subtitle" ]
             [ text
@@ -370,12 +398,7 @@ viewFormBox context formData error saving =
                         "New Courtroom"
                 )
             ]
-        , case error of
-            Just err ->
-                div [ Attr.class "notification is-danger is-light" ] [ text err ]
-
-            Nothing ->
-                text ""
+        , viewErrors errors
         , Html.form [ Events.onSubmit SaveCourtroom ]
             [ div [ Attr.class "columns" ]
                 [ div [ Attr.class "column" ]
@@ -486,6 +509,16 @@ viewBulkInput state =
                 [ text "Import" ]
             ]
         ]
+
+
+viewErrors : List String -> Html msg
+viewErrors errors =
+    if List.isEmpty errors then
+        text ""
+
+    else
+        div [ Attr.class "notification is-danger is-light" ]
+            [ ul [] (List.map (\e -> li [] [ text e ]) errors) ]
 
 
 viewTable : List Courtroom -> Maybe String -> Html Msg
