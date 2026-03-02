@@ -3,6 +3,7 @@ module Pages.Admin.Teams exposing (Model, Msg, page)
 import Api exposing (School, Team, Tournament)
 import Auth
 import Effect exposing (Effect)
+import Error exposing (Error(..))
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
@@ -12,6 +13,7 @@ import Page exposing (Page)
 import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Shared
+import Team
 import View exposing (View)
 
 
@@ -45,7 +47,7 @@ type alias TeamForm =
 
 type FormState
     = FormHidden
-    | FormOpen FormContext TeamForm (Maybe String)
+    | FormOpen FormContext TeamForm (List String)
     | FormSaving FormContext TeamForm
 
 
@@ -147,7 +149,7 @@ update user msg model =
                         , teamNumber = ""
                         , name = ""
                         }
-                        Nothing
+                        []
               }
             , Effect.none
             )
@@ -161,7 +163,7 @@ update user msg model =
                         , teamNumber = String.fromInt t.teamNumber
                         , name = t.name
                         }
-                        Nothing
+                        []
               }
             , Effect.none
             )
@@ -184,23 +186,21 @@ update user msg model =
         SaveTeam ->
             case model.form of
                 FormOpen context formData _ ->
-                    let
-                        data =
-                            { tournament = formData.tournament
-                            , school = formData.school
-                            , teamNumber = String.toInt formData.teamNumber |> Maybe.withDefault 0
-                            , name = formData.name
-                            }
+                    case validateForm formData of
+                        Err errors ->
+                            ( { model | form = FormOpen context formData errors }, Effect.none )
 
-                        cmd =
-                            case context of
-                                Editing id ->
-                                    Api.updateTeam user.token id data GotSaveResponse
+                        Ok data ->
+                            let
+                                cmd =
+                                    case context of
+                                        Editing id ->
+                                            Api.updateTeam user.token id data GotSaveResponse
 
-                                Creating ->
-                                    Api.createTeam user.token data GotSaveResponse
-                    in
-                    ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
+                                        Creating ->
+                                            Api.createTeam user.token data GotSaveResponse
+                            in
+                            ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
 
                 _ ->
                     ( model, Effect.none )
@@ -238,7 +238,7 @@ update user msg model =
         GotSaveResponse (Err _) ->
             case model.form of
                 FormSaving context formData ->
-                    ( { model | form = FormOpen context formData (Just "Failed to save team.") }, Effect.none )
+                    ( { model | form = FormOpen context formData [ "Failed to save team." ] }, Effect.none )
 
                 _ ->
                     ( model, Effect.none )
@@ -289,11 +289,82 @@ update user msg model =
 updateFormField : (TeamForm -> TeamForm) -> FormState -> FormState
 updateFormField transform state =
     case state of
-        FormOpen context formData error ->
-            FormOpen context (transform formData) error
+        FormOpen context formData _ ->
+            FormOpen context (transform formData) []
 
         _ ->
             state
+
+
+type alias ValidatedTeam =
+    { tournament : String
+    , school : String
+    , teamNumber : Int
+    , name : String
+    }
+
+
+validateForm : TeamForm -> Result (List String) ValidatedTeam
+validateForm formData =
+    let
+        toStrings =
+            List.map (\(Error msg) -> msg)
+
+        tournamentValidation =
+            if String.trim formData.tournament == "" then
+                Err [ "Tournament is required." ]
+
+            else
+                Ok ()
+
+        schoolValidation =
+            if String.trim formData.school == "" then
+                Err [ "School is required." ]
+
+            else
+                Ok ()
+
+        teamNumberValidation =
+            case String.toInt (String.trim formData.teamNumber) of
+                Nothing ->
+                    Err [ "Team number must be a valid integer." ]
+
+                Just n ->
+                    Team.numberFromInt n |> Result.mapError toStrings
+
+        nameValidation =
+            Team.nameFromString formData.name |> Result.mapError toStrings
+
+        collectErrors results =
+            List.concatMap
+                (\r ->
+                    case r of
+                        Err errs ->
+                            errs
+
+                        Ok _ ->
+                            []
+                )
+                results
+
+        allErrors =
+            collectErrors
+                [ tournamentValidation
+                , schoolValidation
+                , teamNumberValidation |> Result.map (\_ -> ())
+                , nameValidation |> Result.map (\_ -> ())
+                ]
+    in
+    if List.isEmpty allErrors then
+        Ok
+            { tournament = String.trim formData.tournament
+            , school = String.trim formData.school
+            , teamNumber = String.toInt (String.trim formData.teamNumber) |> Maybe.withDefault 0
+            , name = String.trim formData.name
+            }
+
+    else
+        Err allErrors
 
 
 handleBulkImport : Auth.User -> Model -> ( Model, Effect Msg )
@@ -471,15 +542,15 @@ viewForm state tournaments schools =
         FormHidden ->
             text ""
 
-        FormOpen context formData error ->
-            viewFormBox context formData error False tournaments schools
+        FormOpen context formData errors ->
+            viewFormBox context formData errors False tournaments schools
 
         FormSaving context formData ->
-            viewFormBox context formData Nothing True tournaments schools
+            viewFormBox context formData [] True tournaments schools
 
 
-viewFormBox : FormContext -> TeamForm -> Maybe String -> Bool -> List Tournament -> List School -> Html Msg
-viewFormBox context formData error saving tournaments schools =
+viewFormBox : FormContext -> TeamForm -> List String -> Bool -> List Tournament -> List School -> Html Msg
+viewFormBox context formData errors saving tournaments schools =
     div [ Attr.class "box mb-5" ]
         [ h2 [ Attr.class "subtitle" ]
             [ text
@@ -491,12 +562,7 @@ viewFormBox context formData error saving tournaments schools =
                         "New Team"
                 )
             ]
-        , case error of
-            Just err ->
-                div [ Attr.class "notification is-danger is-light" ] [ text err ]
-
-            Nothing ->
-                text ""
+        , viewErrors errors
         , Html.form [ Events.onSubmit SaveTeam ]
             [ div [ Attr.class "columns" ]
                 [ div [ Attr.class "column" ]
@@ -717,3 +783,13 @@ viewRow deleting schoolName tournamentName t =
                 ]
             ]
         ]
+
+
+viewErrors : List String -> Html msg
+viewErrors errors =
+    if List.isEmpty errors then
+        text ""
+
+    else
+        div [ Attr.class "notification is-danger is-light" ]
+            [ ul [] (List.map (\e -> li [] [ text e ]) errors) ]
