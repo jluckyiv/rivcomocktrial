@@ -41,7 +41,7 @@ type alias StudentForm =
 
 type FormState
     = FormHidden
-    | FormOpen FormContext StudentForm (Maybe String)
+    | FormOpen FormContext StudentForm (List String)
     | FormSaving FormContext StudentForm
 
 
@@ -123,10 +123,10 @@ update user msg model =
             ( { model | filterSchool = val }, Effect.none )
 
         ShowCreateForm ->
-            ( { model | form = FormOpen Creating { name = "", school = model.filterSchool } Nothing }, Effect.none )
+            ( { model | form = FormOpen Creating { name = "", school = model.filterSchool } [] }, Effect.none )
 
         EditStudent s ->
-            ( { model | form = FormOpen (Editing s.id) { name = s.name, school = s.school } Nothing }, Effect.none )
+            ( { model | form = FormOpen (Editing s.id) { name = s.name, school = s.school } [] }, Effect.none )
 
         CancelForm ->
             ( { model | form = FormHidden }, Effect.none )
@@ -140,19 +140,21 @@ update user msg model =
         SaveStudent ->
             case model.form of
                 FormOpen context formData _ ->
-                    let
-                        data =
-                            { name = formData.name, school = formData.school }
+                    case validateForm formData of
+                        Err errors ->
+                            ( { model | form = FormOpen context formData errors }, Effect.none )
 
-                        cmd =
-                            case context of
-                                Editing id ->
-                                    Api.updateStudent user.token id data GotSaveResponse
+                        Ok data ->
+                            let
+                                cmd =
+                                    case context of
+                                        Editing id ->
+                                            Api.updateStudent user.token id data GotSaveResponse
 
-                                Creating ->
-                                    Api.createStudent user.token data GotSaveResponse
-                    in
-                    ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
+                                        Creating ->
+                                            Api.createStudent user.token data GotSaveResponse
+                            in
+                            ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
 
                 _ ->
                     ( model, Effect.none )
@@ -190,7 +192,7 @@ update user msg model =
         GotSaveResponse (Err _) ->
             case model.form of
                 FormSaving context formData ->
-                    ( { model | form = FormOpen context formData (Just "Failed to save student.") }, Effect.none )
+                    ( { model | form = FormOpen context formData [ "Failed to save student." ] }, Effect.none )
 
                 _ ->
                     ( model, Effect.none )
@@ -238,11 +240,35 @@ update user msg model =
 -- HELPERS
 
 
+validateForm : StudentForm -> Result (List String) { name : String, school : String }
+validateForm formData =
+    let
+        errors =
+            []
+                |> addErrorIf (String.trim formData.name == "") "Name is required"
+                |> addErrorIf (String.trim formData.school == "") "School is required"
+    in
+    if List.isEmpty errors then
+        Ok { name = formData.name, school = formData.school }
+
+    else
+        Err errors
+
+
+addErrorIf : Bool -> String -> List String -> List String
+addErrorIf condition error errors =
+    if condition then
+        errors ++ [ error ]
+
+    else
+        errors
+
+
 updateFormField : (StudentForm -> StudentForm) -> FormState -> FormState
 updateFormField transform state =
     case state of
-        FormOpen context formData error ->
-            FormOpen context (transform formData) error
+        FormOpen context formData _ ->
+            FormOpen context (transform formData) []
 
         _ ->
             state
@@ -390,15 +416,15 @@ viewForm state schools =
         FormHidden ->
             text ""
 
-        FormOpen context formData error ->
-            viewFormBox context formData error False schools
+        FormOpen context formData errors ->
+            viewFormBox context formData errors False schools
 
         FormSaving context formData ->
-            viewFormBox context formData Nothing True schools
+            viewFormBox context formData [] True schools
 
 
-viewFormBox : FormContext -> StudentForm -> Maybe String -> Bool -> List School -> Html Msg
-viewFormBox context formData error saving schools =
+viewFormBox : FormContext -> StudentForm -> List String -> Bool -> List School -> Html Msg
+viewFormBox context formData errors saving schools =
     div [ Attr.class "box mb-5" ]
         [ h2 [ Attr.class "subtitle" ]
             [ text
@@ -410,12 +436,7 @@ viewFormBox context formData error saving schools =
                         "New Student"
                 )
             ]
-        , case error of
-            Just err ->
-                div [ Attr.class "notification is-danger is-light" ] [ text err ]
-
-            Nothing ->
-                text ""
+        , viewErrors errors
         , Html.form [ Events.onSubmit SaveStudent ]
             [ div [ Attr.class "columns" ]
                 [ div [ Attr.class "column" ]
@@ -531,6 +552,16 @@ viewBulkInput state =
                 [ text "Import" ]
             ]
         ]
+
+
+viewErrors : List String -> Html msg
+viewErrors errors =
+    if List.isEmpty errors then
+        text ""
+
+    else
+        div [ Attr.class "notification is-danger is-light" ]
+            [ ul [] (List.map (\e -> li [] [ text e ]) errors) ]
 
 
 viewTable : List Student -> List School -> Maybe String -> String -> Html Msg

@@ -46,7 +46,7 @@ type alias RoundForm =
 
 type FormState
     = FormHidden
-    | FormOpen FormContext RoundForm (Maybe String)
+    | FormOpen FormContext RoundForm (List String)
     | FormSaving FormContext RoundForm
 
 
@@ -128,7 +128,7 @@ update user msg model =
                         , roundType = "preliminary"
                         , tournament = model.filterTournament
                         }
-                        Nothing
+                        []
               }
             , Effect.none
             )
@@ -142,7 +142,7 @@ update user msg model =
                         , roundType = r.roundType
                         , tournament = r.tournament
                         }
-                        Nothing
+                        []
               }
             , Effect.none
             )
@@ -165,24 +165,21 @@ update user msg model =
         SaveRound ->
             case model.form of
                 FormOpen context formData _ ->
-                    let
-                        data =
-                            { number = String.toInt formData.number |> Maybe.withDefault 0
-                            , date = formData.date
-                            , roundType = formData.roundType
-                            , published = False
-                            , tournament = formData.tournament
-                            }
+                    case validateForm formData of
+                        Err errors ->
+                            ( { model | form = FormOpen context formData errors }, Effect.none )
 
-                        cmd =
-                            case context of
-                                Editing id ->
-                                    Api.updateRound user.token id data GotSaveResponse
+                        Ok data ->
+                            let
+                                cmd =
+                                    case context of
+                                        Editing id ->
+                                            Api.updateRound user.token id data GotSaveResponse
 
-                                Creating ->
-                                    Api.createRound user.token data GotSaveResponse
-                    in
-                    ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
+                                        Creating ->
+                                            Api.createRound user.token data GotSaveResponse
+                            in
+                            ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
 
                 _ ->
                     ( model, Effect.none )
@@ -220,7 +217,7 @@ update user msg model =
         GotSaveResponse (Err _) ->
             case model.form of
                 FormSaving context formData ->
-                    ( { model | form = FormOpen context formData (Just "Failed to save round.") }, Effect.none )
+                    ( { model | form = FormOpen context formData [ "Failed to save round." ] }, Effect.none )
 
                 _ ->
                     ( model, Effect.none )
@@ -279,11 +276,65 @@ update user msg model =
 -- HELPERS
 
 
+type alias ValidatedRound =
+    { number : Int
+    , date : String
+    , roundType : String
+    , published : Bool
+    , tournament : String
+    }
+
+
+validateForm : RoundForm -> Result (List String) ValidatedRound
+validateForm formData =
+    let
+        errors =
+            []
+                |> addErrorIf (String.trim formData.tournament == "") "Tournament is required"
+                |> addErrorIf
+                    (case String.toInt formData.number of
+                        Just n ->
+                            n < 1
+
+                        Nothing ->
+                            True
+                    )
+                    "Round number must be a positive integer"
+                |> addErrorIf (String.trim formData.date == "") "Date is required"
+                |> addErrorIf (not (List.member formData.roundType [ "preliminary", "elimination" ])) "Round type must be preliminary or elimination"
+    in
+    if List.isEmpty errors then
+        case String.toInt formData.number of
+            Just n ->
+                Ok
+                    { number = n
+                    , date = formData.date
+                    , roundType = formData.roundType
+                    , published = False
+                    , tournament = formData.tournament
+                    }
+
+            Nothing ->
+                Err errors
+
+    else
+        Err errors
+
+
+addErrorIf : Bool -> String -> List String -> List String
+addErrorIf condition error errors =
+    if condition then
+        errors ++ [ error ]
+
+    else
+        errors
+
+
 updateFormField : (RoundForm -> RoundForm) -> FormState -> FormState
 updateFormField transform state =
     case state of
-        FormOpen context formData error ->
-            FormOpen context (transform formData) error
+        FormOpen context formData _ ->
+            FormOpen context (transform formData) []
 
         _ ->
             state
@@ -359,15 +410,15 @@ viewForm state tournaments =
         FormHidden ->
             text ""
 
-        FormOpen context formData error ->
-            viewFormBox context formData error False tournaments
+        FormOpen context formData errors ->
+            viewFormBox context formData errors False tournaments
 
         FormSaving context formData ->
-            viewFormBox context formData Nothing True tournaments
+            viewFormBox context formData [] True tournaments
 
 
-viewFormBox : FormContext -> RoundForm -> Maybe String -> Bool -> List Tournament -> Html Msg
-viewFormBox context formData error saving tournaments =
+viewFormBox : FormContext -> RoundForm -> List String -> Bool -> List Tournament -> Html Msg
+viewFormBox context formData errors saving tournaments =
     div [ Attr.class "box mb-5" ]
         [ h2 [ Attr.class "subtitle" ]
             [ text
@@ -379,12 +430,7 @@ viewFormBox context formData error saving tournaments =
                         "New Round"
                 )
             ]
-        , case error of
-            Just err ->
-                div [ Attr.class "notification is-danger is-light" ] [ text err ]
-
-            Nothing ->
-                text ""
+        , viewErrors errors
         , Html.form [ Events.onSubmit SaveRound ]
             [ div [ Attr.class "columns" ]
                 [ div [ Attr.class "column" ]
@@ -468,6 +514,16 @@ viewFormBox context formData error saving tournaments =
                 ]
             ]
         ]
+
+
+viewErrors : List String -> Html msg
+viewErrors errors =
+    if List.isEmpty errors then
+        text ""
+
+    else
+        div [ Attr.class "notification is-danger is-light" ]
+            [ ul [] (List.map (\e -> li [] [ text e ]) errors) ]
 
 
 viewTable : List Round -> List Tournament -> Maybe String -> String -> Html Msg
