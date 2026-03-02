@@ -13,12 +13,14 @@ module TestHelpers exposing
     , grace
     , henry
     , iris
+    , judgeName
     , schoolName
     , studentName
     , teamA
     , teamB
     , teamName
     , teamNumber
+    , testJudge
     , validRoster
     , witness1
     , witness2
@@ -30,6 +32,7 @@ import Coach exposing (TeacherCoach, TeacherCoachApplicant)
 import Courtroom
 import District
 import Email exposing (Email)
+import Judge
 import Roster exposing (AttorneyDuty(..), RoleAssignment(..), Roster)
 import School
 import Side exposing (Side(..))
@@ -252,6 +255,21 @@ teamB =
 applicant : String -> String -> TeacherCoachApplicant
 applicant first last =
     Coach.apply (coachName first last) (email "test@example.com")
+
+
+judgeName : String -> String -> Judge.Name
+judgeName first last =
+    case Judge.nameFromStrings first last of
+        Ok n ->
+            n
+
+        Err _ ->
+            Debug.todo ("Invalid judge name: " ++ first ++ " " ++ last)
+
+
+testJudge : Judge.Judge
+testJudge =
+    Judge.create (judgeName "Test" "Judge") (email "judge@example.com")
 
 
 coach : String -> String -> TeacherCoach

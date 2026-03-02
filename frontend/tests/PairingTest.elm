@@ -3,10 +3,10 @@ module PairingTest exposing (suite)
 import Assignment exposing (Assignment(..))
 import Courtroom
 import Expect
-import Judge exposing (Judge(..))
+import Judge
 import Pairing
 import Test exposing (Test, describe, test)
-import TestHelpers exposing (courtroomName, teamA, teamB)
+import TestHelpers exposing (courtroomName, teamA, teamB, testJudge)
 
 
 suite : Test
@@ -60,9 +60,9 @@ suite =
             [ test "sets the judge" <|
                 \_ ->
                     Pairing.create teamA teamB
-                        |> Result.map (Pairing.assignJudge Judge)
+                        |> Result.map (Pairing.assignJudge testJudge)
                         |> Result.map Pairing.judge
-                        |> Expect.equal (Ok (Assigned Judge))
+                        |> Expect.equal (Ok (Assigned testJudge))
             ]
         ]
 

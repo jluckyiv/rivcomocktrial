@@ -3,10 +3,10 @@ module TrialTest exposing (suite)
 import Assignment exposing (Assignment(..))
 import Courtroom
 import Expect
-import Judge exposing (Judge(..))
+import Judge
 import Pairing
 import Test exposing (Test, describe, test)
-import TestHelpers exposing (courtroomName, teamA, teamB)
+import TestHelpers exposing (courtroomName, teamA, teamB, testJudge)
 import Trial
 
 
@@ -43,21 +43,21 @@ suite =
             , test "only judge assigned returns Nothing" <|
                 \_ ->
                     unsafePairing
-                        |> Pairing.assignJudge Judge
+                        |> Pairing.assignJudge testJudge
                         |> Trial.fromPairing
                         |> Expect.equal Nothing
             , test "both assigned returns Just Trial" <|
                 \_ ->
                     unsafePairing
                         |> Pairing.assignCourtroom courtroom
-                        |> Pairing.assignJudge Judge
+                        |> Pairing.assignJudge testJudge
                         |> Trial.fromPairing
                         |> expectJust
             , test "trial has correct prosecution" <|
                 \_ ->
                     unsafePairing
                         |> Pairing.assignCourtroom courtroom
-                        |> Pairing.assignJudge Judge
+                        |> Pairing.assignJudge testJudge
                         |> Trial.fromPairing
                         |> Maybe.map Trial.prosecution
                         |> Expect.equal (Just teamA)
@@ -65,7 +65,7 @@ suite =
                 \_ ->
                     unsafePairing
                         |> Pairing.assignCourtroom courtroom
-                        |> Pairing.assignJudge Judge
+                        |> Pairing.assignJudge testJudge
                         |> Trial.fromPairing
                         |> Maybe.map Trial.defense
                         |> Expect.equal (Just teamB)
@@ -73,7 +73,7 @@ suite =
                 \_ ->
                     unsafePairing
                         |> Pairing.assignCourtroom courtroom
-                        |> Pairing.assignJudge Judge
+                        |> Pairing.assignJudge testJudge
                         |> Trial.fromPairing
                         |> Maybe.map Trial.courtroom
                         |> Expect.equal (Just courtroom)
@@ -81,10 +81,10 @@ suite =
                 \_ ->
                     unsafePairing
                         |> Pairing.assignCourtroom courtroom
-                        |> Pairing.assignJudge Judge
+                        |> Pairing.assignJudge testJudge
                         |> Trial.fromPairing
                         |> Maybe.map Trial.judge
-                        |> Expect.equal (Just Judge)
+                        |> Expect.equal (Just testJudge)
             ]
         ]
 
