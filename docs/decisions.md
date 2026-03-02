@@ -5,6 +5,73 @@ rationale. Newest first.
 
 ---
 
+## ADR-007: Auth UX — role self-identification and OAuth labels
+
+**Date:** 2026-03-01
+
+**Context:** The app has multiple user roles (teacher
+coach, attorney coach, scorer/judge, admin) with
+different auth mechanisms. Need to decide how users
+identify themselves at registration and what the OAuth
+buttons should say.
+
+**Decision:**
+
+1. **Role selection first.** The login/register screen
+   opens with "How are you participating?" and presents
+   role cards:
+   - "Teacher Coach" → OAuth2 → applicant flow (admin
+     approval required)
+   - "Attorney Coach" → OAuth2 → simpler registration
+   - "Scorer / Judge" → magic link (email) or QR code
+     scan on tournament day
+   - Admin and SuperUser are never self-registered —
+     created by existing admins
+
+2. **OAuth button labels use education-specific names:**
+   - "Sign in with Microsoft 365 Education"
+   - "Sign in with Google Workspace for Education"
+
+   This signals that teachers should use their
+   school-issued account, not a personal one. The school
+   domain in the OAuth response aids admin verification.
+
+3. **Scorer/judge auth is lightweight.** Scorers
+   authenticate via magic link (emailed) or by scanning
+   a single tournament-wide QR code on the day of
+   competition. No password, no OAuth. This
+   accommodates last-minute volunteers and reduces
+   friction on tournament day.
+
+**Rationale:**
+- Role selection up front maps directly to `UserRole`
+  domain type and determines the auth flow
+- Education-branded OAuth buttons set correct
+  expectations — teachers know to pick their school
+  account, reducing mismatched-identity issues
+- RCOE distinguishes teacher coaches from attorney
+  coaches at registration (different privileges, only
+  teachers receive scores and admin their team) — the
+  UI should reflect this distinction early
+- Magic link / QR for scorers matches the reality:
+  volunteers sign up days before or show up the morning
+  of, and must be scoring within minutes
+
+**Consequences:**
+- Login screen has a pre-auth step (role selection)
+  before showing auth options — slightly more clicks
+  but clearer flow
+- OAuth provider configuration needs two providers
+  (Google + Microsoft) in PocketBase
+- Magic link requires PocketBase email sending config
+- Single tournament-wide QR code means any scanner gets
+  the auth flow — courtroom assignment happens after
+  auth, not encoded in the QR
+- Admin/SuperUser creation is an admin-only action,
+  keeping the public-facing auth screen simple
+
+---
+
 ## ADR-006: Flat module-per-concept for domain types
 
 **Date:** 2026-03-01
