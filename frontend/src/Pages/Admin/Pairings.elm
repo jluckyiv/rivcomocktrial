@@ -60,7 +60,7 @@ type alias Model =
     , courtrooms : List Courtroom
     , allTrials : List Trial
     , loading : Bool
-    , error : Maybe String
+    , formErrors : List String
     , inputMode : InputMode
     , formProsecution : String
     , formDefense : String
@@ -70,7 +70,7 @@ type alias Model =
     , deleting : Maybe String
     , bulkText : String
     , bulkParsed : List BulkParsedPairing
-    , bulkError : Maybe String
+    , bulkErrors : List String
     , showBulkPreview : Bool
     , bulkSaving : Bool
     , crossBracketStrategy : CrossBracketStrategy
@@ -91,7 +91,7 @@ init user route _ =
       , courtrooms = []
       , allTrials = []
       , loading = True
-      , error = Nothing
+      , formErrors = []
       , inputMode = DropdownMode
       , formProsecution = ""
       , formDefense = ""
@@ -101,7 +101,7 @@ init user route _ =
       , deleting = Nothing
       , bulkText = ""
       , bulkParsed = []
-      , bulkError = Nothing
+      , bulkErrors = []
       , showBulkPreview = False
       , bulkSaving = False
       , crossBracketStrategy = HighHigh
@@ -172,13 +172,13 @@ update user msg model =
             )
 
         GotRounds (Err _) ->
-            ( { model | error = Just "Failed to load rounds." }, Effect.none )
+            ( { model | formErrors = [ "Failed to load rounds." ] }, Effect.none )
 
         GotTrials (Ok response) ->
             ( { model | trials = response.items, loading = False }, Effect.none )
 
         GotTrials (Err _) ->
-            ( { model | loading = False, error = Just "Failed to load trials." }, Effect.none )
+            ( { model | loading = False, formErrors = [ "Failed to load trials." ] }, Effect.none )
 
         GotAllTrials (Ok response) ->
             ( { model | allTrials = response.items }, Effect.none )
@@ -197,7 +197,7 @@ update user msg model =
             ( { model | teams = filtered }, Effect.none )
 
         GotTeams (Err _) ->
-            ( { model | error = Just "Failed to load teams." }, Effect.none )
+            ( { model | formErrors = [ "Failed to load teams." ] }, Effect.none )
 
         GotCourtrooms (Ok response) ->
             ( { model | courtrooms = response.items }, Effect.none )
@@ -209,36 +209,30 @@ update user msg model =
             ( { model | inputMode = mode }, Effect.none )
 
         FormProsecutionChanged val ->
-            ( { model | formProsecution = val }, Effect.none )
+            ( { model | formProsecution = val, formErrors = [] }, Effect.none )
 
         FormDefenseChanged val ->
-            ( { model | formDefense = val }, Effect.none )
+            ( { model | formDefense = val, formErrors = [] }, Effect.none )
 
         FormCourtroomChanged val ->
-            ( { model | formCourtroom = val }, Effect.none )
+            ( { model | formCourtroom = val, formErrors = [] }, Effect.none )
 
         SaveTrial ->
-            if model.formProsecution == model.formDefense then
-                ( { model | error = Just "Prosecution and defense cannot be the same team." }, Effect.none )
+            case validateDropdownForm model of
+                Err errors ->
+                    ( { model | formErrors = errors }, Effect.none )
 
-            else
-                let
-                    data =
-                        { round = model.roundId
-                        , prosecutionTeam = model.formProsecution
-                        , defenseTeam = model.formDefense
-                        , courtroom = model.formCourtroom
-                        }
+                Ok data ->
+                    let
+                        cmd =
+                            case model.editingId of
+                                Just id ->
+                                    Api.updateTrial user.token id data GotSaveResponse
 
-                    cmd =
-                        case model.editingId of
-                            Just id ->
-                                Api.updateTrial user.token id data GotSaveResponse
-
-                            Nothing ->
-                                Api.createTrial user.token data GotSaveResponse
-                in
-                ( { model | formSaving = True, error = Nothing }, Effect.sendCmd cmd )
+                                Nothing ->
+                                    Api.createTrial user.token data GotSaveResponse
+                    in
+                    ( { model | formSaving = True, formErrors = [] }, Effect.sendCmd cmd )
 
         GotSaveResponse (Ok trial) ->
             let
@@ -287,7 +281,7 @@ update user msg model =
             )
 
         GotSaveResponse (Err _) ->
-            ( { model | formSaving = False, error = Just "Failed to save trial." }, Effect.none )
+            ( { model | formSaving = False, formErrors = [ "Failed to save trial." ] }, Effect.none )
 
         EditTrial trial ->
             ( { model
@@ -324,10 +318,10 @@ update user msg model =
             )
 
         GotDeleteResponse _ (Err _) ->
-            ( { model | deleting = Nothing, error = Just "Failed to delete trial." }, Effect.none )
+            ( { model | deleting = Nothing, formErrors = [ "Failed to delete trial." ] }, Effect.none )
 
         BulkTextChanged val ->
-            ( { model | bulkText = val, showBulkPreview = False, bulkError = Nothing }, Effect.none )
+            ( { model | bulkText = val, showBulkPreview = False, bulkErrors = [] }, Effect.none )
 
         ParseBulkText ->
             let
@@ -339,10 +333,10 @@ update user msg model =
             in
             case errors of
                 [] ->
-                    ( { model | bulkParsed = parsed, showBulkPreview = True, bulkError = Nothing }, Effect.none )
+                    ( { model | bulkParsed = parsed, showBulkPreview = True, bulkErrors = [] }, Effect.none )
 
                 _ ->
-                    ( { model | bulkError = Just (String.join "; " errors), showBulkPreview = False }, Effect.none )
+                    ( { model | bulkErrors = errors, showBulkPreview = False }, Effect.none )
 
         ConfirmBulkCreate ->
             let
@@ -393,7 +387,7 @@ update user msg model =
             )
 
         GotBulkCreateResponse (Err _) ->
-            ( { model | bulkSaving = False, error = Just "Failed to create some trials." }, Effect.none )
+            ( { model | bulkSaving = False, formErrors = [ "Failed to create some trials." ] }, Effect.none )
 
         CancelBulkPreview ->
             ( { model | showBulkPreview = False, bulkParsed = [] }, Effect.none )
@@ -441,6 +435,44 @@ update user msg model =
 
         ClearPowerMatch ->
             ( { model | powerMatchResult = Nothing }, Effect.none )
+
+
+
+-- VALIDATION
+
+
+validateDropdownForm :
+    Model
+    -> Result (List String) { round : String, prosecutionTeam : String, defenseTeam : String, courtroom : String }
+validateDropdownForm model =
+    let
+        errors =
+            []
+                |> addErrorIf (String.trim model.formProsecution == "") "Prosecution team is required"
+                |> addErrorIf (String.trim model.formDefense == "") "Defense team is required"
+                |> addErrorIf
+                    (model.formProsecution /= "" && model.formProsecution == model.formDefense)
+                    "Prosecution and defense cannot be the same team"
+    in
+    if List.isEmpty errors then
+        Ok
+            { round = model.roundId
+            , prosecutionTeam = model.formProsecution
+            , defenseTeam = model.formDefense
+            , courtroom = model.formCourtroom
+            }
+
+    else
+        Err errors
+
+
+addErrorIf : Bool -> String -> List String -> List String
+addErrorIf condition error errors =
+    if condition then
+        errors ++ [ error ]
+
+    else
+        errors
 
 
 
@@ -580,7 +612,7 @@ view model =
 
         else
             [ viewHeader model
-            , viewError model.error
+            , viewErrors model.formErrors
             , viewModeToggle model
             , case model.inputMode of
                 DropdownMode ->
@@ -622,14 +654,14 @@ viewHeader model =
         ]
 
 
-viewError : Maybe String -> Html Msg
-viewError maybeError =
-    case maybeError of
-        Just err ->
-            div [ Attr.class "notification is-danger" ] [ text err ]
+viewErrors : List String -> Html msg
+viewErrors errors =
+    if List.isEmpty errors then
+        text ""
 
-        Nothing ->
-            text ""
+    else
+        div [ Attr.class "notification is-danger is-light" ]
+            [ ul [] (List.map (\e -> li [] [ text e ]) errors) ]
 
 
 viewModeToggle : Model -> Html Msg
@@ -914,12 +946,7 @@ viewBulkTextSection model =
                     []
                 ]
             ]
-        , case model.bulkError of
-            Just err ->
-                div [ Attr.class "notification is-danger is-light" ] [ text err ]
-
-            Nothing ->
-                text ""
+        , viewErrors model.bulkErrors
         , if model.showBulkPreview then
             viewBulkPreview model
 
