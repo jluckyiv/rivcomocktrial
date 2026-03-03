@@ -311,11 +311,30 @@ people) to try the UI and give feedback.
 
 ---
 
+## Admin Page Domain Validation ✅
+
+**Status:** Done (issue #36, PRs #42–45)
+
+All FormState-based admin pages now route form
+submissions through `validateForm` functions that
+accumulate `List String` errors. Pages using domain
+validators: Tournaments (`Tournament.nameFromString`,
+`yearFromInt`, `configFromInts`, `statusFromString`),
+Schools (`School.nameFromString`), Teams
+(`Team.nameFromString`, `numberFromInt`), Courtrooms
+(`Courtroom.nameFromString`). Pages using plain checks:
+Rounds (typed `ValidatedRound` with `number : Int`),
+Students (non-empty checks, form restructure deferred).
+
+**Remaining:** Pairings page (issue #46) — uses a
+different error pattern (model-level, not FormState).
+
+---
+
 ## Open Questions
 
 These are deferred to the relevant milestones:
 
-- Power matching algorithm details (before Milestone 2)
 - Blue Ribbon award exact formula / AMTA variation
   (Milestone 5)
 - Score sheet format for coaches (pending PDF,

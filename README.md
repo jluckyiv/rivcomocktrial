@@ -122,8 +122,14 @@ fly ssh console --config fly.staging.toml -C \
 
 - [Roadmap](docs/roadmap.md) — milestones, domain
   context, open questions
+- [Domain Roadmap](docs/domain-roadmap.md) — domain
+  modeling plan, design principles, dependency graph
+- [Domain Audit](docs/domain-audit.md) — 4-tier audit
+  of all 24 domain modules
+- [Competition Workflow](docs/competition-workflow.md)
+  — end-to-end competition sequence and rules
 - [Architecture Decisions](docs/decisions.md) — key
-  technical choices and rationale
+  technical choices and rationale (ADR-001–007)
 
 ## Development Workflow
 
