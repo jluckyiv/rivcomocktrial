@@ -340,6 +340,13 @@ resolved in Tiers 1–3.
   consistent error accumulation.
 - **Roster composition validation**: Full count/role
   enforcement deferred to its own issue.
+- **Admin page domain validation** (issue #36, PRs
+  #42–45): All FormState-based admin pages now use
+  `validateForm` with `List String` error accumulation.
+  Domain validators used where available (Tournaments,
+  Schools, Teams, Courtrooms); plain checks elsewhere
+  (Rounds, Students). Pairings page deferred (issue
+  #46) — model-level errors, not FormState.
 
 ---
 
