@@ -57,6 +57,8 @@ See also:
 ```
 Layer 4 (Results):     PrelimResult  ElimResult
                        Standings  Awards
+                       TrialResult  Publication
+                       ElimSideRules
                            │          │
 Layer 3 (Scoring):     SubmittedBallot → VerifiedBallot
                        PresiderBallot   Rank
@@ -615,14 +617,17 @@ Rank). The combination logic belongs here in Layer 4.
 
 ### Summary
 
-| Module           | Status | Key Pattern              |
-| ---------------- | ------ | ------------------------ |
-| PrelimResult.elm | Done   | Court Total aggregate    |
-| ElimResult.elm   | Done   | Scorecard majority       |
-| Standings.elm    | Done   | Configurable tiebreakers |
-| Awards.elm       | Done   | Types; algorithm deferred |
+| Module             | Status | Key Pattern              |
+| ------------------ | ------ | ------------------------ |
+| PrelimResult.elm   | Done   | Court Total aggregate    |
+| ElimResult.elm     | Done   | Scorecard majority       |
+| Standings.elm      | Done   | Configurable tiebreakers |
+| Awards.elm         | Done   | Types; algorithm deferred |
+| Publication.elm    | Done   | Progressive disclosure   |
+| TrialResult.elm    | Done   | Ballot→TeamRecord bridge |
+| ElimSideRules.elm  | Done   | Rule 5.5K side assignment |
 
-**Tests:** 35 total Layer 4.
+**Tests:** 35 total Layer 4 (original) + 59 new.
 
 ---
 
@@ -674,7 +679,7 @@ TDD: write failing tests, implement types and
 functions, refactor. No persistence, no UI — pure
 domain logic.
 
-### Done (199 tests → 522 tests)
+### Done (199 tests → 581 tests)
 1. District, School, Student, Coach, Email, Team,
    Side, Role — Layer 1 organizational types
 2. Assignment — generic reusable type
@@ -712,10 +717,17 @@ domain logic.
     conflict validation
 22. BallotTracking — ballot collection per trial,
     typed status queries (ADR-009)
+23. Publication — per-round progressive disclosure,
+    requires FullyVerified round progress
+24. TrialResult — Trial + VerifiedBallots → TeamRecord,
+    aggregate and headToHead adapters
+25. ElimSideRules — rule 5.5K side assignment,
+    MeetingHistory sum type (ADR-009)
 
 ### Deferred implementation
 - Awards scoring algorithm — criteria in flux
-- Standings ByHeadToHead — needs pairing history
+- Standings ByHeadToHead — adapter available via
+  `TrialResult.headToHead`; wiring deferred to UI
 - Roster validation — needs exact count rules
 - Ballot metadata (scorer, timestamps) — needs auth
 
@@ -760,8 +772,10 @@ Intentionally deferred:
 | Milestone 8 (polish) | No new domain types        |
 
 Core domain types are complete, including round
-lifecycle (issue #49). Remaining gaps from
-mvp-domain-gaps.md: Publication, StandingsAggregation,
+lifecycle and all MVP domain gaps from
+mvp-domain-gaps.md (issue #49). All 6 gaps resolved:
+ActiveTrial, RoundProgress, VolunteerSlot,
+BallotTracking, Publication, TrialResult,
 ElimSideRules. Next phase: persistence (PocketBase
 collections), then UI. The types teach us the domain —
 now that they're right, the rest is plumbing.

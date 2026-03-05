@@ -1,6 +1,6 @@
 # Domain Model Audit
 
-Comprehensive audit of all 28 domain modules against
+Comprehensive audit of all 31 domain modules against
 least-privilege/max-enforcement principles.
 
 **Guiding rule:** Every type is opaque unless there is a
@@ -356,6 +356,48 @@ accessors.
 
 ---
 
+### Publication.elm — DONE (issue #49)
+
+Per-round publication control with progressive
+disclosure. `PublicationLevel(..)` exposed:
+`ResultOnly | ScoreSheet | FullBallots`.
+`Audience(..)` exposed: `OwnTeamCoach | AllCoaches
+| Public`. Opaque `Publication` type. `publish` smart
+constructor requires `FullyVerified` round progress.
+`levelAtLeast` and `audienceAtLeast` for ordering.
+`isVisibleTo` checks both level and audience bounds.
+
+---
+
+### TrialResult.elm — DONE (issue #49)
+
+Bridges `Trial` + `List VerifiedBallot` → team
+records. Opaque `TrialResult` with `trialResult`
+smart constructor (reuses `PrelimResult.courtTotal`
+for points, `prelimVerdict`/`prelimVerdictWithPresider`
+for winner). `aggregate` folds results into
+`List (Team, Standings.TeamRecord)`. `headToHead`
+filters to shared trials and returns win/loss record
+from first team's perspective — adapter for
+`Standings.ByHeadToHead`.
+
+---
+
+### ElimSideRules.elm — DONE (issue #49)
+
+Elimination side assignment per rule 5.5K.
+`MeetingHistory(..)` exposed (ADR-009 — each variant
+carries exactly the Side data needed):
+`FirstMeeting { mostRecentSide }
+| Rematch { priorSide } | ThirdMeeting`.
+`meetingHistory` counts prior meetings between teams.
+`elimSide` flips the relevant side, or errors on
+ThirdMeeting (coin flip required).
+`elimSideAssignment` returns (higher, lower) side
+pair.
+
+---
+
 ### Awards.elm
 
 **Current:** `AwardCategory(..)` and
@@ -473,3 +515,6 @@ resolved in Tiers 1–3.
 | `VolunteerStatus(..)` | Sum type with data, pattern matching intended (ADR-009) |
 | `ScorerStatus(..)` | Sum type with data, carries proof (ADR-009) |
 | `PresiderStatus(..)` | Closed enum, 2 states, pattern matching intended |
+| `PublicationLevel(..)` | Closed enum, 3 levels, ordering comparisons |
+| `Audience(..)` | Closed enum, 3 levels, ordering comparisons |
+| `MeetingHistory(..)` | Sum type with data, carries proof (ADR-009) |
