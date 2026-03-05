@@ -59,6 +59,7 @@ Layer 4 (Results):     PrelimResult  ElimResult
                        Standings  Awards
                        TrialResult  Publication
                        ElimSideRules
+                       TrialClosure (orchestrates L2+L3)
                            │          │
 Layer 3 (Scoring):     SubmittedBallot → VerifiedBallot
                        PresiderBallot   Rank
@@ -323,6 +324,7 @@ accessors — the type carries the proof.
 | Conflict.elm      | Done   | Hard/Soft detection      |
 | VolunteerSlot.elm | Done   | Check-in lifecycle       |
 | BallotTracking.elm| Done   | Ballot collection (ADR-009) |
+| TrialClosure.elm  | Done   | Ballot-aware transitions    |
 
 **Tests:** 113 total (78 Layer 1 + 35 Layer 2).
 
@@ -681,7 +683,7 @@ TDD: write failing tests, implement types and
 functions, refactor. No persistence, no UI — pure
 domain logic.
 
-### Done (199 tests → 592 tests)
+### Done (199 tests → 613 tests)
 1. District, School, Student, Coach, Email, Team,
    Side, Role — Layer 1 organizational types
 2. Assignment — generic reusable type
@@ -729,6 +731,12 @@ domain logic.
     rule 5.5H. Feeds into ElimSideRules.
 27. PowerMatch refactor — migrated from Api.Team/Trial
     to domain Team/Trial/Side. Removed local Side type.
+28. TrialClosure — ballot-aware trial transitions.
+    `completeTrial` gates on all ballots submitted,
+    `verifyTrial` gates on AllVerified. `reopenTrial`
+    on ActiveTrial for correction workflow.
+    `replaceVerifiedBallot` on BallotTracking for
+    swapping corrected ballots.
 
 ### Deferred implementation
 - Awards scoring algorithm — criteria in flux
@@ -778,7 +786,9 @@ lifecycle and all MVP domain gaps from
 mvp-domain-gaps.md (issue #49). All 6 gaps resolved:
 ActiveTrial, RoundProgress, VolunteerSlot,
 BallotTracking, Publication, TrialResult,
-ElimSideRules. Next phase: persistence (PocketBase
+ElimSideRules. Trial closure workflow (issue #40) adds
+ballot-aware transitions and correction reopen path via
+TrialClosure. Next phase: persistence (PocketBase
 collections), then UI. The types teach us the domain —
 now that they're right, the rest is plumbing.
 

@@ -146,6 +146,45 @@ suite =
                         |> Result.andThen ActiveTrial.verifyTrial
                         |> Expect.err
             ]
+        , describe "reopenTrial"
+            [ test "Verified -> Complete succeeds" <|
+                \_ ->
+                    ActiveTrial.fromTrial testTrial
+                        |> ActiveTrial.startTrial
+                        |> Result.andThen ActiveTrial.completeTrial
+                        |> Result.andThen ActiveTrial.verifyTrial
+                        |> Result.andThen ActiveTrial.reopenTrial
+                        |> Result.map ActiveTrial.status
+                        |> Expect.equal (Ok Complete)
+            , test "AwaitingCheckIn -> fails" <|
+                \_ ->
+                    ActiveTrial.fromTrial testTrial
+                        |> ActiveTrial.reopenTrial
+                        |> Expect.err
+            , test "InProgress -> fails" <|
+                \_ ->
+                    ActiveTrial.fromTrial testTrial
+                        |> ActiveTrial.startTrial
+                        |> Result.andThen ActiveTrial.reopenTrial
+                        |> Expect.err
+            , test "Complete -> fails" <|
+                \_ ->
+                    ActiveTrial.fromTrial testTrial
+                        |> ActiveTrial.startTrial
+                        |> Result.andThen ActiveTrial.completeTrial
+                        |> Result.andThen ActiveTrial.reopenTrial
+                        |> Expect.err
+            , test "round-trip: verify -> reopen -> verify again" <|
+                \_ ->
+                    ActiveTrial.fromTrial testTrial
+                        |> ActiveTrial.startTrial
+                        |> Result.andThen ActiveTrial.completeTrial
+                        |> Result.andThen ActiveTrial.verifyTrial
+                        |> Result.andThen ActiveTrial.reopenTrial
+                        |> Result.andThen ActiveTrial.verifyTrial
+                        |> Result.map ActiveTrial.status
+                        |> Expect.equal (Ok Verified)
+            ]
         , describe "full lifecycle"
             [ test "AwaitingCheckIn -> InProgress -> Complete -> Verified" <|
                 \_ ->

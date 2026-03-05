@@ -3,6 +3,7 @@ module ActiveTrial exposing
     , TrialStatus(..)
     , completeTrial
     , fromTrial
+    , reopenTrial
     , startTrial
     , status
     , statusToString
@@ -71,6 +72,22 @@ completeTrial (ActiveTrial r) =
                     ("Cannot complete trial: status is "
                         ++ statusToString other
                         ++ ", expected In Progress"
+                    )
+                ]
+
+
+reopenTrial : ActiveTrial -> Result (List Error) ActiveTrial
+reopenTrial (ActiveTrial r) =
+    case r.status of
+        Verified ->
+            Ok (ActiveTrial { r | status = Complete })
+
+        other ->
+            Err
+                [ Error
+                    ("Cannot reopen trial: status is "
+                        ++ statusToString other
+                        ++ ", expected Verified"
                     )
                 ]
 
