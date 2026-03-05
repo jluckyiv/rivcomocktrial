@@ -37,7 +37,7 @@ meetingHistory higherSeed lowerSeed trials mostRecentSide =
                 [ trial ] ->
                     let
                         priorSide =
-                            if isTeam higherSeed (Trial.prosecution trial) then
+                            if Team.sameTeam higherSeed (Trial.prosecution trial) then
                                 Prosecution
 
                             else
@@ -92,11 +92,5 @@ involves a b trial =
         d =
             Trial.defense trial
     in
-    (isTeam a p && isTeam b d)
-        || (isTeam b p && isTeam a d)
-
-
-isTeam : Team -> Team -> Bool
-isTeam a b =
-    Team.numberToInt (Team.teamNumber a)
-        == Team.numberToInt (Team.teamNumber b)
+    (Team.sameTeam a p && Team.sameTeam b d)
+        || (Team.sameTeam b p && Team.sameTeam a d)

@@ -9,7 +9,8 @@ module PowerMatch exposing
     , sideHistory
     )
 
-import Api exposing (Team, Trial)
+import Team exposing (Team)
+import Trial exposing (Trial)
 
 
 type CrossBracketStrategy
@@ -38,29 +39,29 @@ type alias PowerMatchResult =
 
 
 type alias ProposedPairing =
-    { prosecutionTeam : String
-    , defenseTeam : String
+    { prosecutionTeam : Team
+    , defenseTeam : Team
     }
 
 
-hasPlayed : List Trial -> String -> String -> Bool
+hasPlayed : List Trial -> Team -> Team -> Bool
 hasPlayed trials teamA teamB =
     List.any
         (\t ->
-            (t.prosecutionTeam == teamA && t.defenseTeam == teamB)
-                || (t.prosecutionTeam == teamB && t.defenseTeam == teamA)
+            (Team.sameTeam (Trial.prosecution t) teamA && Team.sameTeam (Trial.defense t) teamB)
+                || (Team.sameTeam (Trial.prosecution t) teamB && Team.sameTeam (Trial.defense t) teamA)
         )
         trials
 
 
-sideHistory : List Trial -> String -> SideCount
-sideHistory trials teamId =
+sideHistory : List Trial -> Team -> SideCount
+sideHistory trials team =
     List.foldl
         (\t acc ->
-            if t.prosecutionTeam == teamId then
+            if Team.sameTeam (Trial.prosecution t) team then
                 { acc | prosecution = acc.prosecution + 1 }
 
-            else if t.defenseTeam == teamId then
+            else if Team.sameTeam (Trial.defense t) team then
                 { acc | defense = acc.defense + 1 }
 
             else
@@ -92,14 +93,14 @@ powerMatch :
     -> PowerMatchResult
 powerMatch strategy rankedTeams allTrials currentRoundTrials =
     let
-        pairedTeamIds =
+        pairedTeams =
             List.concatMap
-                (\t -> [ t.prosecutionTeam, t.defenseTeam ])
+                (\t -> [ Trial.prosecution t, Trial.defense t ])
                 currentRoundTrials
 
         available =
             List.filter
-                (\rt -> not (List.member rt.team.id pairedTeamIds))
+                (\rt -> not (List.any (Team.sameTeam rt.team) pairedTeams))
                 rankedTeams
 
         brackets =
@@ -356,7 +357,7 @@ tryPartners strategy allTrials team candidates skipped =
 
 canPair : List Trial -> RankedTeam -> RankedTeam -> Bool
 canPair allTrials a b =
-    not (hasPlayed allTrials a.team.id b.team.id)
+    not (hasPlayed allTrials a.team b.team)
         && not (sameSideConflict allTrials a b)
 
 
@@ -368,10 +369,10 @@ sameSideConflict :
 sameSideConflict allTrials a b =
     let
         aSides =
-            sideHistory allTrials a.team.id
+            sideHistory allTrials a.team
 
         bSides =
-            sideHistory allTrials b.team.id
+            sideHistory allTrials b.team
 
         aNeeds =
             neededSide aSides
@@ -415,19 +416,19 @@ assignSides :
 assignSides allTrials ( a, b ) =
     let
         aSides =
-            sideHistory allTrials a.team.id
+            sideHistory allTrials a.team
 
         bSides =
-            sideHistory allTrials b.team.id
+            sideHistory allTrials b.team
     in
     if aSides.prosecution <= bSides.prosecution then
-        { prosecutionTeam = a.team.id
-        , defenseTeam = b.team.id
+        { prosecutionTeam = a.team
+        , defenseTeam = b.team
         }
 
     else
-        { prosecutionTeam = b.team.id
-        , defenseTeam = a.team.id
+        { prosecutionTeam = b.team
+        , defenseTeam = a.team
         }
 
 

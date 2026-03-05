@@ -3,6 +3,7 @@ module TestHelpers exposing
     , applicant
     , bob
     , charlie
+    , coach
     , coachName
     , courtroomA
     , courtroomB

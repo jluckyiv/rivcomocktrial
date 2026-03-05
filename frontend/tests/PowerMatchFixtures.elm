@@ -36,8 +36,20 @@ module PowerMatchFixtures exposing
     , trialsThrough
     )
 
-import Api exposing (Team, Trial)
+import District
 import PowerMatch exposing (RankedTeam)
+import School
+import Team exposing (Team)
+import TestHelpers
+    exposing
+        ( coach
+        , districtName
+        , schoolName
+        , teamName
+        , teamNumber
+        , trialFor
+        )
+import Trial exposing (Trial)
 
 
 
@@ -46,14 +58,14 @@ import PowerMatch exposing (RankedTeam)
 
 makeTeam : Int -> String -> Team
 makeTeam num name =
-    { id = "team_" ++ String.padLeft 2 '0' (String.fromInt num)
-    , tournament = "tournament_2026"
-    , school = "school_" ++ String.fromInt num
-    , teamNumber = num
-    , name = name
-    , created = "2026-01-01"
-    , updated = "2026-01-01"
-    }
+    Team.create
+        (teamNumber num)
+        (teamName name)
+        (School.create
+            (schoolName ("School " ++ String.fromInt num))
+            (District.create (districtName ("District " ++ String.fromInt num)))
+        )
+        (coach ("Coach" ++ String.fromInt num) "Test")
 
 
 makeRankedTeam : Int -> String -> Int -> Int -> Int -> RankedTeam
@@ -234,16 +246,9 @@ allTeams =
 -- TRIAL HELPERS
 
 
-makeTrial : String -> Int -> String -> String -> Trial
-makeTrial id roundNum prosecutionId defenseId =
-    { id = id
-    , round = "round_" ++ String.fromInt roundNum
-    , prosecutionTeam = prosecutionId
-    , defenseTeam = defenseId
-    , courtroom = ""
-    , created = "2026-01-01"
-    , updated = "2026-01-01"
-    }
+makeTrial : Team -> Team -> Trial
+makeTrial =
+    trialFor
 
 
 
@@ -252,19 +257,19 @@ makeTrial id roundNum prosecutionId defenseId =
 
 round1Trials : List Trial
 round1Trials =
-    [ makeTrial "r1_01" 1 team06.id team15.id
-    , makeTrial "r1_02" 1 team24.id team01.id
-    , makeTrial "r1_03" 1 team19.id team09.id
-    , makeTrial "r1_04" 1 team08.id team11.id
-    , makeTrial "r1_05" 1 team05.id team27.id
-    , makeTrial "r1_06" 1 team26.id team13.id
-    , makeTrial "r1_07" 1 team10.id team02.id
-    , makeTrial "r1_08" 1 team03.id team16.id
-    , makeTrial "r1_09" 1 team04.id team14.id
-    , makeTrial "r1_10" 1 team28.id team25.id
-    , makeTrial "r1_11" 1 team22.id team17.id
-    , makeTrial "r1_12" 1 team21.id team12.id
-    , makeTrial "r1_13" 1 team23.id team20.id
+    [ makeTrial team06 team15
+    , makeTrial team24 team01
+    , makeTrial team19 team09
+    , makeTrial team08 team11
+    , makeTrial team05 team27
+    , makeTrial team26 team13
+    , makeTrial team10 team02
+    , makeTrial team03 team16
+    , makeTrial team04 team14
+    , makeTrial team28 team25
+    , makeTrial team22 team17
+    , makeTrial team21 team12
+    , makeTrial team23 team20
     ]
 
 
@@ -274,19 +279,19 @@ round1Trials =
 
 round2Trials : List Trial
 round2Trials =
-    [ makeTrial "r2_01" 2 team09.id team23.id
-    , makeTrial "r2_02" 2 team02.id team19.id
-    , makeTrial "r2_03" 2 team27.id team21.id
-    , makeTrial "r2_04" 2 team16.id team22.id
-    , makeTrial "r2_05" 2 team13.id team04.id
-    , makeTrial "r2_06" 2 team12.id team06.id
-    , makeTrial "r2_07" 2 team25.id team03.id
-    , makeTrial "r2_08" 2 team15.id team05.id
-    , makeTrial "r2_09" 2 team11.id team24.id
-    , makeTrial "r2_10" 2 team20.id team26.id
-    , makeTrial "r2_11" 2 team14.id team28.id
-    , makeTrial "r2_12" 2 team17.id team10.id
-    , makeTrial "r2_13" 2 team01.id team08.id
+    [ makeTrial team09 team23
+    , makeTrial team02 team19
+    , makeTrial team27 team21
+    , makeTrial team16 team22
+    , makeTrial team13 team04
+    , makeTrial team12 team06
+    , makeTrial team25 team03
+    , makeTrial team15 team05
+    , makeTrial team11 team24
+    , makeTrial team20 team26
+    , makeTrial team14 team28
+    , makeTrial team17 team10
+    , makeTrial team01 team08
     ]
 
 
@@ -296,19 +301,19 @@ round2Trials =
 
 round3Trials : List Trial
 round3Trials =
-    [ makeTrial "r3_01" 3 team25.id team01.id
-    , makeTrial "r3_02" 3 team28.id team05.id
-    , makeTrial "r3_03" 3 team23.id team17.id
-    , makeTrial "r3_04" 3 team20.id team12.id
-    , makeTrial "r3_05" 3 team06.id team03.id
-    , makeTrial "r3_06" 3 team04.id team02.id
-    , makeTrial "r3_07" 3 team26.id team14.id
-    , makeTrial "r3_08" 3 team10.id team08.id
-    , makeTrial "r3_09" 3 team19.id team16.id
-    , makeTrial "r3_10" 3 team22.id team09.id
-    , makeTrial "r3_11" 3 team21.id team24.id
-    , makeTrial "r3_12" 3 team15.id team11.id
-    , makeTrial "r3_13" 3 team27.id team13.id
+    [ makeTrial team25 team01
+    , makeTrial team28 team05
+    , makeTrial team23 team17
+    , makeTrial team20 team12
+    , makeTrial team06 team03
+    , makeTrial team04 team02
+    , makeTrial team26 team14
+    , makeTrial team10 team08
+    , makeTrial team19 team16
+    , makeTrial team22 team09
+    , makeTrial team21 team24
+    , makeTrial team15 team11
+    , makeTrial team27 team13
     ]
 
 
@@ -318,19 +323,19 @@ round3Trials =
 
 round4Trials : List Trial
 round4Trials =
-    [ makeTrial "r4_01" 4 team02.id team15.id
-    , makeTrial "r4_02" 4 team16.id team25.id
-    , makeTrial "r4_03" 4 team13.id team21.id
-    , makeTrial "r4_04" 4 team24.id team26.id
-    , makeTrial "r4_05" 4 team12.id team22.id
-    , makeTrial "r4_06" 4 team11.id team28.id
-    , makeTrial "r4_07" 4 team05.id team10.id
-    , makeTrial "r4_08" 4 team01.id team27.id
-    , makeTrial "r4_09" 4 team03.id team23.id
-    , makeTrial "r4_10" 4 team08.id team04.id
-    , makeTrial "r4_11" 4 team14.id team06.id
-    , makeTrial "r4_12" 4 team17.id team19.id
-    , makeTrial "r4_13" 4 team09.id team20.id
+    [ makeTrial team02 team15
+    , makeTrial team16 team25
+    , makeTrial team13 team21
+    , makeTrial team24 team26
+    , makeTrial team12 team22
+    , makeTrial team11 team28
+    , makeTrial team05 team10
+    , makeTrial team01 team27
+    , makeTrial team03 team23
+    , makeTrial team08 team04
+    , makeTrial team14 team06
+    , makeTrial team17 team19
+    , makeTrial team09 team20
     ]
 
 

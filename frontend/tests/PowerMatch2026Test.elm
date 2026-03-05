@@ -1,6 +1,5 @@
 module PowerMatch2026Test exposing (..)
 
-import Api exposing (Trial)
 import Expect
 import PowerMatch
     exposing
@@ -10,7 +9,14 @@ import PowerMatch
         , sideHistory
         )
 import PowerMatchFixtures as F
+import Team exposing (Team)
 import Test exposing (Test, describe, test)
+import Trial exposing (Trial)
+
+
+teamKey : Team -> Int
+teamKey team =
+    Team.numberToInt (Team.teamNumber team)
 
 
 {-| Tests that validate the 2026 competition data against
@@ -42,14 +48,14 @@ sideBalanceTests =
                             (\team ->
                                 let
                                     sides =
-                                        sideHistory allTrials team.id
+                                        sideHistory allTrials team
                                 in
                                 sides.prosecution /= 2
                             )
                             F.allTeams
                 in
                 violations
-                    |> List.map .teamNumber
+                    |> List.map teamKey
                     |> Expect.equal []
         , test "every team plays defense exactly 2 times" <|
             \_ ->
@@ -62,14 +68,14 @@ sideBalanceTests =
                             (\team ->
                                 let
                                     sides =
-                                        sideHistory allTrials team.id
+                                        sideHistory allTrials team
                                 in
                                 sides.defense /= 2
                             )
                             F.allTeams
                 in
                 violations
-                    |> List.map .teamNumber
+                    |> List.map teamKey
                     |> Expect.equal []
         ]
 
@@ -102,8 +108,9 @@ noRematchTests =
                     matchups =
                         List.map
                             (\t ->
-                                normalizeMatchup t.prosecutionTeam
-                                    t.defenseTeam
+                                normalizeMatchup
+                                    (teamKey (Trial.prosecution t))
+                                    (teamKey (Trial.defense t))
                             )
                             allTrials
 
@@ -120,11 +127,11 @@ rematches : List Trial -> List Trial -> List String
 rematches priorTrials roundTrials =
     List.filterMap
         (\t ->
-            if hasPlayed priorTrials t.prosecutionTeam t.defenseTeam then
+            if hasPlayed priorTrials (Trial.prosecution t) (Trial.defense t) then
                 Just
-                    (t.prosecutionTeam
+                    (String.fromInt (teamKey (Trial.prosecution t))
                         ++ " vs "
-                        ++ t.defenseTeam
+                        ++ String.fromInt (teamKey (Trial.defense t))
                     )
 
             else
@@ -143,72 +150,84 @@ sideSwitchingTests =
         [ test "R1 prosecution teams play R2 defense" <|
             \_ ->
                 let
-                    r1ProsecutionIds =
-                        List.map .prosecutionTeam F.round1Trials
+                    r1ProsecutionKeys =
+                        List.map
+                            (\t -> teamKey (Trial.prosecution t))
+                            F.round1Trials
 
                     -- These teams should appear as defense in R2
                     violations =
                         List.filter
                             (\t ->
-                                List.member t.prosecutionTeam
-                                    r1ProsecutionIds
+                                List.member
+                                    (teamKey (Trial.prosecution t))
+                                    r1ProsecutionKeys
                             )
                             F.round2Trials
                 in
                 violations
-                    |> List.map .prosecutionTeam
+                    |> List.map (\t -> teamKey (Trial.prosecution t))
                     |> Expect.equal []
         , test "R1 defense teams play R2 prosecution" <|
             \_ ->
                 let
-                    r1DefenseIds =
-                        List.map .defenseTeam F.round1Trials
+                    r1DefenseKeys =
+                        List.map
+                            (\t -> teamKey (Trial.defense t))
+                            F.round1Trials
 
                     -- These teams should appear as prosecution in R2
                     violations =
                         List.filter
                             (\t ->
-                                List.member t.defenseTeam
-                                    r1DefenseIds
+                                List.member
+                                    (teamKey (Trial.defense t))
+                                    r1DefenseKeys
                             )
                             F.round2Trials
                 in
                 violations
-                    |> List.map .defenseTeam
+                    |> List.map (\t -> teamKey (Trial.defense t))
                     |> Expect.equal []
         , test "R3 prosecution teams play R4 defense" <|
             \_ ->
                 let
-                    r3ProsecutionIds =
-                        List.map .prosecutionTeam F.round3Trials
+                    r3ProsecutionKeys =
+                        List.map
+                            (\t -> teamKey (Trial.prosecution t))
+                            F.round3Trials
 
                     violations =
                         List.filter
                             (\t ->
-                                List.member t.prosecutionTeam
-                                    r3ProsecutionIds
+                                List.member
+                                    (teamKey (Trial.prosecution t))
+                                    r3ProsecutionKeys
                             )
                             F.round4Trials
                 in
                 violations
-                    |> List.map .prosecutionTeam
+                    |> List.map (\t -> teamKey (Trial.prosecution t))
                     |> Expect.equal []
         , test "R3 defense teams play R4 prosecution" <|
             \_ ->
                 let
-                    r3DefenseIds =
-                        List.map .defenseTeam F.round3Trials
+                    r3DefenseKeys =
+                        List.map
+                            (\t -> teamKey (Trial.defense t))
+                            F.round3Trials
 
                     violations =
                         List.filter
                             (\t ->
-                                List.member t.defenseTeam
-                                    r3DefenseIds
+                                List.member
+                                    (teamKey (Trial.defense t))
+                                    r3DefenseKeys
                             )
                             F.round4Trials
                 in
                 violations
-                    |> List.map .defenseTeam
+                    |> List.map (\t -> teamKey (Trial.defense t))
                     |> Expect.equal []
         ]
 
@@ -222,9 +241,6 @@ bracketTests =
     describe "2026 bracket placement"
         [ test "R3 pairings are all within-bracket (0 cross-bracket)" <|
             \_ ->
-                -- After R2: 2-0, 1-1, 0-2
-                -- R3 resets side switching, so all pairings can
-                -- be within-bracket
                 let
                     winsAfterR2 =
                         countWins (F.trialsThrough 2)
@@ -235,11 +251,11 @@ bracketTests =
                                 let
                                     pWins =
                                         getWins winsAfterR2
-                                            t.prosecutionTeam
+                                            (Trial.prosecution t)
 
                                     dWins =
                                         getWins winsAfterR2
-                                            t.defenseTeam
+                                            (Trial.defense t)
                                 in
                                 pWins /= dWins
                             )
@@ -259,11 +275,11 @@ bracketTests =
                                 let
                                     pWins =
                                         getWins winsAfterR1
-                                            t.prosecutionTeam
+                                            (Trial.prosecution t)
 
                                     dWins =
                                         getWins winsAfterR1
-                                            t.defenseTeam
+                                            (Trial.defense t)
                                 in
                                 pWins /= dWins
                             )
@@ -283,11 +299,11 @@ bracketTests =
                                 let
                                     pWins =
                                         getWins winsAfterR3
-                                            t.prosecutionTeam
+                                            (Trial.prosecution t)
 
                                     dWins =
                                         getWins winsAfterR3
-                                            t.defenseTeam
+                                            (Trial.defense t)
                                 in
                                 pWins /= dWins
                             )
@@ -327,10 +343,8 @@ trialCountTests =
                                         List.length
                                             (List.filter
                                                 (\t ->
-                                                    t.prosecutionTeam
-                                                        == team.id
-                                                        || t.defenseTeam
-                                                        == team.id
+                                                    Team.sameTeam (Trial.prosecution t) team
+                                                        || Team.sameTeam (Trial.defense t) team
                                                 )
                                                 allTrials
                                             )
@@ -340,7 +354,7 @@ trialCountTests =
                             F.allTeams
                 in
                 violations
-                    |> List.map .teamNumber
+                    |> List.map teamKey
                     |> Expect.equal []
         , test "26 unique teams across all trials" <|
             \_ ->
@@ -348,17 +362,17 @@ trialCountTests =
                     allTrials =
                         F.trialsThrough 4
 
-                    allIds =
+                    allKeys =
                         List.concatMap
                             (\t ->
-                                [ t.prosecutionTeam
-                                , t.defenseTeam
+                                [ teamKey (Trial.prosecution t)
+                                , teamKey (Trial.defense t)
                                 ]
                             )
                             allTrials
 
                     unique =
-                        removeDuplicates allIds
+                        removeDuplicates allKeys
                 in
                 List.length unique
                     |> Expect.equal 26
@@ -380,12 +394,12 @@ winLossTests =
 
                     oneWin =
                         List.filter
-                            (\team -> getWins wins team.id == 1)
+                            (\team -> getWins wins team == 1)
                             F.allTeams
 
                     zeroWins =
                         List.filter
-                            (\team -> getWins wins team.id == 0)
+                            (\team -> getWins wins team == 0)
                             F.allTeams
                 in
                 ( List.length oneWin, List.length zeroWins )
@@ -399,8 +413,8 @@ winLossTests =
                     winners =
                         F.allTeams
                             |> List.filter
-                                (\t -> getWins wins t.id == 1)
-                            |> List.map .teamNumber
+                                (\t -> getWins wins t == 1)
+                            |> List.map teamKey
                             |> List.sort
                 in
                 winners
@@ -419,7 +433,7 @@ winLossTests =
                             (\w ->
                                 List.length
                                     (List.filter
-                                        (\t -> getWins wins t.id == w)
+                                        (\t -> getWins wins t == w)
                                         F.allTeams
                                     )
                             )
@@ -435,8 +449,8 @@ winLossTests =
                     fourOh =
                         F.allTeams
                             |> List.filter
-                                (\t -> getWins wins t.id == 4)
-                            |> List.map .teamNumber
+                                (\t -> getWins wins t == 4)
+                            |> List.map teamKey
                             |> List.sort
                 in
                 fourOh |> Expect.equal [ 9, 13 ]
@@ -452,7 +466,7 @@ chaparralRematchTests =
     describe "2026 R4: Chaparral moved to avoid Ramona rematch"
         [ test "Ramona (16) and Chaparral (22) played in R2" <|
             \_ ->
-                hasPlayed F.round2Trials F.team16.id F.team22.id
+                hasPlayed F.round2Trials F.team16 F.team22
                     |> Expect.equal True
         , test "both are 2-1 going into R4" <|
             \_ ->
@@ -461,10 +475,10 @@ chaparralRematchTests =
                         countWins (F.trialsThrough 3)
 
                     ramonaWins =
-                        getWins wins F.team16.id
+                        getWins wins F.team16
 
                     chaparralWins =
-                        getWins wins F.team22.id
+                        getWins wins F.team22
                 in
                 ( ramonaWins, chaparralWins )
                     |> Expect.equal ( 2, 2 )
@@ -472,21 +486,18 @@ chaparralRematchTests =
             \_ ->
                 let
                     sides =
-                        sideHistory F.round3Trials F.team16.id
+                        sideHistory F.round3Trials F.team16
                 in
                 sides |> Expect.equal { prosecution = 0, defense = 1 }
         , test "Chaparral needs D in R4 (played P in R3)" <|
             \_ ->
                 let
                     sides =
-                        sideHistory F.round3Trials F.team22.id
+                        sideHistory F.round3Trials F.team22
                 in
                 sides |> Expect.equal { prosecution = 1, defense = 0 }
         , test "without the R2 matchup, they would be paired" <|
             \_ ->
-                -- Isolate just Ramona and Chaparral in their
-                -- own bracket. With no rematch history, the
-                -- algorithm must pair them (only option).
                 let
                     ranked =
                         [ F.makeRankedTeam 16 "Ramona" 2 1 1
@@ -496,14 +507,10 @@ chaparralRematchTests =
                     -- R3 sides only (no R2 matchup between them)
                     priorTrials =
                         [ -- Ramona played D in R3 → needs P
-                          F.makeTrial "side_16" 3
-                            F.team19.id
-                            F.team16.id
+                          F.makeTrial F.team19 F.team16
 
                         -- Chaparral played P in R3 → needs D
-                        , F.makeTrial "side_22" 3
-                            F.team22.id
-                            F.team09.id
+                        , F.makeTrial F.team22 F.team09
                         ]
 
                     result =
@@ -512,17 +519,14 @@ chaparralRematchTests =
                     paired =
                         List.any
                             (\p ->
-                                p.prosecutionTeam
-                                    == F.team16.id
-                                    && p.defenseTeam
-                                    == F.team22.id
+                                Team.sameTeam p.prosecutionTeam F.team16
+                                    && Team.sameTeam p.defenseTeam F.team22
                             )
                             result.pairings
                 in
                 paired |> Expect.equal True
         , test "the R2 matchup prevents that pairing" <|
             \_ ->
-                -- Same setup, but add the R2 trial between them
                 let
                     ranked =
                         [ F.makeRankedTeam 16 "Ramona" 2 1 1
@@ -530,17 +534,11 @@ chaparralRematchTests =
                         ]
 
                     priorTrials =
-                        [ F.makeTrial "side_16" 3
-                            F.team19.id
-                            F.team16.id
-                        , F.makeTrial "side_22" 3
-                            F.team22.id
-                            F.team09.id
+                        [ F.makeTrial F.team19 F.team16
+                        , F.makeTrial F.team22 F.team09
 
                         -- The R2 rematch
-                        , F.makeTrial "r2_04" 2
-                            F.team16.id
-                            F.team22.id
+                        , F.makeTrial F.team16 F.team22
                         ]
 
                     result =
@@ -565,15 +563,11 @@ chaparralRematchTests =
                     pairsRamonaWithChaparral =
                         List.any
                             (\p ->
-                                (p.prosecutionTeam
-                                    == F.team16.id
-                                    && p.defenseTeam
-                                    == F.team22.id
+                                (Team.sameTeam p.prosecutionTeam F.team16
+                                    && Team.sameTeam p.defenseTeam F.team22
                                 )
-                                    || (p.prosecutionTeam
-                                            == F.team22.id
-                                            && p.defenseTeam
-                                            == F.team16.id
+                                    || (Team.sameTeam p.prosecutionTeam F.team22
+                                            && Team.sameTeam p.defenseTeam F.team16
                                        )
                             )
                             result.pairings
@@ -594,15 +588,11 @@ chaparralRematchTests =
                     pairsRamonaWithChaparral =
                         List.any
                             (\p ->
-                                (p.prosecutionTeam
-                                    == F.team16.id
-                                    && p.defenseTeam
-                                    == F.team22.id
+                                (Team.sameTeam p.prosecutionTeam F.team16
+                                    && Team.sameTeam p.defenseTeam F.team22
                                 )
-                                    || (p.prosecutionTeam
-                                            == F.team22.id
-                                            && p.defenseTeam
-                                            == F.team16.id
+                                    || (Team.sameTeam p.prosecutionTeam F.team22
+                                            && Team.sameTeam p.defenseTeam F.team16
                                        )
                             )
                             result.pairings
@@ -652,284 +642,243 @@ rankedAfterR3 =
 -- HELPERS
 
 
-{-| Count wins for each team. A team wins if it appears
-as prosecution and the prosecution score is higher, or
-as defense and the defense score is higher. Since our
-Trial type doesn't carry scores, we use the fixture data
-winner convention: prosecution team wins odd-numbered
-trials, defense wins even-numbered ones... actually we
-can't determine winner from Trial alone.
-
-Instead, we use the known winners from the fixture data.
-We encode this by checking which team IDs appear as
-winners in each round based on the known results.
+{-| Count wins for each team based on known 2026 results.
+Returns a list of (team key, win count) pairs.
 -}
-countWins : List Trial -> List ( String, Int )
+countWins : List Trial -> List ( Int, Int )
 countWins trials =
     let
-        allTeamIds =
+        allTeamKeys =
             List.concatMap
-                (\t -> [ t.prosecutionTeam, t.defenseTeam ])
+                (\t ->
+                    [ teamKey (Trial.prosecution t)
+                    , teamKey (Trial.defense t)
+                    ]
+                )
                 trials
                 |> removeDuplicates
 
-        winCount teamId =
+        winCount key =
             List.length
                 (List.filter
-                    (\t -> isWinner t teamId)
+                    (\t -> isWinner t key)
                     trials
                 )
     in
-    List.map (\id -> ( id, winCount id )) allTeamIds
+    List.map (\key -> ( key, winCount key )) allTeamKeys
 
 
 {-| Determine if a team won a trial based on the known
-2026 results. We encode winners by mapping trial IDs
-to the winning side.
+2026 results.
 -}
-isWinner : Trial -> String -> Bool
-isWinner trial teamId =
+isWinner : Trial -> Int -> Bool
+isWinner trial key =
     case trialWinner trial of
-        Just winnerId ->
-            winnerId == teamId
+        Just winnerKey ->
+            winnerKey == key
 
         Nothing ->
             False
 
 
-{-| Return the winner's team ID for a known trial.
-Maps each fixture trial ID to the winning team based on
-the 2026 official results.
+{-| Return the winner's team key for a known trial.
+Maps each fixture trial (by prosecution/defense team keys)
+to the winning team based on the 2026 official results.
 -}
-trialWinner : Trial -> Maybe String
+trialWinner : Trial -> Maybe Int
 trialWinner trial =
-    -- R1 winners: D, D, D, P, D, D, D, D, P, D, P, D, D
-    case trial.id of
+    let
+        pKey =
+            teamKey (Trial.prosecution trial)
+
+        dKey =
+            teamKey (Trial.defense trial)
+
+        pWins =
+            Just pKey
+
+        dWins =
+            Just dKey
+    in
+    -- Identify by (prosecution, defense) team numbers
+    case ( pKey, dKey ) of
         -- Round 1
-        "r1_01" ->
-            Just trial.defenseTeam
+        ( 6, 15 ) ->
+            dWins
 
-        -- La Quinta v Indio → D (Indio)
-        "r1_02" ->
-            Just trial.defenseTeam
+        ( 24, 1 ) ->
+            dWins
 
-        -- Palo Verde v Palm Desert → D
-        "r1_03" ->
-            Just trial.defenseTeam
+        ( 19, 9 ) ->
+            dWins
 
-        -- JW North v Notre Dame → D
-        "r1_04" ->
-            Just trial.prosecutionTeam
+        ( 8, 11 ) ->
+            pWins
 
-        -- Norco v Canyon Springs → P
-        "r1_05" ->
-            Just trial.defenseTeam
+        ( 5, 27 ) ->
+            dWins
 
-        -- Patriot v MLK → D
-        "r1_06" ->
-            Just trial.defenseTeam
+        ( 26, 13 ) ->
+            dWins
 
-        -- Centennial v Poly → D
-        "r1_07" ->
-            Just trial.defenseTeam
+        ( 10, 2 ) ->
+            dWins
 
-        -- Valley View v Santiago → D
-        "r1_08" ->
-            Just trial.defenseTeam
+        ( 3, 16 ) ->
+            dWins
 
-        -- Vista del Lago v Ramona → D
-        "r1_09" ->
-            Just trial.prosecutionTeam
+        ( 4, 14 ) ->
+            pWins
 
-        -- Murrieta Valley v Heritage → P
-        "r1_10" ->
-            Just trial.defenseTeam
+        ( 28, 25 ) ->
+            dWins
 
-        -- San Jacinto v St. Jeanne → D
-        "r1_11" ->
-            Just trial.prosecutionTeam
+        ( 22, 17 ) ->
+            pWins
 
-        -- Chaparral v Liberty → P
-        "r1_12" ->
-            Just trial.defenseTeam
+        ( 21, 12 ) ->
+            dWins
 
-        -- Great Oak v Temecula Valley → D
-        "r1_13" ->
-            Just trial.defenseTeam
+        ( 23, 20 ) ->
+            dWins
 
-        -- Paloma Valley v Hemet → D
         -- Round 2
-        "r2_01" ->
-            Just trial.prosecutionTeam
+        ( 9, 23 ) ->
+            pWins
 
-        -- Notre Dame v Paloma Valley → P
-        "r2_02" ->
-            Just trial.defenseTeam
+        ( 2, 19 ) ->
+            dWins
 
-        -- Santiago v JW North → D
-        "r2_03" ->
-            Just trial.prosecutionTeam
+        ( 27, 21 ) ->
+            pWins
 
-        -- MLK v Great Oak → P
-        "r2_04" ->
-            Just trial.defenseTeam
+        ( 16, 22 ) ->
+            dWins
 
-        -- Ramona v Chaparral → D
-        "r2_05" ->
-            Just trial.prosecutionTeam
+        ( 13, 4 ) ->
+            pWins
 
-        -- Poly v Murrieta Valley → P
-        "r2_06" ->
-            Just trial.prosecutionTeam
+        ( 12, 6 ) ->
+            pWins
 
-        -- Temecula Valley v La Quinta → P
-        "r2_07" ->
-            Just trial.prosecutionTeam
+        ( 25, 3 ) ->
+            pWins
 
-        -- St. Jeanne v Vista del Lago → P
-        "r2_08" ->
-            Just trial.defenseTeam
+        ( 15, 5 ) ->
+            dWins
 
-        -- Indio v Patriot → D
-        "r2_09" ->
-            Just trial.prosecutionTeam
+        ( 11, 24 ) ->
+            pWins
 
-        -- Canyon Springs v Palo Verde → P
-        "r2_10" ->
-            Just trial.prosecutionTeam
+        ( 20, 26 ) ->
+            pWins
 
-        -- Hemet v Centennial → P
-        "r2_11" ->
-            Just trial.defenseTeam
+        ( 14, 28 ) ->
+            dWins
 
-        -- Heritage v San Jacinto → D
-        "r2_12" ->
-            Just trial.defenseTeam
+        ( 17, 10 ) ->
+            dWins
 
-        -- Liberty v Valley View → D
-        "r2_13" ->
-            Just trial.prosecutionTeam
+        ( 1, 8 ) ->
+            pWins
 
-        -- Palm Desert v Norco → P
         -- Round 3
-        "r3_01" ->
-            Just trial.defenseTeam
+        ( 25, 1 ) ->
+            dWins
 
-        -- St. Jeanne v Palm Desert → D
-        "r3_02" ->
-            Just trial.defenseTeam
+        ( 28, 5 ) ->
+            dWins
 
-        -- San Jacinto v Patriot → D
-        "r3_03" ->
-            Just trial.prosecutionTeam
+        ( 23, 17 ) ->
+            pWins
 
-        -- Paloma Valley v Liberty → P
-        "r3_04" ->
-            Just trial.defenseTeam
+        ( 20, 12 ) ->
+            dWins
 
-        -- Hemet v Temecula Valley → D
-        "r3_05" ->
-            Just trial.prosecutionTeam
+        ( 6, 3 ) ->
+            pWins
 
-        -- La Quinta v Vista del Lago → P
-        "r3_06" ->
-            Just trial.defenseTeam
+        ( 4, 2 ) ->
+            dWins
 
-        -- Murrieta Valley v Santiago → D
-        "r3_07" ->
-            Just trial.prosecutionTeam
+        ( 26, 14 ) ->
+            pWins
 
-        -- Centennial v Heritage → P
-        "r3_08" ->
-            Just trial.prosecutionTeam
+        ( 10, 8 ) ->
+            pWins
 
-        -- Valley View v Norco → P
-        "r3_09" ->
-            Just trial.defenseTeam
+        ( 19, 16 ) ->
+            dWins
 
-        -- JW North v Ramona → D
-        "r3_10" ->
-            Just trial.defenseTeam
+        ( 22, 9 ) ->
+            dWins
 
-        -- Chaparral v Notre Dame → D
-        "r3_11" ->
-            Just trial.prosecutionTeam
+        ( 21, 24 ) ->
+            pWins
 
-        -- Great Oak v Palo Verde → P
-        "r3_12" ->
-            Just trial.prosecutionTeam
+        ( 15, 11 ) ->
+            pWins
 
-        -- Indio v Canyon Springs → P
-        "r3_13" ->
-            Just trial.defenseTeam
+        ( 27, 13 ) ->
+            dWins
 
-        -- MLK v Poly → D
         -- Round 4
-        "r4_01" ->
-            Just trial.prosecutionTeam
+        ( 2, 15 ) ->
+            pWins
 
-        -- Santiago v Indio → P
-        "r4_02" ->
-            Just trial.prosecutionTeam
+        ( 16, 25 ) ->
+            pWins
 
-        -- Ramona v St. Jeanne → P
-        "r4_03" ->
-            Just trial.prosecutionTeam
+        ( 13, 21 ) ->
+            pWins
 
-        -- Poly v Great Oak → P
-        "r4_04" ->
-            Just trial.defenseTeam
+        ( 24, 26 ) ->
+            dWins
 
-        -- Palo Verde v Centennial → D
-        "r4_05" ->
-            Just trial.defenseTeam
+        ( 12, 22 ) ->
+            dWins
 
-        -- Temecula Valley v Chaparral → D
-        "r4_06" ->
-            Just trial.prosecutionTeam
+        ( 11, 28 ) ->
+            pWins
 
-        -- Canyon Springs v San Jacinto → P
-        "r4_07" ->
-            Just trial.defenseTeam
+        ( 5, 10 ) ->
+            dWins
 
-        -- Patriot v Valley View → D
-        "r4_08" ->
-            Just trial.defenseTeam
+        ( 1, 27 ) ->
+            dWins
 
-        -- Palm Desert v MLK → D
-        "r4_09" ->
-            Just trial.defenseTeam
+        ( 3, 23 ) ->
+            dWins
 
-        -- Vista del Lago v Paloma Valley → D
-        "r4_10" ->
-            Just trial.defenseTeam
+        ( 8, 4 ) ->
+            dWins
 
-        -- Norco v Murrieta Valley → D
-        "r4_11" ->
-            Just trial.prosecutionTeam
+        ( 14, 6 ) ->
+            pWins
 
-        -- Heritage v La Quinta → P
-        "r4_12" ->
-            Just trial.defenseTeam
+        ( 17, 19 ) ->
+            dWins
 
-        -- Liberty v JW North → D
-        "r4_13" ->
-            Just trial.prosecutionTeam
+        ( 9, 20 ) ->
+            pWins
 
-        -- Notre Dame v Hemet → P
         _ ->
             Nothing
 
 
-getWins : List ( String, Int ) -> String -> Int
-getWins winList teamId =
-    List.filter (\( id, _ ) -> id == teamId) winList
+getWins : List ( Int, Int ) -> Team -> Int
+getWins winList team =
+    let
+        key =
+            teamKey team
+    in
+    List.filter (\( k, _ ) -> k == key) winList
         |> List.head
         |> Maybe.map Tuple.second
         |> Maybe.withDefault 0
 
 
-normalizeMatchup : String -> String -> ( String, String )
+normalizeMatchup : Int -> Int -> ( Int, Int )
 normalizeMatchup a b =
     if a < b then
         ( a, b )
@@ -938,16 +887,16 @@ normalizeMatchup a b =
         ( b, a )
 
 
-findDuplicates : List ( String, String ) -> List ( String, String )
+findDuplicates : List ( Int, Int ) -> List ( Int, Int )
 findDuplicates matchups =
     findDuplicatesHelper matchups [] []
 
 
 findDuplicatesHelper :
-    List ( String, String )
-    -> List ( String, String )
-    -> List ( String, String )
-    -> List ( String, String )
+    List ( Int, Int )
+    -> List ( Int, Int )
+    -> List ( Int, Int )
+    -> List ( Int, Int )
 findDuplicatesHelper remaining seen dupes =
     case remaining of
         [] ->
@@ -961,12 +910,12 @@ findDuplicatesHelper remaining seen dupes =
                 findDuplicatesHelper rest (m :: seen) dupes
 
 
-removeDuplicates : List String -> List String
+removeDuplicates : List Int -> List Int
 removeDuplicates items =
     removeDuplicatesHelper items []
 
 
-removeDuplicatesHelper : List String -> List String -> List String
+removeDuplicatesHelper : List Int -> List Int -> List Int
 removeDuplicatesHelper remaining acc =
     case remaining of
         [] ->

@@ -218,7 +218,7 @@ headToHead teamOne teamTwo results =
     in
     List.foldl
         (\(TrialResult r) acc ->
-            if isTeam teamOne r.prosecution then
+            if Team.sameTeam teamOne r.prosecution then
                 case r.winner of
                     Prosecution ->
                         { acc | wins = acc.wins + 1 }
@@ -240,11 +240,5 @@ headToHead teamOne teamTwo results =
 
 involvesTeams : Team -> Team -> TrialResult -> Bool
 involvesTeams a b (TrialResult r) =
-    (isTeam a r.prosecution && isTeam b r.defense)
-        || (isTeam b r.prosecution && isTeam a r.defense)
-
-
-isTeam : Team -> Team -> Bool
-isTeam a b =
-    Team.numberToInt (Team.teamNumber a)
-        == Team.numberToInt (Team.teamNumber b)
+    (Team.sameTeam a r.prosecution && Team.sameTeam b r.defense)
+        || (Team.sameTeam b r.prosecution && Team.sameTeam a r.defense)

@@ -398,6 +398,17 @@ pair.
 
 ---
 
+### ElimBracket.elm — NEW
+
+Elimination bracket seeding per rule 5.5H.
+`Matchup` is opaque — wraps higher-seed and lower-seed
+`Team`. `bracket` takes exactly 8 teams in seed order,
+returns 4 matchups: 1v8, 2v7, 3v6, 4v5. Fails if not
+exactly 8 teams. `higherSeed`/`lowerSeed` accessors
+feed directly into `ElimSideRules.meetingHistory`.
+
+---
+
 ### Awards.elm
 
 **Current:** `AwardCategory(..)` and

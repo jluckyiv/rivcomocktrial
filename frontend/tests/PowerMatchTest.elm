@@ -1,6 +1,5 @@
 module PowerMatchTest exposing (..)
 
-import Api exposing (Team, Trial)
 import Expect
 import PowerMatch
     exposing
@@ -13,16 +12,28 @@ import PowerMatch
         , sideHistory
         )
 import PowerMatchFixtures as F
+import Team exposing (Team)
 import Test exposing (Test, describe, test)
+import Trial exposing (Trial)
 
 
-{-| Helper: collect all team IDs from pairings.
+{-| Helper: collect all team keys (numbers) from pairings.
 -}
-pairedTeamIds : PowerMatchResult -> List String
-pairedTeamIds result =
+pairedTeamKeys : PowerMatchResult -> List Int
+pairedTeamKeys result =
     List.concatMap
-        (\p -> [ p.prosecutionTeam, p.defenseTeam ])
+        (\p ->
+            [ teamKey p.prosecutionTeam
+            , teamKey p.defenseTeam
+            ]
+        )
         result.pairings
+
+
+teamKey : Team -> Int
+teamKey team =
+    Team.numberToInt (Team.teamNumber team)
+
 
 
 -- SIDE HISTORY TESTS
@@ -39,23 +50,23 @@ sideHistoryTests =
 
                     -- Team 09 (Notre Dame): R1 D, R2 P
                     sides =
-                        sideHistory trials F.team09.id
+                        sideHistory trials F.team09
                 in
                 Expect.equal
                     { prosecution = 1, defense = 1 }
                     sides
         , test "team with no trials has zero counts" <|
             \_ ->
-                sideHistory [] "nonexistent"
+                sideHistory [] F.team01
                     |> Expect.equal { prosecution = 0, defense = 0 }
         , test "team 06 after R1: 1P 0D" <|
             \_ ->
-                sideHistory F.round1Trials F.team06.id
+                sideHistory F.round1Trials F.team06
                     |> Expect.equal { prosecution = 1, defense = 0 }
         , test "team 01 after R2: 1P 1D" <|
             \_ ->
                 -- R1: defense, R2: prosecution
-                sideHistory (F.trialsThrough 2) F.team01.id
+                sideHistory (F.trialsThrough 2) F.team01
                     |> Expect.equal { prosecution = 1, defense = 1 }
         ]
 
@@ -70,15 +81,15 @@ hasPlayedTests =
         [ test "detects previous matchup (P vs D)" <|
             \_ ->
                 -- R1: La Quinta (6) P vs Indio (15) D
-                hasPlayed F.round1Trials F.team06.id F.team15.id
+                hasPlayed F.round1Trials F.team06 F.team15
                     |> Expect.equal True
         , test "detects previous matchup (D vs P, reversed)" <|
             \_ ->
-                hasPlayed F.round1Trials F.team15.id F.team06.id
+                hasPlayed F.round1Trials F.team15 F.team06
                     |> Expect.equal True
         , test "returns False for teams that haven't played" <|
             \_ ->
-                hasPlayed F.round1Trials F.team01.id F.team06.id
+                hasPlayed F.round1Trials F.team01 F.team06
                     |> Expect.equal False
         ]
 
@@ -173,15 +184,15 @@ structuralInvariantTests =
              [ test "every team appears exactly once" <|
                 \_ ->
                     let
-                        ids =
-                            pairedTeamIds result
+                        keys =
+                            pairedTeamKeys result
 
-                        expectedIds =
-                            List.map .id F.allTeams
+                        expectedKeys =
+                            List.map teamKey F.allTeams
                     in
                     Expect.equal
-                        (List.sort expectedIds)
-                        (List.sort ids)
+                        (List.sort expectedKeys)
+                        (List.sort keys)
              , test "produces 13 pairings for 26 teams" <|
                 \_ ->
                     List.length result.pairings
@@ -206,7 +217,7 @@ structuralInvariantTests =
                             F.round1Trials
                                 ++ List.map
                                     (\p ->
-                                        F.makeTrial "" 2
+                                        F.makeTrial
                                             p.prosecutionTeam
                                             p.defenseTeam
                                     )
@@ -217,7 +228,7 @@ structuralInvariantTests =
                                 (\team ->
                                     let
                                         sides =
-                                            sideHistory allTrials team.id
+                                            sideHistory allTrials team
                                     in
                                     sides.prosecution >= 3
                                         || sides.defense >= 3
@@ -229,15 +240,18 @@ structuralInvariantTests =
                 \_ ->
                     let
                         -- Teams that played P in R1
-                        r1ProsecutionIds =
-                            List.map .prosecutionTeam F.round1Trials
+                        r1ProsecutionKeys =
+                            List.map
+                                (\t -> teamKey (Trial.prosecution t))
+                                F.round1Trials
 
                         -- Check they play D in R2
                         violations =
                             List.filter
                                 (\p ->
-                                    List.member p.prosecutionTeam
-                                        r1ProsecutionIds
+                                    List.member
+                                        (teamKey p.prosecutionTeam)
+                                        r1ProsecutionKeys
                                 )
                                 result.pairings
                     in
@@ -259,15 +273,15 @@ structuralInvariantTests =
              [ test "every team appears exactly once" <|
                 \_ ->
                     let
-                        ids =
-                            pairedTeamIds result
+                        keys =
+                            pairedTeamKeys result
 
-                        expectedIds =
-                            List.map .id F.allTeams
+                        expectedKeys =
+                            List.map teamKey F.allTeams
                     in
                     Expect.equal
-                        (List.sort expectedIds)
-                        (List.sort ids)
+                        (List.sort expectedKeys)
+                        (List.sort keys)
              , test "produces 13 pairings" <|
                 \_ ->
                     List.length result.pairings
@@ -288,14 +302,17 @@ structuralInvariantTests =
              , test "side switching: R3 P plays R4 D" <|
                 \_ ->
                     let
-                        r3ProsecutionIds =
-                            List.map .prosecutionTeam F.round3Trials
+                        r3ProsecutionKeys =
+                            List.map
+                                (\t -> teamKey (Trial.prosecution t))
+                                F.round3Trials
 
                         violations =
                             List.filter
                                 (\p ->
-                                    List.member p.prosecutionTeam
-                                        r3ProsecutionIds
+                                    List.member
+                                        (teamKey p.prosecutionTeam)
+                                        r3ProsecutionKeys
                                 )
                                 result.pairings
                     in
@@ -308,7 +325,7 @@ structuralInvariantTests =
                             priorTrials
                                 ++ List.map
                                     (\p ->
-                                        F.makeTrial "" 4
+                                        F.makeTrial
                                             p.prosecutionTeam
                                             p.defenseTeam
                                     )
@@ -319,7 +336,7 @@ structuralInvariantTests =
                                 (\team ->
                                     let
                                         sides =
-                                            sideHistory allTrials team.id
+                                            sideHistory allTrials team
                                     in
                                     sides.prosecution >= 3
                                         || sides.defense >= 3
@@ -358,8 +375,8 @@ crossBracketStrategyTests =
                             []
                 in
                 Expect.notEqual
-                    highHigh.pairings
-                    highLow.pairings
+                    (List.map (\p -> ( teamKey p.prosecutionTeam, teamKey p.defenseTeam )) highHigh.pairings)
+                    (List.map (\p -> ( teamKey p.prosecutionTeam, teamKey p.defenseTeam )) highLow.pairings)
         , test "HighLow: no rematches" <|
             \_ ->
                 let
@@ -394,15 +411,15 @@ crossBracketStrategyTests =
                             priorTrials
                             []
 
-                    ids =
-                        pairedTeamIds result
+                    keys =
+                        pairedTeamKeys result
 
-                    expectedIds =
-                        List.map .id F.allTeams
+                    expectedKeys =
+                        List.map teamKey F.allTeams
                 in
                 Expect.equal
-                    (List.sort expectedIds)
-                    (List.sort ids)
+                    (List.sort expectedKeys)
+                    (List.sort keys)
         ]
 
 
@@ -415,11 +432,6 @@ rematchAvoidanceTests =
     describe "rematch avoidance"
         [ test "avoids rematch even when greedy choice would cause one" <|
             \_ ->
-                -- Set up 4 teams where the naive greedy pairing
-                -- (first with last) would force a rematch:
-                -- A has played D, B has played C.
-                -- Greedy top-bottom: A-D (rematch!), B-C (rematch!)
-                -- Correct: A-C, B-D (or A-B with side swap)
                 let
                     teamA =
                         F.makeTeam 90 "Team A"
@@ -435,8 +447,8 @@ rematchAvoidanceTests =
 
                     -- A played D in R1, B played C in R1
                     priorTrials =
-                        [ F.makeTrial "prev_1" 1 teamA.id teamD.id
-                        , F.makeTrial "prev_2" 1 teamB.id teamC.id
+                        [ F.makeTrial teamA teamD
+                        , F.makeTrial teamB teamC
                         ]
 
                     ranked =
@@ -465,10 +477,6 @@ rematchAvoidanceTests =
                     result
         , test "avoids rematch with 6 teams and constrained history" <|
             \_ ->
-                -- 6 teams, R1 pairings: A-B, C-D, E-F
-                -- R2 with side switch: naive would pair
-                -- B-A (rematch), D-C (rematch), F-E (rematch)
-                -- Must find valid non-rematch arrangement
                 let
                     teamA =
                         F.makeTeam 80 "Team A"
@@ -489,9 +497,9 @@ rematchAvoidanceTests =
                         F.makeTeam 85 "Team F"
 
                     priorTrials =
-                        [ F.makeTrial "p1" 1 teamA.id teamB.id
-                        , F.makeTrial "p2" 1 teamC.id teamD.id
-                        , F.makeTrial "p3" 1 teamE.id teamF.id
+                        [ F.makeTrial teamA teamB
+                        , F.makeTrial teamC teamD
+                        , F.makeTrial teamE teamF
                         ]
 
                     ranked =
