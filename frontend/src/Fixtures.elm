@@ -1,5 +1,6 @@
 module Fixtures exposing
     ( districts
+    , registrations
     , schools
     , teams
     , tournament
@@ -17,6 +18,7 @@ import Coach
 import District exposing (District)
 import Email exposing (Email)
 import Error exposing (Error(..))
+import Registration exposing (Registration)
 import School exposing (School)
 import Team exposing (Team)
 import Tournament exposing (Tournament)
@@ -556,3 +558,34 @@ tournament =
     in
     crashOnError "tournament registration transition"
         (Tournament.openRegistration draft)
+
+
+
+-- REGISTRATIONS
+
+
+applicant : String -> String -> String -> Coach.TeacherCoachApplicant
+applicant first last emailAddr =
+    Coach.apply (coachName first last) (email emailAddr)
+
+
+registrations : List Registration
+registrations =
+    [ Registration.create
+        (Registration.idFromString "reg-001")
+        (applicant "Maria" "Santos" "msantos@palmdesert.edu")
+        palmDesertSchool
+        (teamName "Palm Desert")
+    , Registration.create
+        (Registration.idFromString "reg-002")
+        (applicant "James" "Chen" "jchen@santiago.edu")
+        santiagoSchool
+        (teamName "Santiago")
+    , Registration.approve
+        (Registration.create
+            (Registration.idFromString "reg-003")
+            (applicant "Lisa" "Thompson" "lthompson@norco.edu")
+            norcoSchool
+            (teamName "Norco")
+        )
+    ]

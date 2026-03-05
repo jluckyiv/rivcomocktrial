@@ -1,4 +1,4 @@
-module Effect exposing
+port module Effect exposing
     ( Effect
     , none, batch
     , sendCmd, sendMsg
@@ -6,6 +6,7 @@ module Effect exposing
     , pushRoute, replaceRoute
     , pushRoutePath, replaceRoutePath
     , loadExternalUrl, back
+    , saveAdminToken
     , map, toCmd
     )
 
@@ -26,6 +27,7 @@ module Effect exposing
 
 import Browser.Navigation
 import Dict exposing (Dict)
+import Json.Encode
 import Route exposing (Route)
 import Route.Path
 import Shared.Model
@@ -88,6 +90,33 @@ like login/logout.
 sendSharedMsg : Shared.Msg.Msg -> Effect msg
 sendSharedMsg =
     SendSharedMsg
+
+
+
+-- PORTS
+
+
+port outgoing :
+    { tag : String, data : Json.Encode.Value }
+    -> Cmd msg
+
+
+{-| Persist or clear the admin token in localStorage.
+-}
+saveAdminToken : Maybe String -> Effect msg
+saveAdminToken token =
+    SendCmd
+        (outgoing
+            { tag = "SaveAdminToken"
+            , data =
+                case token of
+                    Just t ->
+                        Json.Encode.string t
+
+                    Nothing ->
+                        Json.Encode.null
+            }
+        )
 
 
 

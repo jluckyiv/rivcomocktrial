@@ -17,12 +17,16 @@ import Shared.Msg
 
 
 type alias Flags =
-    {}
+    { adminToken : Maybe String
+    }
 
 
 decoder : Json.Decode.Decoder Flags
 decoder =
-    Json.Decode.succeed {}
+    Json.Decode.map Flags
+        (Json.Decode.field "adminToken"
+            (Json.Decode.nullable Json.Decode.string)
+        )
 
 
 
@@ -35,7 +39,16 @@ type alias Model =
 
 init : Result Json.Decode.Error Flags -> Route () -> ( Model, Effect Msg )
 init flagsResult route =
-    ( { adminToken = Nothing }
+    let
+        token =
+            case flagsResult of
+                Ok flags ->
+                    flags.adminToken
+
+                Err _ ->
+                    Nothing
+    in
+    ( { adminToken = token }
     , Effect.none
     )
 
@@ -53,12 +66,19 @@ update route msg model =
     case msg of
         Shared.Msg.AdminLoggedIn token ->
             ( { model | adminToken = Just token }
-            , Effect.pushRoutePath Route.Path.Admin_Tournaments
+            , Effect.batch
+                [ Effect.saveAdminToken (Just token)
+                , Effect.pushRoutePath
+                    Route.Path.Admin_Tournaments
+                ]
             )
 
         Shared.Msg.AdminLoggedOut ->
             ( { model | adminToken = Nothing }
-            , Effect.pushRoutePath Route.Path.Home_
+            , Effect.batch
+                [ Effect.saveAdminToken Nothing
+                , Effect.pushRoutePath Route.Path.Home_
+                ]
             )
 
 

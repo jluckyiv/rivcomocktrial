@@ -3,6 +3,7 @@ module FixturesTest exposing (suite)
 import District
 import Expect
 import Fixtures
+import Registration
 import School
 import Set
 import Team
@@ -93,5 +94,25 @@ suite =
                         |> Tournament.status
                         |> Tournament.statusToString
                         |> Expect.equal "Registration"
+            ]
+        , describe "registrations"
+            [ test "has 3 registrations" <|
+                \_ ->
+                    Fixtures.registrations
+                        |> List.length
+                        |> Expect.equal 3
+            , test "includes 2 Pending and 1 Approved" <|
+                \_ ->
+                    let
+                        statuses =
+                            Fixtures.registrations
+                                |> List.map Registration.status
+                    in
+                    Expect.equal
+                        [ Registration.Pending
+                        , Registration.Pending
+                        , Registration.Approved
+                        ]
+                        statuses
             ]
         ]
