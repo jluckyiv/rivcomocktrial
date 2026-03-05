@@ -36,6 +36,7 @@ suite =
         [ createTests
         , submitTests
         , verifyTests
+        , replaceTests
         , presiderTests
         , scorerStatusTests
         , presiderStatusTests
@@ -261,6 +262,96 @@ presiderStatusTests =
                     |> BallotTracking.submitPresiderBallot ballot
                     |> Result.map BallotTracking.presiderStatus
                     |> Expect.equal (Ok PresiderBallotReceived)
+        ]
+
+
+replaceTests : Test
+replaceTests =
+    describe "replaceVerifiedBallot"
+        [ test "replaces existing verified ballot" <|
+            \_ ->
+                let
+                    verifiedBallot =
+                        VerifiedBallot.verify testSubmittedBallot
+
+                    correctedBallot =
+                        VerifiedBallot.verifyWithCorrections
+                            testSubmittedBallot
+                            []
+                in
+                BallotTracking.create testTrial [ testScorer ]
+                    |> BallotTracking.submitBallot
+                        testScorer
+                        testSubmittedBallot
+                    |> Result.andThen
+                        (BallotTracking.verifyBallot
+                            testScorer
+                            verifiedBallot
+                        )
+                    |> Result.andThen
+                        (BallotTracking.replaceVerifiedBallot
+                            testScorer
+                            correctedBallot
+                        )
+                    |> Result.map BallotTracking.verified
+                    |> Result.map List.length
+                    |> Expect.equal (Ok 1)
+        , test "fails when volunteer has no verified ballot" <|
+            \_ ->
+                let
+                    correctedBallot =
+                        VerifiedBallot.verifyWithCorrections
+                            testSubmittedBallot
+                            []
+                in
+                BallotTracking.create testTrial [ testScorer ]
+                    |> BallotTracking.submitBallot
+                        testScorer
+                        testSubmittedBallot
+                    |> Result.andThen
+                        (BallotTracking.replaceVerifiedBallot
+                            testScorer
+                            correctedBallot
+                        )
+                    |> Expect.err
+        , test "preserves other verified ballots" <|
+            \_ ->
+                let
+                    verifiedBallot =
+                        VerifiedBallot.verify testSubmittedBallot
+
+                    correctedBallot =
+                        VerifiedBallot.verifyWithCorrections
+                            testSubmittedBallot
+                            []
+                in
+                BallotTracking.create testTrial [ testScorer, scorer2 ]
+                    |> BallotTracking.submitBallot
+                        testScorer
+                        testSubmittedBallot
+                    |> Result.andThen
+                        (BallotTracking.submitBallot
+                            scorer2
+                            testSubmittedBallot
+                        )
+                    |> Result.andThen
+                        (BallotTracking.verifyBallot
+                            testScorer
+                            verifiedBallot
+                        )
+                    |> Result.andThen
+                        (BallotTracking.verifyBallot
+                            scorer2
+                            verifiedBallot
+                        )
+                    |> Result.andThen
+                        (BallotTracking.replaceVerifiedBallot
+                            testScorer
+                            correctedBallot
+                        )
+                    |> Result.map BallotTracking.verified
+                    |> Result.map List.length
+                    |> Expect.equal (Ok 2)
         ]
 
 

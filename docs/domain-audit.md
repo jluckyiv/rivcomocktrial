@@ -175,16 +175,18 @@ exposure from assignment history.
 
 ---
 
-### ActiveTrial.elm — DONE (issue #49)
+### ActiveTrial.elm — DONE (issue #49, updated #40)
 
 Opaque `ActiveTrial` wrapping `Trial` with a state
 machine. `TrialStatus` exposed (closed enum):
 `AwaitingCheckIn | InProgress | Complete | Verified`.
 `fromTrial` is the only constructor (starts at
 `AwaitingCheckIn`). Transitions via `startTrial`,
-`completeTrial`, `verifyTrial` — each returns
-`Result (List Error) ActiveTrial`, enforcing the
-linear state progression. `statusToString` for display.
+`completeTrial`, `verifyTrial`, `reopenTrial` — each
+returns `Result (List Error) ActiveTrial`, enforcing
+the state progression. `reopenTrial` (issue #40)
+transitions `Verified → Complete` for corrections.
+`statusToString` for display.
 
 ---
 
@@ -219,7 +221,7 @@ carries courtroom data in the type, not as a separate
 
 ---
 
-### BallotTracking.elm — DONE (issue #49)
+### BallotTracking.elm — DONE (issue #49, updated #40)
 
 Opaque `BallotTracking` for ballot collection per
 trial. `ScorerStatus` exposed:
@@ -229,10 +231,27 @@ exposed: `AwaitingPresiderBallot
 | PresiderBallotReceived`. `create` takes Trial + expected
 scorers. `submitBallot`, `verifyBallot`,
 `submitPresiderBallot` return `Result (List Error)`.
+`replaceVerifiedBallot` swaps a verified entry for the
+correction workflow (issue #40).
 Query functions `scorerStatus` and `presiderStatus`
 return typed status (ADR-009) — no boolean accessors.
 `AwaitingSubmissions` carries the missing volunteers
 list, eliminating a separate `missingScorers` function.
+
+---
+
+### TrialClosure.elm — NEW (issue #40)
+
+Orchestration layer connecting ActiveTrial and
+BallotTracking for ballot-aware trial transitions.
+`completeTrial` requires all ballots submitted before
+allowing `InProgress → Complete`. `verifyTrial` requires
+`AllVerified` scorer status before `Complete → Verified`.
+Both accumulate errors from ballot state and trial
+status checks. Correction workflow uses
+`ActiveTrial.reopenTrial` + `BallotTracking.replaceVerifiedBallot`
++ `TrialClosure.verifyTrial` — no new function needed.
+Keeps ActiveTrial and BallotTracking independent.
 
 ---
 

@@ -6,6 +6,7 @@ module BallotTracking exposing
     , expectedScorers
     , presiderBallot
     , presiderStatus
+    , replaceVerifiedBallot
     , scorerStatus
     , submitBallot
     , submitPresiderBallot
@@ -120,6 +121,33 @@ verifyBallot vol ballot (BallotTracking r) =
                 { r
                     | verified =
                         r.verified ++ [ ( vol, ballot ) ]
+                }
+            )
+
+
+replaceVerifiedBallot :
+    Volunteer
+    -> VerifiedBallot
+    -> BallotTracking
+    -> Result (List Error) BallotTracking
+replaceVerifiedBallot vol ballot (BallotTracking r) =
+    if not (List.any (\( v, _ ) -> v == vol) r.verified) then
+        Err [ Error "Volunteer has no verified ballot to replace" ]
+
+    else
+        Ok
+            (BallotTracking
+                { r
+                    | verified =
+                        List.map
+                            (\( v, b ) ->
+                                if v == vol then
+                                    ( v, ballot )
+
+                                else
+                                    ( v, b )
+                            )
+                            r.verified
                 }
             )
 
