@@ -44,6 +44,7 @@ the *Designing with Types* series:
 
 See also:
 - [ADR-006](decisions.md) — flat module-per-concept
+- [ADR-009](decisions.md) — parse, don't validate
 - [competition-workflow.md](competition-workflow.md)
   — end-to-end competition sequence
 - [power-matching-analysis.md](power-matching-analysis.md)
@@ -59,10 +60,12 @@ Layer 4 (Results):     PrelimResult  ElimResult
                            │          │
 Layer 3 (Scoring):     SubmittedBallot → VerifiedBallot
                        PresiderBallot   Rank
+                       BallotTracking (orchestrates L3)
                            │              │
 Layer 2 (Competition): Tournament  Round  Courtroom
-                       Pairing → Trial   Judge
+                       Pairing → Trial → ActiveTrial
                        Roster  Volunteer  Conflict
+                       VolunteerSlot  RoundProgress
                            │
 Layer 1 (Organizational):
   District  School  Student  Coach  Email
@@ -261,21 +264,63 @@ reference the witness directly, not by number.
 **Validation:** correct count per role, no duplicate
 students. Deferred — depends on exact count rules.
 
+### ActiveTrial.elm — DONE (issue #49)
+
+State machine wrapping Trial. `TrialStatus`:
+`AwaitingCheckIn → InProgress → Complete → Verified`.
+Linear progression enforced by `startTrial`,
+`completeTrial`, `verifyTrial` — each returns
+`Result (List Error) ActiveTrial`. Parallels the
+`Pairing → Trial` promotion: Trial is "resolved
+pairing," ActiveTrial is "competing/competed."
+
+### RoundProgress.elm — DONE (issue #49)
+
+Derived state from `List ActiveTrial` — not a state
+machine, a pure query. `roundProgress` returns
+`CheckInOpen | AllTrialsStarted | AllTrialsComplete
+| FullyVerified` based on the least-advanced trial.
+
+### VolunteerSlot.elm — DONE (issue #49)
+
+Tracks volunteer check-in lifecycle per round.
+`VolunteerStatus` is a sum type with courtroom data:
+`Tentative Courtroom | Present | CheckedIn Courtroom`.
+Follows ADR-009 — the courtroom is carried *in* the
+status variant, not as a separate `Maybe Courtroom`.
+Three constructors for three entry paths: `tentative`,
+`walkUp`, `walkUpDirect`. `validateCheckIn` integrates
+with Conflict module for hard/soft conflict detection.
+
+### BallotTracking.elm — DONE (issue #49)
+
+Orchestrates ballot collection per trial. Sits at L2/L3
+boundary — references `SubmittedBallot`, `VerifiedBallot`,
+`PresiderBallot` from Layer 3 but tracks trial-level
+state from Layer 2. `ScorerStatus` is a sum type
+(ADR-009): `AwaitingSubmissions (List Volunteer)
+| AwaitingVerification | AllVerified`. No boolean
+accessors — the type carries the proof.
+
 ### Summary
 
-| Module         | Status | Key Pattern              |
-| -------------- | ------ | ------------------------ |
-| Tournament.elm | Done   | Status as sum type       |
-| Round.elm      | Done   | Variants over Int        |
-| Courtroom.elm  | Done   | Opaque wrapper           |
-| Judge.elm      | Done   | Opaque Name+Email        |
-| Assignment.elm | Done   | Domain language          |
-| Pairing.elm    | Done   | Pre-resolved state       |
-| Trial.elm      | Done   | Fully-resolved state     |
-| Witness.elm    | Done   | Opaque wrapper           |
-| Roster.elm     | Done   | Sum type per role        |
-| Volunteer.elm  | Done   | Opaque Name+Email+Role   |
-| Conflict.elm   | Done   | Hard/Soft detection      |
+| Module            | Status | Key Pattern              |
+| ----------------- | ------ | ------------------------ |
+| Tournament.elm    | Done   | Status as sum type       |
+| Round.elm         | Done   | Variants over Int        |
+| Courtroom.elm     | Done   | Opaque wrapper           |
+| Judge.elm         | Done   | Opaque Name+Email        |
+| Assignment.elm    | Done   | Domain language          |
+| Pairing.elm       | Done   | Pre-resolved state       |
+| Trial.elm         | Done   | Fully-resolved state     |
+| ActiveTrial.elm   | Done   | State machine (ADR-009)  |
+| RoundProgress.elm | Done   | Derived query            |
+| Witness.elm       | Done   | Opaque wrapper           |
+| Roster.elm        | Done   | Sum type per role        |
+| Volunteer.elm     | Done   | Opaque Name+Email+Role   |
+| Conflict.elm      | Done   | Hard/Soft detection      |
+| VolunteerSlot.elm | Done   | Check-in lifecycle       |
+| BallotTracking.elm| Done   | Ballot collection (ADR-009) |
 
 **Tests:** 113 total (78 Layer 1 + 35 Layer 2).
 
@@ -629,7 +674,7 @@ TDD: write failing tests, implement types and
 functions, refactor. No persistence, no UI — pure
 domain logic.
 
-### Done (199 tests)
+### Done (199 tests → 522 tests)
 1. District, School, Student, Coach, Email, Team,
    Side, Role — Layer 1 organizational types
 2. Assignment — generic reusable type
@@ -658,6 +703,15 @@ domain logic.
     configurable RankingStrategy
 18. Awards — AwardCategory, AwardTiebreaker,
     nominationCategory linkage
+19. ActiveTrial — state machine wrapping Trial
+    (AwaitingCheckIn → InProgress → Complete →
+    Verified)
+20. RoundProgress — derived round state from
+    List ActiveTrial
+21. VolunteerSlot — check-in lifecycle with
+    conflict validation
+22. BallotTracking — ballot collection per trial,
+    typed status queries (ADR-009)
 
 ### Deferred implementation
 - Awards scoring algorithm — criteria in flux
@@ -705,7 +759,12 @@ Intentionally deferred:
 | Milestone 7 (public) | No new domain types        |
 | Milestone 8 (polish) | No new domain types        |
 
-All domain types are complete. Next phase: persistence
-(PocketBase collections), then UI (admin pages, coach
-pages, public pages). The types teach us the domain —
+Core domain types are complete, including round
+lifecycle (issue #49). Remaining gaps from
+mvp-domain-gaps.md: Publication, StandingsAggregation,
+ElimSideRules. Next phase: persistence (PocketBase
+collections), then UI. The types teach us the domain —
 now that they're right, the rest is plumbing.
+
+See also:
+- [ADR-009](decisions.md) — Parse, don't validate

@@ -5,6 +5,189 @@ rationale. Newest first.
 
 ---
 
+## ADR-009: Parse, don't validate — prefer types over booleans
+
+**Date:** 2026-03-04
+
+**Context:** During issue #49 (round lifecycle domain
+types), the plan included boolean query functions like
+`isFullySubmitted`, `isFullyVerified`, and
+`missingScorers`. These check a property and return
+`Bool` or a derived value, discarding the proof. This
+is the "validate" pattern described in Alexis King's
+["Parse, Don't Validate"][parse-dont-validate].
+
+[parse-dont-validate]: https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/
+
+**Decision:** Prefer sum types that encode state over
+boolean accessor functions. When code needs to know
+"what state is this in?", return a type that proves
+which state it's in — don't return a `Bool` that the
+caller must re-interpret.
+
+Concrete example from `BallotTracking`:
+
+```elm
+-- AVOID: boolean queries that discard information
+isFullySubmitted : BallotTracking -> Bool
+missingScorers : BallotTracking -> List Volunteer
+
+-- PREFER: a type that encodes the state
+type ScorerStatus
+    = AwaitingSubmissions (List Volunteer)
+    | AwaitingVerification
+    | AllVerified
+
+scorerStatus : BallotTracking -> ScorerStatus
+```
+
+A caller pattern-matching on `AllVerified` *knows*
+everything is verified — the type proves it. And
+`AwaitingSubmissions` carries *who* is missing, so
+there's no separate `missingScorers` function needed.
+
+**Principles (ongoing):**
+
+1. **Parse at boundaries, not everywhere.** Validate
+   inputs once (smart constructors), then use types
+   that make invalid states unrepresentable downstream.
+
+2. **Sum types over booleans.** A `Bool` is just
+   `True | False` — it throws away *which* state.
+   A named sum type carries meaning the compiler can
+   check.
+
+3. **Carry the proof.** If checking a property produces
+   useful data (e.g., which scorers are missing), the
+   return type should carry that data — not discard it
+   and force the caller to recompute.
+
+4. **Avoid primitive obsession.** `String`, `Int`,
+   `Bool` rarely capture domain intent. Wrap them in
+   domain types (`Name`, `Points`, `TrialStatus`) so
+   the compiler prevents mixing them up.
+
+5. **Let the type system be the documentation.** If a
+   function only accepts `ActiveTrial` (not `Trial`),
+   the type signature documents that the trial must
+   have been activated — no runtime check needed.
+
+**Rationale:**
+- Aligns with Wlaschin's "Making Illegal States
+  Unrepresentable" and King's "Parse, Don't Validate"
+- Elm's exhaustive pattern matching makes sum types
+  cheap to use — the compiler forces handling every case
+- Reduces test surface: fewer boolean combinations to
+  test when states are mutually exclusive by construction
+- Already established in the codebase (opaque types,
+  smart constructors, `Result (List Error) a`) — this
+  ADR makes the principle explicit and extends it to
+  query functions
+
+**Consequences:**
+- Modules may expose more types (e.g., `ScorerStatus`,
+  `PresiderStatus`) but fewer functions
+- Callers use pattern matching instead of
+  `if isFullyVerified then ...` — more verbose but
+  compiler-checked
+- Ongoing discipline: when tempted to add a `Bool`
+  accessor, ask "should this be a type instead?"
+
+---
+
+## ADR-008: URL design principles
+
+**Date:** 2026-03-04
+
+**Context:** The app has two audiences — admins managing
+the competition and public users (coaches, scorers,
+spectators) consuming it. URLs will appear in QR codes,
+text messages, bookmarks, and printed materials. Elm
+Land's file-based routing maps page filenames directly
+to URL paths, so URL design and file structure are the
+same decision. Influenced by [URLs are UI][hanselman],
+[URL Design][warpspire], [Cool URIs Don't Change][tbl],
+and Ember.js's philosophy that URLs are a public API
+for application state.
+
+[hanselman]: https://www.hanselman.com/blog/urls-are-ui
+[warpspire]: https://warpspire.com/posts/url-design
+[tbl]: https://www.w3.org/Provider/Style/URI
+
+**Decision:**
+
+1. **`/admin/*` namespace for all admin pages.** Admin
+   pages live under `Pages/Admin/` and route to
+   `/admin/*`. This is already established.
+
+2. **Public URLs are top-level.** Spectator and coach
+   pages live at `/standings`, `/schedule`,
+   `/rounds/:number`, `/teams/:name`, etc. — no
+   `/public` prefix. The public site is the default;
+   admin is the exception.
+
+3. **Dynamic segments use IDs, not slugs.** Detail
+   pages use PocketBase record IDs:
+   `/admin/tournaments/:id`. IDs are stable and
+   unambiguous. Human-readable suffixes may be appended
+   but are ignored for routing (StackOverflow pattern).
+
+4. **Querystrings for filtering and view state.**
+   Filters like round or courtroom use query params:
+   `/admin/pairings?round=2`. Pages must work without
+   querystrings (show a default view).
+
+5. **Scoring URLs optimized for mobile and QR.**
+   Ballot scoring paths are short and typeable:
+   `/score/:code` rather than deeply nested admin
+   paths. The `:code` is a short, unique identifier
+   (not a full PocketBase ID) to reduce QR density
+   and typing errors.
+
+6. **URLs are a contract.** Once a URL is shared
+   (bookmarked, printed, linked in email), it must
+   continue to work. Changing a URL requires a
+   redirect. Plan URL structure before building pages.
+
+7. **Elm Land conventions apply.** File naming maps to
+   URLs per Elm Land rules:
+   - Folder nesting = path segments
+     (`Pages/Admin/Teams.elm` → `/admin/teams`)
+   - CamelCase → kebab-case
+     (`SignIn.elm` → `/sign-in`)
+   - Trailing underscore = dynamic segment
+     (`Id_.elm` → `/:id`)
+   - `ALL_.elm` = catch-all for variable-depth paths
+
+**Rationale:**
+- Top-level public URLs are shorter, more shareable,
+  and signal that the public site is the primary
+  product — admin is a back-office tool
+- ID-based routes avoid slug uniqueness problems and
+  rename fragility. Slugs can be appended for SEO/
+  readability without being load-bearing
+- Querystrings for filters follow web conventions and
+  keep base URLs functional without parameters
+- Short scoring URLs reduce QR code density (fewer
+  modules = easier phone scanning) and are faster to
+  type when QR fails
+- Treating URLs as a contract forces upfront design
+  and prevents link rot
+
+**Consequences:**
+- Public page files go in `Pages/` (not `Pages/Public/`)
+  to get top-level URLs — must be careful not to
+  collide with domain module names (ADR-006)
+- Need a short-code generation scheme for scoring URLs
+  (deferred to issue #33/#34)
+- Detail pages require new files with dynamic segments
+  (e.g., `Pages/Admin/Tournaments/Id_.elm`) — this is
+  future work as admin detail views are added
+- URL changes after launch require redirect support,
+  which PocketBase hooks or middleware can handle
+
+---
+
 ## ADR-007: Auth UX — role self-identification and OAuth labels
 
 **Date:** 2026-03-01
