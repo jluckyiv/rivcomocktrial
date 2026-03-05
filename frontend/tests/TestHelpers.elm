@@ -29,6 +29,7 @@ module TestHelpers exposing
     , testScorer
     , testSubmittedBallot
     , testTrial
+    , trialFor
     , validRoster
     , volunteerName
     , witness1
@@ -364,6 +365,30 @@ testTrial =
 
         Nothing ->
             Debug.todo "testTrial must be valid"
+
+
+trialFor : Team -> Team -> Trial
+trialFor prosecution defense =
+    let
+        pairing =
+            case Pairing.create prosecution defense of
+                Ok p ->
+                    p
+
+                Err _ ->
+                    Debug.todo "trialFor pairing must be valid"
+    in
+    case
+        pairing
+            |> Pairing.assignCourtroom courtroomA
+            |> Pairing.assignJudge testJudge
+            |> Trial.fromPairing
+    of
+        Just t ->
+            t
+
+        Nothing ->
+            Debug.todo "trialFor must be valid"
 
 
 testActiveTrial : ActiveTrial
