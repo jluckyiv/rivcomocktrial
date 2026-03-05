@@ -3,14 +3,11 @@ module PowerMatch exposing
     , PowerMatchResult
     , ProposedPairing
     , RankedTeam
-    , SideCount
-    , hasPlayed
     , powerMatch
-    , sideHistory
     )
 
+import MatchHistory exposing (MatchHistory)
 import Team exposing (Team)
-import Trial exposing (Trial)
 
 
 type CrossBracketStrategy
@@ -26,12 +23,6 @@ type alias RankedTeam =
     }
 
 
-type alias SideCount =
-    { prosecution : Int
-    , defense : Int
-    }
-
-
 type alias PowerMatchResult =
     { pairings : List ProposedPairing
     , warnings : List String
@@ -44,38 +35,11 @@ type alias ProposedPairing =
     }
 
 
-hasPlayed : List Trial -> Team -> Team -> Bool
-hasPlayed trials teamA teamB =
-    List.any
-        (\t ->
-            (Team.sameTeam (Trial.prosecution t) teamA && Team.sameTeam (Trial.defense t) teamB)
-                || (Team.sameTeam (Trial.prosecution t) teamB && Team.sameTeam (Trial.defense t) teamA)
-        )
-        trials
-
-
-sideHistory : List Trial -> Team -> SideCount
-sideHistory trials team =
-    List.foldl
-        (\t acc ->
-            if Team.sameTeam (Trial.prosecution t) team then
-                { acc | prosecution = acc.prosecution + 1 }
-
-            else if Team.sameTeam (Trial.defense t) team then
-                { acc | defense = acc.defense + 1 }
-
-            else
-                acc
-        )
-        { prosecution = 0, defense = 0 }
-        trials
-
-
 {-| Generate power-matched pairings.
 
 Takes pre-ranked teams (caller determines ranking),
-all prior trials (for rematch/side checking), and trials
-already created in the current round.
+all prior match history (for rematch/side checking), and
+match history for the current round.
 
 Guarantees:
 
@@ -88,15 +52,13 @@ Guarantees:
 powerMatch :
     CrossBracketStrategy
     -> List RankedTeam
-    -> List Trial
-    -> List Trial
+    -> MatchHistory
+    -> MatchHistory
     -> PowerMatchResult
-powerMatch strategy rankedTeams allTrials currentRoundTrials =
+powerMatch strategy rankedTeams allHistory currentRoundHistory =
     let
         pairedTeams =
-            List.concatMap
-                (\t -> [ Trial.prosecution t, Trial.defense t ])
-                currentRoundTrials
+            currentRoundPairedTeams currentRoundHistory
 
         available =
             List.filter
@@ -107,20 +69,33 @@ powerMatch strategy rankedTeams allTrials currentRoundTrials =
             groupByWins available
 
         ( withinPairs, spillover ) =
-            pairWithinBrackets allTrials brackets
+            pairWithinBrackets allHistory brackets
 
         crossPairs =
-            pairCrossBracket strategy allTrials spillover
+            pairCrossBracket strategy allHistory spillover
 
         allPairs =
             withinPairs ++ crossPairs
 
         pairings =
-            List.map (assignSides allTrials) allPairs
+            List.map (assignSides allHistory) allPairs
     in
     { pairings = pairings
     , warnings = []
     }
+
+
+{-| Extract teams already paired in the current round's history.
+-}
+currentRoundPairedTeams : MatchHistory -> List Team
+currentRoundPairedTeams history =
+    let
+        records =
+            MatchHistory.toRecords history
+    in
+    List.concatMap
+        (\r -> [ r.prosecution, r.defense ])
+        records
 
 
 
@@ -157,15 +132,15 @@ groupByWins teams =
 
 
 pairWithinBrackets :
-    List Trial
+    MatchHistory
     -> List ( Int, List RankedTeam )
     -> ( List ( RankedTeam, RankedTeam ), List RankedTeam )
-pairWithinBrackets allTrials brackets =
+pairWithinBrackets allHistory brackets =
     List.foldl
         (\( _, bracketTeams ) ( pairsAcc, spillAcc ) ->
             let
                 ( pairs, spill ) =
-                    pairWithinBracket allTrials bracketTeams
+                    pairWithinBracket allHistory bracketTeams
             in
             ( pairsAcc ++ pairs, spillAcc ++ spill )
         )
@@ -174,24 +149,24 @@ pairWithinBrackets allTrials brackets =
 
 
 pairWithinBracket :
-    List Trial
+    MatchHistory
     -> List RankedTeam
     -> ( List ( RankedTeam, RankedTeam ), List RankedTeam )
-pairWithinBracket allTrials teams =
+pairWithinBracket allHistory teams =
     let
         sorted =
             List.sortBy .rank teams
     in
-    pairTopBottom allTrials sorted [] []
+    pairTopBottom allHistory sorted [] []
 
 
 pairTopBottom :
-    List Trial
+    MatchHistory
     -> List RankedTeam
     -> List ( RankedTeam, RankedTeam )
     -> List RankedTeam
     -> ( List ( RankedTeam, RankedTeam ), List RankedTeam )
-pairTopBottom allTrials remaining pairs spill =
+pairTopBottom allHistory remaining pairs spill =
     case remaining of
         [] ->
             ( List.reverse pairs, spill )
@@ -212,50 +187,50 @@ pairTopBottom allTrials remaining pairs spill =
                     ( List.reverse pairs, spill )
 
                 Just topTeam ->
-                    case findPartnerFromBottom allTrials topTeam rest of
+                    case findPartnerFromBottom allHistory topTeam rest of
                         Just ( partner, restWithout ) ->
-                            pairTopBottom allTrials
+                            pairTopBottom allHistory
                                 restWithout
                                 (( topTeam, partner ) :: pairs)
                                 spill
 
                         Nothing ->
                             -- Top can't pair within bracket
-                            pairTopBottom allTrials
+                            pairTopBottom allHistory
                                 rest
                                 pairs
                                 (topTeam :: spill)
 
 
 findPartnerFromBottom :
-    List Trial
+    MatchHistory
     -> RankedTeam
     -> List RankedTeam
     -> Maybe ( RankedTeam, List RankedTeam )
-findPartnerFromBottom allTrials top candidates =
-    findFromEnd allTrials top (List.reverse candidates) []
+findPartnerFromBottom allHistory top candidates =
+    findFromEnd allHistory top (List.reverse candidates) []
 
 
 findFromEnd :
-    List Trial
+    MatchHistory
     -> RankedTeam
     -> List RankedTeam
     -> List RankedTeam
     -> Maybe ( RankedTeam, List RankedTeam )
-findFromEnd allTrials top reversed skipped =
+findFromEnd allHistory top reversed skipped =
     case reversed of
         [] ->
             Nothing
 
         candidate :: rest ->
-            if canPair allTrials top candidate then
+            if canPair allHistory top candidate then
                 Just
                     ( candidate
                     , List.reverse rest ++ List.reverse skipped
                     )
 
             else
-                findFromEnd allTrials
+                findFromEnd allHistory
                     top
                     rest
                     (candidate :: skipped)
@@ -267,17 +242,17 @@ findFromEnd allTrials top reversed skipped =
 
 pairCrossBracket :
     CrossBracketStrategy
-    -> List Trial
+    -> MatchHistory
     -> List RankedTeam
     -> List ( RankedTeam, RankedTeam )
-pairCrossBracket strategy allTrials spillover =
+pairCrossBracket strategy allHistory spillover =
     let
         sorted =
             List.sortBy
                 (\rt -> ( negate rt.wins, rt.rank ))
                 spillover
     in
-    backtrackPairCross strategy allTrials sorted
+    backtrackPairCross strategy allHistory sorted
         |> Maybe.withDefault []
 
 
@@ -288,10 +263,10 @@ candidate.
 -}
 backtrackPairCross :
     CrossBracketStrategy
-    -> List Trial
+    -> MatchHistory
     -> List RankedTeam
     -> Maybe (List ( RankedTeam, RankedTeam ))
-backtrackPairCross strategy allTrials remaining =
+backtrackPairCross strategy allHistory remaining =
     case remaining of
         [] ->
             Just []
@@ -310,42 +285,42 @@ backtrackPairCross strategy allTrials remaining =
                         HighLow ->
                             List.reverse rest
             in
-            tryPartners strategy allTrials first candidates []
+            tryPartners strategy allHistory first candidates []
 
 
 tryPartners :
     CrossBracketStrategy
-    -> List Trial
+    -> MatchHistory
     -> RankedTeam
     -> List RankedTeam
     -> List RankedTeam
     -> Maybe (List ( RankedTeam, RankedTeam ))
-tryPartners strategy allTrials team candidates skipped =
+tryPartners strategy allHistory team candidates skipped =
     case candidates of
         [] ->
             Nothing
 
         candidate :: rest ->
-            if canPair allTrials team candidate then
+            if canPair allHistory team candidate then
                 let
                     restWithout =
                         List.reverse skipped ++ rest
                 in
-                case backtrackPairCross strategy allTrials restWithout of
+                case backtrackPairCross strategy allHistory restWithout of
                     Just morePairs ->
                         Just (( team, candidate ) :: morePairs)
 
                     Nothing ->
                         -- This choice blocks a solution; try next
                         tryPartners strategy
-                            allTrials
+                            allHistory
                             team
                             rest
                             (candidate :: skipped)
 
             else
                 tryPartners strategy
-                    allTrials
+                    allHistory
                     team
                     rest
                     (candidate :: skipped)
@@ -355,24 +330,24 @@ tryPartners strategy allTrials team candidates skipped =
 -- CONSTRAINTS
 
 
-canPair : List Trial -> RankedTeam -> RankedTeam -> Bool
-canPair allTrials a b =
-    not (hasPlayed allTrials a.team b.team)
-        && not (sameSideConflict allTrials a b)
+canPair : MatchHistory -> RankedTeam -> RankedTeam -> Bool
+canPair allHistory a b =
+    not (MatchHistory.hasPlayed allHistory a.team b.team)
+        && not (sameSideConflict allHistory a b)
 
 
 sameSideConflict :
-    List Trial
+    MatchHistory
     -> RankedTeam
     -> RankedTeam
     -> Bool
-sameSideConflict allTrials a b =
+sameSideConflict allHistory a b =
     let
         aSides =
-            sideHistory allTrials a.team
+            MatchHistory.sideHistory allHistory a.team
 
         bSides =
-            sideHistory allTrials b.team
+            MatchHistory.sideHistory allHistory b.team
 
         aNeeds =
             neededSide aSides
@@ -393,7 +368,7 @@ type Side
     | Defense
 
 
-neededSide : SideCount -> Maybe Side
+neededSide : MatchHistory.SideCount -> Maybe Side
 neededSide sides =
     if sides.prosecution > sides.defense then
         Just Defense
@@ -410,16 +385,16 @@ neededSide sides =
 
 
 assignSides :
-    List Trial
+    MatchHistory
     -> ( RankedTeam, RankedTeam )
     -> ProposedPairing
-assignSides allTrials ( a, b ) =
+assignSides allHistory ( a, b ) =
     let
         aSides =
-            sideHistory allTrials a.team
+            MatchHistory.sideHistory allHistory a.team
 
         bSides =
-            sideHistory allTrials b.team
+            MatchHistory.sideHistory allHistory b.team
     in
     if aSides.prosecution <= bSides.prosecution then
         { prosecutionTeam = a.team

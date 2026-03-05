@@ -1,20 +1,18 @@
 module PowerMatchTest exposing (..)
 
 import Expect
+import MatchHistory exposing (MatchHistory)
 import PowerMatch
     exposing
         ( CrossBracketStrategy(..)
         , PowerMatchResult
         , ProposedPairing
         , RankedTeam
-        , hasPlayed
         , powerMatch
-        , sideHistory
         )
 import PowerMatchFixtures as F
 import Team exposing (Team)
 import Test exposing (Test, describe, test)
-import Trial exposing (Trial)
 
 
 {-| Helper: collect all team keys (numbers) from pairings.
@@ -33,65 +31,6 @@ pairedTeamKeys result =
 teamKey : Team -> Int
 teamKey team =
     Team.numberToInt (Team.teamNumber team)
-
-
-
--- SIDE HISTORY TESTS
-
-
-sideHistoryTests : Test
-sideHistoryTests =
-    describe "sideHistory"
-        [ test "counts prosecution and defense appearances" <|
-            \_ ->
-                let
-                    trials =
-                        F.trialsThrough 2
-
-                    -- Team 09 (Notre Dame): R1 D, R2 P
-                    sides =
-                        sideHistory trials F.team09
-                in
-                Expect.equal
-                    { prosecution = 1, defense = 1 }
-                    sides
-        , test "team with no trials has zero counts" <|
-            \_ ->
-                sideHistory [] F.team01
-                    |> Expect.equal { prosecution = 0, defense = 0 }
-        , test "team 06 after R1: 1P 0D" <|
-            \_ ->
-                sideHistory F.round1Trials F.team06
-                    |> Expect.equal { prosecution = 1, defense = 0 }
-        , test "team 01 after R2: 1P 1D" <|
-            \_ ->
-                -- R1: defense, R2: prosecution
-                sideHistory (F.trialsThrough 2) F.team01
-                    |> Expect.equal { prosecution = 1, defense = 1 }
-        ]
-
-
-
--- HAS PLAYED TESTS
-
-
-hasPlayedTests : Test
-hasPlayedTests =
-    describe "hasPlayed"
-        [ test "detects previous matchup (P vs D)" <|
-            \_ ->
-                -- R1: La Quinta (6) P vs Indio (15) D
-                hasPlayed F.round1Trials F.team06 F.team15
-                    |> Expect.equal True
-        , test "detects previous matchup (D vs P, reversed)" <|
-            \_ ->
-                hasPlayed F.round1Trials F.team15 F.team06
-                    |> Expect.equal True
-        , test "returns False for teams that haven't played" <|
-            \_ ->
-                hasPlayed F.round1Trials F.team01 F.team06
-                    |> Expect.equal False
-        ]
 
 
 
@@ -178,8 +117,8 @@ structuralInvariantTests =
                 result =
                     powerMatch HighHigh
                         rankedAfterR1
-                        F.round1Trials
-                        []
+                        F.round1History
+                        MatchHistory.empty
              in
              [ test "every team appears exactly once" <|
                 \_ ->
@@ -203,7 +142,7 @@ structuralInvariantTests =
                         hasRematch =
                             List.any
                                 (\p ->
-                                    hasPlayed F.round1Trials
+                                    MatchHistory.hasPlayed F.round1History
                                         p.prosecutionTeam
                                         p.defenseTeam
                                 )
@@ -213,22 +152,24 @@ structuralInvariantTests =
              , test "no team plays same side 3+ times" <|
                 \_ ->
                     let
-                        allTrials =
-                            F.round1Trials
-                                ++ List.map
-                                    (\p ->
-                                        F.makeTrial
-                                            p.prosecutionTeam
-                                            p.defenseTeam
-                                    )
-                                    result.pairings
+                        allHistory =
+                            MatchHistory.fromRecords
+                                (MatchHistory.toRecords F.round1History
+                                    ++ List.map
+                                        (\p ->
+                                            { prosecution = p.prosecutionTeam
+                                            , defense = p.defenseTeam
+                                            }
+                                        )
+                                        result.pairings
+                                )
 
                         sideViolation =
                             List.any
                                 (\team ->
                                     let
                                         sides =
-                                            sideHistory allTrials team
+                                            MatchHistory.sideHistory allHistory team
                                     in
                                     sides.prosecution >= 3
                                         || sides.defense >= 3
@@ -242,8 +183,8 @@ structuralInvariantTests =
                         -- Teams that played P in R1
                         r1ProsecutionKeys =
                             List.map
-                                (\t -> teamKey (Trial.prosecution t))
-                                F.round1Trials
+                                (\r -> teamKey r.prosecution)
+                                (MatchHistory.toRecords F.round1History)
 
                         -- Check they play D in R2
                         violations =
@@ -261,14 +202,14 @@ structuralInvariantTests =
             )
         , describe "R4 pairings"
             (let
-                priorTrials =
-                    F.trialsThrough 3
+                priorHistory =
+                    F.historyThrough 3
 
                 result =
                     powerMatch HighHigh
                         rankedAfterR3
-                        priorTrials
-                        []
+                        priorHistory
+                        MatchHistory.empty
              in
              [ test "every team appears exactly once" <|
                 \_ ->
@@ -292,7 +233,7 @@ structuralInvariantTests =
                         hasRematch =
                             List.any
                                 (\p ->
-                                    hasPlayed priorTrials
+                                    MatchHistory.hasPlayed priorHistory
                                         p.prosecutionTeam
                                         p.defenseTeam
                                 )
@@ -304,8 +245,8 @@ structuralInvariantTests =
                     let
                         r3ProsecutionKeys =
                             List.map
-                                (\t -> teamKey (Trial.prosecution t))
-                                F.round3Trials
+                                (\r -> teamKey r.prosecution)
+                                (MatchHistory.toRecords F.round3History)
 
                         violations =
                             List.filter
@@ -321,22 +262,24 @@ structuralInvariantTests =
              , test "no team plays same side 3+ times" <|
                 \_ ->
                     let
-                        allTrials =
-                            priorTrials
-                                ++ List.map
-                                    (\p ->
-                                        F.makeTrial
-                                            p.prosecutionTeam
-                                            p.defenseTeam
-                                    )
-                                    result.pairings
+                        allHistory =
+                            MatchHistory.fromRecords
+                                (MatchHistory.toRecords priorHistory
+                                    ++ List.map
+                                        (\p ->
+                                            { prosecution = p.prosecutionTeam
+                                            , defense = p.defenseTeam
+                                            }
+                                        )
+                                        result.pairings
+                                )
 
                         sideViolation =
                             List.any
                                 (\team ->
                                     let
                                         sides =
-                                            sideHistory allTrials team
+                                            MatchHistory.sideHistory allHistory team
                                     in
                                     sides.prosecution >= 3
                                         || sides.defense >= 3
@@ -359,20 +302,20 @@ crossBracketStrategyTests =
         [ test "HighHigh and HighLow produce different pairings for R4" <|
             \_ ->
                 let
-                    priorTrials =
-                        F.trialsThrough 3
+                    priorHistory =
+                        F.historyThrough 3
 
                     highHigh =
                         powerMatch HighHigh
                             rankedAfterR3
-                            priorTrials
-                            []
+                            priorHistory
+                            MatchHistory.empty
 
                     highLow =
                         powerMatch HighLow
                             rankedAfterR3
-                            priorTrials
-                            []
+                            priorHistory
+                            MatchHistory.empty
                 in
                 Expect.notEqual
                     (List.map (\p -> ( teamKey p.prosecutionTeam, teamKey p.defenseTeam )) highHigh.pairings)
@@ -380,19 +323,19 @@ crossBracketStrategyTests =
         , test "HighLow: no rematches" <|
             \_ ->
                 let
-                    priorTrials =
-                        F.trialsThrough 3
+                    priorHistory =
+                        F.historyThrough 3
 
                     result =
                         powerMatch HighLow
                             rankedAfterR3
-                            priorTrials
-                            []
+                            priorHistory
+                            MatchHistory.empty
 
                     hasRematch =
                         List.any
                             (\p ->
-                                hasPlayed priorTrials
+                                MatchHistory.hasPlayed priorHistory
                                     p.prosecutionTeam
                                     p.defenseTeam
                             )
@@ -402,14 +345,14 @@ crossBracketStrategyTests =
         , test "HighLow: every team appears exactly once" <|
             \_ ->
                 let
-                    priorTrials =
-                        F.trialsThrough 3
+                    priorHistory =
+                        F.historyThrough 3
 
                     result =
                         powerMatch HighLow
                             rankedAfterR3
-                            priorTrials
-                            []
+                            priorHistory
+                            MatchHistory.empty
 
                     keys =
                         pairedTeamKeys result
@@ -446,10 +389,11 @@ rematchAvoidanceTests =
                         F.makeTeam 93 "Team D"
 
                     -- A played D in R1, B played C in R1
-                    priorTrials =
-                        [ F.makeTrial teamA teamD
-                        , F.makeTrial teamB teamC
-                        ]
+                    priorHistory =
+                        MatchHistory.fromRecords
+                            [ { prosecution = teamA, defense = teamD }
+                            , { prosecution = teamB, defense = teamC }
+                            ]
 
                     ranked =
                         [ { team = teamA, wins = 1, losses = 0, rank = 1 }
@@ -459,12 +403,12 @@ rematchAvoidanceTests =
                         ]
 
                     result =
-                        powerMatch HighHigh ranked priorTrials []
+                        powerMatch HighHigh ranked priorHistory MatchHistory.empty
 
                     hasRematch =
                         List.any
                             (\p ->
-                                hasPlayed priorTrials
+                                MatchHistory.hasPlayed priorHistory
                                     p.prosecutionTeam
                                     p.defenseTeam
                             )
@@ -496,11 +440,12 @@ rematchAvoidanceTests =
                     teamF =
                         F.makeTeam 85 "Team F"
 
-                    priorTrials =
-                        [ F.makeTrial teamA teamB
-                        , F.makeTrial teamC teamD
-                        , F.makeTrial teamE teamF
-                        ]
+                    priorHistory =
+                        MatchHistory.fromRecords
+                            [ { prosecution = teamA, defense = teamB }
+                            , { prosecution = teamC, defense = teamD }
+                            , { prosecution = teamE, defense = teamF }
+                            ]
 
                     ranked =
                         [ { team = teamA, wins = 1, losses = 0, rank = 1 }
@@ -512,12 +457,12 @@ rematchAvoidanceTests =
                         ]
 
                     result =
-                        powerMatch HighHigh ranked priorTrials []
+                        powerMatch HighHigh ranked priorHistory MatchHistory.empty
 
                     hasRematch =
                         List.any
                             (\p ->
-                                hasPlayed priorTrials
+                                MatchHistory.hasPlayed priorHistory
                                     p.prosecutionTeam
                                     p.defenseTeam
                             )
