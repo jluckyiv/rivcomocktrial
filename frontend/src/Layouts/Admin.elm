@@ -128,6 +128,7 @@ viewNavbar model route =
                 , navLink route Route.Path.Admin_Students "Students"
                 , navLink route Route.Path.Admin_Courtrooms "Courtrooms"
                 , navLink route Route.Path.Admin_Rounds "Rounds"
+                , navLink route Route.Path.Admin_Registrations "Registrations"
                 ]
             , div [ Attr.class "navbar-end" ]
                 [ div [ Attr.class "navbar-item" ]
