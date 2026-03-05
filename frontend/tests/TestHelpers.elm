@@ -4,6 +4,8 @@ module TestHelpers exposing
     , bob
     , charlie
     , coachName
+    , courtroomA
+    , courtroomB
     , courtroomName
     , diana
     , districtName
@@ -21,9 +23,12 @@ module TestHelpers exposing
     , teamC
     , teamName
     , teamNumber
+    , testActiveTrial
     , testJudge
     , testPresider
     , testScorer
+    , testSubmittedBallot
+    , testTrial
     , validRoster
     , volunteerName
     , witness1
@@ -32,16 +37,22 @@ module TestHelpers exposing
     , witness4
     )
 
+import ActiveTrial exposing (ActiveTrial)
+import Assignment exposing (Assignment(..))
 import Coach exposing (TeacherCoach, TeacherCoachApplicant)
-import Courtroom
+import Courtroom exposing (Courtroom)
 import District
 import Email exposing (Email)
 import Judge
+import Pairing
+import PresiderBallot
 import Roster exposing (AttorneyDuty(..), RoleAssignment(..), Roster)
 import School
 import Side exposing (Side(..))
 import Student
+import SubmittedBallot exposing (SubmittedBallot)
 import Team exposing (Team)
+import Trial exposing (Trial)
 import TrialRole exposing (TrialRole(..))
 import Volunteer
 import Witness exposing (Witness)
@@ -319,3 +330,64 @@ teamC =
             (District.create (districtName "District C"))
         )
         (coach "Charlie" "Davis")
+
+
+courtroomA : Courtroom
+courtroomA =
+    Courtroom.create (courtroomName "Dept A")
+
+
+courtroomB : Courtroom
+courtroomB =
+    Courtroom.create (courtroomName "Dept B")
+
+
+testTrial : Trial
+testTrial =
+    let
+        pairing =
+            case Pairing.create teamA teamB of
+                Ok p ->
+                    p
+
+                Err _ ->
+                    Debug.todo "testTrial pairing must be valid"
+    in
+    case
+        pairing
+            |> Pairing.assignCourtroom courtroomA
+            |> Pairing.assignJudge testJudge
+            |> Trial.fromPairing
+    of
+        Just t ->
+            t
+
+        Nothing ->
+            Debug.todo "testTrial must be valid"
+
+
+testActiveTrial : ActiveTrial
+testActiveTrial =
+    ActiveTrial.fromTrial testTrial
+
+
+testSubmittedBallot : SubmittedBallot
+testSubmittedBallot =
+    let
+        points =
+            case SubmittedBallot.fromInt 8 of
+                Ok p ->
+                    p
+
+                Err _ ->
+                    Debug.todo "testSubmittedBallot points must be valid"
+    in
+    case
+        SubmittedBallot.create
+            [ SubmittedBallot.Opening Prosecution alice points ]
+    of
+        Ok b ->
+            b
+
+        Err _ ->
+            Debug.todo "testSubmittedBallot must be valid"

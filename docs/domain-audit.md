@@ -1,6 +1,6 @@
 # Domain Model Audit
 
-Comprehensive audit of all 24 domain modules against
+Comprehensive audit of all 28 domain modules against
 least-privilege/max-enforcement principles.
 
 **Guiding rule:** Every type is opaque unless there is a
@@ -172,6 +172,67 @@ Conflict detection types and pure functions.
 `checkHardConflicts` filters declared conflicts against
 trial teams. `checkSoftConflicts` detects repeat team
 exposure from assignment history.
+
+---
+
+### ActiveTrial.elm — DONE (issue #49)
+
+Opaque `ActiveTrial` wrapping `Trial` with a state
+machine. `TrialStatus` exposed (closed enum):
+`AwaitingCheckIn | InProgress | Complete | Verified`.
+`fromTrial` is the only constructor (starts at
+`AwaitingCheckIn`). Transitions via `startTrial`,
+`completeTrial`, `verifyTrial` — each returns
+`Result (List Error) ActiveTrial`, enforcing the
+linear state progression. `statusToString` for display.
+
+---
+
+### RoundProgress.elm — DONE (issue #49)
+
+`RoundProgress` exposed (closed enum):
+`CheckInOpen | AllTrialsStarted | AllTrialsComplete
+| FullyVerified`. Pure query function
+`roundProgress : List ActiveTrial -> RoundProgress`
+derives round-level state from trial statuses. Not a
+state machine — a projection. Empty list yields
+`FullyVerified` (vacuous truth). `progressToString`
+for display.
+
+---
+
+### VolunteerSlot.elm — DONE (issue #49)
+
+Opaque `VolunteerSlot` tracking volunteer check-in
+lifecycle. `VolunteerStatus` exposed (sum type with
+data): `Tentative Courtroom | Present | CheckedIn
+Courtroom`. Three constructors: `tentative` (pre-
+assigned), `walkUp` (day-of at jury assembly),
+`walkUpDirect` (straight to courtroom). Transitions:
+`reportForDuty` (Tentative → Present, idempotent),
+`checkIn` (any → CheckedIn, always succeeds).
+`validateCheckIn` integrates with `Conflict` module —
+hard conflicts block (Err), soft conflicts warn (Ok
+with warnings). Follows ADR-009: `VolunteerStatus`
+carries courtroom data in the type, not as a separate
+`Maybe Courtroom`.
+
+---
+
+### BallotTracking.elm — DONE (issue #49)
+
+Opaque `BallotTracking` for ballot collection per
+trial. `ScorerStatus` exposed:
+`AwaitingSubmissions (List Volunteer)
+| AwaitingVerification | AllVerified`. `PresiderStatus`
+exposed: `AwaitingPresiderBallot
+| PresiderBallotReceived`. `create` takes Trial + expected
+scorers. `submitBallot`, `verifyBallot`,
+`submitPresiderBallot` return `Result (List Error)`.
+Query functions `scorerStatus` and `presiderStatus`
+return typed status (ADR-009) — no boolean accessors.
+`AwaitingSubmissions` carries the missing volunteers
+list, eliminating a separate `missingScorers` function.
 
 ---
 
@@ -407,3 +468,8 @@ resolved in Tiers 1–3.
 | `Tiebreaker(..)` | Config enum |
 | `AwardCategory(..)` | Config enum |
 | `AwardTiebreaker(..)` | Config enum |
+| `TrialStatus(..)` | Closed enum, 4 states, pattern matching intended |
+| `RoundProgress(..)` | Closed enum, 4 states, pattern matching intended |
+| `VolunteerStatus(..)` | Sum type with data, pattern matching intended (ADR-009) |
+| `ScorerStatus(..)` | Sum type with data, carries proof (ADR-009) |
+| `PresiderStatus(..)` | Closed enum, 2 states, pattern matching intended |
