@@ -626,8 +626,10 @@ Rank). The combination logic belongs here in Layer 4.
 | Publication.elm    | Done   | Progressive disclosure   |
 | TrialResult.elm    | Done   | Ballot→TeamRecord bridge |
 | ElimSideRules.elm  | Done   | Rule 5.5K side assignment |
+| ElimBracket.elm    | Done   | 1v8/2v7/3v6/4v5 seeding  |
 
-**Tests:** 35 total Layer 4 (original) + 59 new.
+**Tests:** 35 total Layer 4 (original) + 59 new + 11
+ElimBracket.
 
 ---
 
@@ -679,7 +681,7 @@ TDD: write failing tests, implement types and
 functions, refactor. No persistence, no UI — pure
 domain logic.
 
-### Done (199 tests → 581 tests)
+### Done (199 tests → 592 tests)
 1. District, School, Student, Coach, Email, Team,
    Side, Role — Layer 1 organizational types
 2. Assignment — generic reusable type
@@ -723,6 +725,10 @@ domain logic.
     aggregate and headToHead adapters
 25. ElimSideRules — rule 5.5K side assignment,
     MeetingHistory sum type (ADR-009)
+26. ElimBracket — 1v8/2v7/3v6/4v5 seeding per
+    rule 5.5H. Feeds into ElimSideRules.
+27. PowerMatch refactor — migrated from Api.Team/Trial
+    to domain Team/Trial/Side. Removed local Side type.
 
 ### Deferred implementation
 - Awards scoring algorithm — criteria in flux
@@ -736,7 +742,8 @@ domain logic.
 20. Admin UI — pages for each workflow step
 21. Coach UI — roster submission, score viewing
 22. Public UI — standings, bracket, results
-23. PowerMatch refactor — use domain types
+23. PowerMatch refactor — done (domain types)
+24. ElimBracket — done (1v8/2v7/3v6/4v5 seeding)
 
 ---
 
@@ -747,11 +754,6 @@ Intentionally deferred:
 - **PocketBase collections** — after domain types
   stabilize
 - **UI / pages** — after persistence
-- **PowerMatch refactor** — works as-is; refactor to
-  domain types is a separate task
-- **Elimination bracket seeding** — rules documented
-  (1v8, 2v7 etc. per Rule 5.5H), implementation
-  deferred
 - **Scorer recruitment/assignment** — outside the app
 - **Coach auth / OAuth** — later milestone
 - **Notification/publishing** — later milestone

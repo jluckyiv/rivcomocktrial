@@ -4,6 +4,7 @@ module Team exposing
     , Team
     , addStudents
     , attorneyCoach
+    , sameTeam
     , create
     , nameFromString
     , nameToString
@@ -95,6 +96,11 @@ create num n s tc =
         , teacherCoach = tc
         , attorneyCoach = Nothing
         }
+
+
+sameTeam : Team -> Team -> Bool
+sameTeam (Team a) (Team b) =
+    a.number == b.number
 
 
 teamNumber : Team -> Number
