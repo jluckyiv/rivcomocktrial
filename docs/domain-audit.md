@@ -141,16 +141,37 @@ trims). Opaque `Courtroom` with `create` and
 
 ---
 
-### Judge.elm
+### Judge.elm — DONE (issue #37)
 
-**Current:** `Judge(..)` is a unit type placeholder.
+Opaque `Judge` with `Name` (first+last), `Email`.
+`nameFromStrings` smart constructor. `create`, `name`,
+`email` accessors. Models courtroom presider in
+Pairing/Trial context.
 
-**Assessment:** Intentionally stubbed. Exposing the
-constructor is fine for a unit type. When judge data
-is added (name, credentials), it should follow the
-opaque pattern.
+---
 
-**No changes needed (yet).**
+### Volunteer.elm — DONE (issue #39)
+
+Opaque `Volunteer` with `Name` (first+last), `Email`,
+and `TrialRole`. Mirrors Judge.elm pattern.
+`nameFromStrings` smart constructor returns
+`Result (List Error) Name`. `create` takes Name, Email,
+TrialRole. Accessors: `name`, `email`, `role`.
+Models scorers and presiding judges as volunteers for
+conflict tracking.
+
+---
+
+### Conflict.elm — DONE (issue #39)
+
+Conflict detection types and pure functions.
+`ConflictSubject` = `WithTeam Team | WithSchool School`.
+`HardConflict` = self-reported conflict (blocks).
+`SoftConflict` = repeat exposure (warns).
+`Conflict` = `Hard HardConflict | Soft SoftConflict`.
+`checkHardConflicts` filters declared conflicts against
+trial teams. `checkSoftConflicts` detects repeat team
+exposure from assignment history.
 
 ---
 

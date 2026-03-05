@@ -62,7 +62,7 @@ Layer 3 (Scoring):     SubmittedBallot → VerifiedBallot
                            │              │
 Layer 2 (Competition): Tournament  Round  Courtroom
                        Pairing → Trial   Judge
-                       Roster
+                       Roster  Volunteer  Conflict
                            │
 Layer 1 (Organizational):
   District  School  Student  Coach  Email
@@ -155,17 +155,24 @@ count becomes configurable, we revisit.
 
 Opaque `Name` wrapper — a named location.
 
-### Judge.elm — DONE (placeholder)
+### Judge.elm — DONE
 
-```elm
-type Judge = Judge
-```
+Opaque `Judge` with `Name` (first+last) and `Email`.
+Models the courtroom presider in Pairing/Trial.
 
-We know a judge exists on a trial. We don't yet know
-the shape — a presider with a name and tiebreaker
-authority, or something else. The placeholder is
-honest about what we know. We'll discover the type
-when we model judicial assignments.
+### Volunteer.elm — DONE (issue #39)
+
+Opaque `Volunteer` with `Name`, `Email`, and
+`TrialRole` (Scorer or Presider). Separate from
+Judge — Volunteer models the person for conflict
+tracking; Judge models the courtroom role.
+
+### Conflict.elm — DONE (issue #39)
+
+Hard conflicts (self-reported, blocking) and soft
+conflicts (repeat exposure, warning). Pure detection
+functions: `checkHardConflicts` for declared conflicts,
+`checkSoftConflicts` for assignment history.
 
 ### Pairing.elm → Trial.elm — DONE
 
@@ -261,12 +268,14 @@ students. Deferred — depends on exact count rules.
 | Tournament.elm | Done   | Status as sum type       |
 | Round.elm      | Done   | Variants over Int        |
 | Courtroom.elm  | Done   | Opaque wrapper           |
-| Judge.elm      | Done   | Placeholder              |
+| Judge.elm      | Done   | Opaque Name+Email        |
 | Assignment.elm | Done   | Domain language          |
 | Pairing.elm    | Done   | Pre-resolved state       |
 | Trial.elm      | Done   | Fully-resolved state     |
 | Witness.elm    | Done   | Opaque wrapper           |
 | Roster.elm     | Done   | Sum type per role        |
+| Volunteer.elm  | Done   | Opaque Name+Email+Role   |
+| Conflict.elm   | Done   | Hard/Soft detection      |
 
 **Tests:** 113 total (78 Layer 1 + 35 Layer 2).
 

@@ -18,10 +18,14 @@ module TestHelpers exposing
     , studentName
     , teamA
     , teamB
+    , teamC
     , teamName
     , teamNumber
     , testJudge
+    , testPresider
+    , testScorer
     , validRoster
+    , volunteerName
     , witness1
     , witness2
     , witness3
@@ -38,6 +42,8 @@ import School
 import Side exposing (Side(..))
 import Student
 import Team exposing (Team)
+import TrialRole exposing (TrialRole(..))
+import Volunteer
 import Witness exposing (Witness)
 
 
@@ -275,3 +281,41 @@ testJudge =
 coach : String -> String -> TeacherCoach
 coach first last =
     Coach.verify (applicant first last)
+
+
+volunteerName : String -> String -> Volunteer.Name
+volunteerName first last =
+    case Volunteer.nameFromStrings first last of
+        Ok n ->
+            n
+
+        Err _ ->
+            Debug.todo ("Invalid volunteer name: " ++ first ++ " " ++ last)
+
+
+testScorer : Volunteer.Volunteer
+testScorer =
+    Volunteer.create
+        (volunteerName "Test" "Scorer")
+        (email "scorer@example.com")
+        ScorerRole
+
+
+testPresider : Volunteer.Volunteer
+testPresider =
+    Volunteer.create
+        (volunteerName "Test" "Presider")
+        (email "presider@example.com")
+        PresiderRole
+
+
+teamC : Team
+teamC =
+    Team.create
+        (teamNumber 3)
+        (teamName "Team C")
+        (School.create
+            (schoolName "School C")
+            (District.create (districtName "District C"))
+        )
+        (coach "Charlie" "Davis")
