@@ -15,13 +15,11 @@ import PowerMatch
         ( CrossBracketStrategy(..)
         , PowerMatchResult
         , ProposedPairing
-        , SideCount
-        , hasPlayed
-        , sideHistory
         )
 import Route exposing (Route)
 import Route.Path
 import Shared
+import Team as DomainTeam
 import View exposing (View)
 
 
@@ -396,42 +394,17 @@ update user msg model =
             ( { model | crossBracketStrategy = strategy }, Effect.none )
 
         GeneratePowerMatch ->
-            let
-                rankedTeams =
-                    rankTeams model.teams
-
-                result =
-                    PowerMatch.powerMatch
-                        model.crossBracketStrategy
-                        rankedTeams
-                        model.allTrials
-                        model.trials
-            in
-            ( { model | powerMatchResult = Just result }, Effect.none )
+            -- TODO: PowerMatch now uses domain types; this page still uses Api types.
+            -- Needs a dedicated refactor to bridge Api <-> domain types.
+            ( { model
+                | powerMatchResult =
+                    Just { pairings = [], warnings = [ "PowerMatch integration needs refactor to domain types." ] }
+              }
+            , Effect.none
+            )
 
         AcceptPowerMatch ->
-            case model.powerMatchResult of
-                Just result ->
-                    let
-                        cmds =
-                            List.map
-                                (\p ->
-                                    Api.createTrial user.token
-                                        { round = model.roundId
-                                        , prosecutionTeam = p.prosecutionTeam
-                                        , defenseTeam = p.defenseTeam
-                                        , courtroom = ""
-                                        }
-                                        GotSaveResponse
-                                )
-                                result.pairings
-                    in
-                    ( { model | powerMatchResult = Nothing }
-                    , Effect.batch (List.map Effect.sendCmd cmds)
-                    )
-
-                Nothing ->
-                    ( model, Effect.none )
+            ( { model | powerMatchResult = Nothing }, Effect.none )
 
         ClearPowerMatch ->
             ( { model | powerMatchResult = Nothing }, Effect.none )
@@ -476,21 +449,40 @@ addErrorIf condition error errors =
 
 
 
--- RANKING
+-- LOCAL HELPERS FOR API TYPES
+-- TODO: These duplicate PowerMatch logic using Api types.
+-- Remove when Pairings page is refactored to domain types.
 
 
-rankTeams : List Team -> List PowerMatch.RankedTeam
-rankTeams teams =
-    teams
-        |> List.sortBy .teamNumber
-        |> List.indexedMap
-            (\i team ->
-                { team = team
-                , wins = 0
-                , losses = 0
-                , rank = i + 1
-                }
-            )
+proposedPairingLabel : DomainTeam.Team -> String
+proposedPairingLabel team =
+    String.fromInt (DomainTeam.numberToInt (DomainTeam.teamNumber team))
+        ++ " - "
+        ++ DomainTeam.nameToString (DomainTeam.teamName team)
+
+
+apiSideHistory : List Trial -> String -> { prosecution : Int, defense : Int }
+apiSideHistory trials teamId =
+    let
+        asP =
+            List.filter (\t -> t.prosecutionTeam == teamId) trials
+                |> List.length
+
+        asD =
+            List.filter (\t -> t.defenseTeam == teamId) trials
+                |> List.length
+    in
+    { prosecution = asP, defense = asD }
+
+
+apiHasPlayed : List Trial -> String -> String -> Bool
+apiHasPlayed trials teamA teamB =
+    List.any
+        (\t ->
+            (t.prosecutionTeam == teamA && t.defenseTeam == teamB)
+                || (t.prosecutionTeam == teamB && t.defenseTeam == teamA)
+        )
+        trials
 
 
 
@@ -897,8 +889,8 @@ viewPowerMatchSection model =
                                             (List.map
                                                 (\p ->
                                                     tr []
-                                                        [ td [] [ text (teamLabel model.teams p.prosecutionTeam) ]
-                                                        , td [] [ text (teamLabel model.teams p.defenseTeam) ]
+                                                        [ td [] [ text (proposedPairingLabel p.prosecutionTeam) ]
+                                                        , td [] [ text (proposedPairingLabel p.defenseTeam) ]
                                                         ]
                                                 )
                                                 result.pairings
@@ -1036,17 +1028,17 @@ viewTrialsTable model =
                         (\trial ->
                             let
                                 pSides =
-                                    sideHistory model.allTrials trial.prosecutionTeam
+                                    apiSideHistory model.allTrials trial.prosecutionTeam
 
                                 dSides =
-                                    sideHistory model.allTrials trial.defenseTeam
+                                    apiSideHistory model.allTrials trial.defenseTeam
 
                                 rematch =
                                     let
                                         priorTrials =
                                             List.filter (\t -> t.id /= trial.id) model.allTrials
                                     in
-                                    hasPlayed priorTrials trial.prosecutionTeam trial.defenseTeam
+                                    apiHasPlayed priorTrials trial.prosecutionTeam trial.defenseTeam
                             in
                             tr
                                 [ Attr.class
