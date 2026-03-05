@@ -1,17 +1,15 @@
 module PowerMatch2026Test exposing (..)
 
 import Expect
+import MatchHistory exposing (MatchHistory, MatchRecord)
 import PowerMatch
     exposing
         ( CrossBracketStrategy(..)
-        , hasPlayed
         , powerMatch
-        , sideHistory
         )
 import PowerMatchFixtures as F
 import Team exposing (Team)
 import Test exposing (Test, describe, test)
-import Trial exposing (Trial)
 
 
 teamKey : Team -> Int
@@ -40,15 +38,15 @@ sideBalanceTests =
         [ test "every team plays prosecution exactly 2 times" <|
             \_ ->
                 let
-                    allTrials =
-                        F.trialsThrough 4
+                    allHistory =
+                        F.historyThrough 4
 
                     violations =
                         List.filter
                             (\team ->
                                 let
                                     sides =
-                                        sideHistory allTrials team
+                                        MatchHistory.sideHistory allHistory team
                                 in
                                 sides.prosecution /= 2
                             )
@@ -60,15 +58,15 @@ sideBalanceTests =
         , test "every team plays defense exactly 2 times" <|
             \_ ->
                 let
-                    allTrials =
-                        F.trialsThrough 4
+                    allHistory =
+                        F.historyThrough 4
 
                     violations =
                         List.filter
                             (\team ->
                                 let
                                     sides =
-                                        sideHistory allTrials team
+                                        MatchHistory.sideHistory allHistory team
                                 in
                                 sides.defense /= 2
                             )
@@ -89,30 +87,30 @@ noRematchTests =
     describe "2026 no rematches"
         [ test "R2 has no rematches from R1" <|
             \_ ->
-                rematches F.round1Trials F.round2Trials
+                rematches F.round1History F.round2History
                     |> Expect.equal []
         , test "R3 has no rematches from R1-R2" <|
             \_ ->
-                rematches (F.trialsThrough 2) F.round3Trials
+                rematches (F.historyThrough 2) F.round3History
                     |> Expect.equal []
         , test "R4 has no rematches from R1-R3" <|
             \_ ->
-                rematches (F.trialsThrough 3) F.round4Trials
+                rematches (F.historyThrough 3) F.round4History
                     |> Expect.equal []
         , test "no team faces the same opponent twice across all 4 rounds" <|
             \_ ->
                 let
-                    allTrials =
-                        F.trialsThrough 4
+                    allRecords =
+                        MatchHistory.toRecords (F.historyThrough 4)
 
                     matchups =
                         List.map
-                            (\t ->
+                            (\r ->
                                 normalizeMatchup
-                                    (teamKey (Trial.prosecution t))
-                                    (teamKey (Trial.defense t))
+                                    (teamKey r.prosecution)
+                                    (teamKey r.defense)
                             )
-                            allTrials
+                            allRecords
 
                     duplicates =
                         findDuplicates matchups
@@ -123,21 +121,21 @@ noRematchTests =
 
 {-| Return list of matchup descriptions that are rematches.
 -}
-rematches : List Trial -> List Trial -> List String
-rematches priorTrials roundTrials =
+rematches : MatchHistory -> MatchHistory -> List String
+rematches priorHistory roundHistory =
     List.filterMap
-        (\t ->
-            if hasPlayed priorTrials (Trial.prosecution t) (Trial.defense t) then
+        (\r ->
+            if MatchHistory.hasPlayed priorHistory r.prosecution r.defense then
                 Just
-                    (String.fromInt (teamKey (Trial.prosecution t))
+                    (String.fromInt (teamKey r.prosecution)
                         ++ " vs "
-                        ++ String.fromInt (teamKey (Trial.defense t))
+                        ++ String.fromInt (teamKey r.defense)
                     )
 
             else
                 Nothing
         )
-        roundTrials
+        (MatchHistory.toRecords roundHistory)
 
 
 
@@ -152,82 +150,82 @@ sideSwitchingTests =
                 let
                     r1ProsecutionKeys =
                         List.map
-                            (\t -> teamKey (Trial.prosecution t))
-                            F.round1Trials
+                            (\r -> teamKey r.prosecution)
+                            (MatchHistory.toRecords F.round1History)
 
                     -- These teams should appear as defense in R2
                     violations =
                         List.filter
-                            (\t ->
+                            (\r ->
                                 List.member
-                                    (teamKey (Trial.prosecution t))
+                                    (teamKey r.prosecution)
                                     r1ProsecutionKeys
                             )
-                            F.round2Trials
+                            (MatchHistory.toRecords F.round2History)
                 in
                 violations
-                    |> List.map (\t -> teamKey (Trial.prosecution t))
+                    |> List.map (\r -> teamKey r.prosecution)
                     |> Expect.equal []
         , test "R1 defense teams play R2 prosecution" <|
             \_ ->
                 let
                     r1DefenseKeys =
                         List.map
-                            (\t -> teamKey (Trial.defense t))
-                            F.round1Trials
+                            (\r -> teamKey r.defense)
+                            (MatchHistory.toRecords F.round1History)
 
                     -- These teams should appear as prosecution in R2
                     violations =
                         List.filter
-                            (\t ->
+                            (\r ->
                                 List.member
-                                    (teamKey (Trial.defense t))
+                                    (teamKey r.defense)
                                     r1DefenseKeys
                             )
-                            F.round2Trials
+                            (MatchHistory.toRecords F.round2History)
                 in
                 violations
-                    |> List.map (\t -> teamKey (Trial.defense t))
+                    |> List.map (\r -> teamKey r.defense)
                     |> Expect.equal []
         , test "R3 prosecution teams play R4 defense" <|
             \_ ->
                 let
                     r3ProsecutionKeys =
                         List.map
-                            (\t -> teamKey (Trial.prosecution t))
-                            F.round3Trials
+                            (\r -> teamKey r.prosecution)
+                            (MatchHistory.toRecords F.round3History)
 
                     violations =
                         List.filter
-                            (\t ->
+                            (\r ->
                                 List.member
-                                    (teamKey (Trial.prosecution t))
+                                    (teamKey r.prosecution)
                                     r3ProsecutionKeys
                             )
-                            F.round4Trials
+                            (MatchHistory.toRecords F.round4History)
                 in
                 violations
-                    |> List.map (\t -> teamKey (Trial.prosecution t))
+                    |> List.map (\r -> teamKey r.prosecution)
                     |> Expect.equal []
         , test "R3 defense teams play R4 prosecution" <|
             \_ ->
                 let
                     r3DefenseKeys =
                         List.map
-                            (\t -> teamKey (Trial.defense t))
-                            F.round3Trials
+                            (\r -> teamKey r.defense)
+                            (MatchHistory.toRecords F.round3History)
 
                     violations =
                         List.filter
-                            (\t ->
+                            (\r ->
                                 List.member
-                                    (teamKey (Trial.defense t))
+                                    (teamKey r.defense)
                                     r3DefenseKeys
                             )
-                            F.round4Trials
+                            (MatchHistory.toRecords F.round4History)
                 in
                 violations
-                    |> List.map (\t -> teamKey (Trial.defense t))
+                    |> List.map (\r -> teamKey r.defense)
                     |> Expect.equal []
         ]
 
@@ -243,23 +241,21 @@ bracketTests =
             \_ ->
                 let
                     winsAfterR2 =
-                        countWins (F.trialsThrough 2)
+                        countWins (F.historyThrough 2)
 
                     crossBracket =
                         List.filter
-                            (\t ->
+                            (\r ->
                                 let
                                     pWins =
-                                        getWins winsAfterR2
-                                            (Trial.prosecution t)
+                                        getWins winsAfterR2 r.prosecution
 
                                     dWins =
-                                        getWins winsAfterR2
-                                            (Trial.defense t)
+                                        getWins winsAfterR2 r.defense
                                 in
                                 pWins /= dWins
                             )
-                            F.round3Trials
+                            (MatchHistory.toRecords F.round3History)
                 in
                 List.length crossBracket
                     |> Expect.equal 0
@@ -267,23 +263,21 @@ bracketTests =
             \_ ->
                 let
                     winsAfterR1 =
-                        countWins F.round1Trials
+                        countWins F.round1History
 
                     crossBracket =
                         List.filter
-                            (\t ->
+                            (\r ->
                                 let
                                     pWins =
-                                        getWins winsAfterR1
-                                            (Trial.prosecution t)
+                                        getWins winsAfterR1 r.prosecution
 
                                     dWins =
-                                        getWins winsAfterR1
-                                            (Trial.defense t)
+                                        getWins winsAfterR1 r.defense
                                 in
                                 pWins /= dWins
                             )
-                            F.round2Trials
+                            (MatchHistory.toRecords F.round2History)
                 in
                 List.length crossBracket
                     |> Expect.equal 7
@@ -291,23 +285,21 @@ bracketTests =
             \_ ->
                 let
                     winsAfterR3 =
-                        countWins (F.trialsThrough 3)
+                        countWins (F.historyThrough 3)
 
                     crossBracket =
                         List.filter
-                            (\t ->
+                            (\r ->
                                 let
                                     pWins =
-                                        getWins winsAfterR3
-                                            (Trial.prosecution t)
+                                        getWins winsAfterR3 r.prosecution
 
                                     dWins =
-                                        getWins winsAfterR3
-                                            (Trial.defense t)
+                                        getWins winsAfterR3 r.defense
                                 in
                                 pWins /= dWins
                             )
-                            F.round4Trials
+                            (MatchHistory.toRecords F.round4History)
                 in
                 List.length crossBracket
                     |> Expect.equal 8
@@ -323,17 +315,17 @@ trialCountTests =
     describe "2026 trial counts"
         [ test "13 trials per round" <|
             \_ ->
-                [ List.length F.round1Trials
-                , List.length F.round2Trials
-                , List.length F.round3Trials
-                , List.length F.round4Trials
+                [ List.length (MatchHistory.toRecords F.round1History)
+                , List.length (MatchHistory.toRecords F.round2History)
+                , List.length (MatchHistory.toRecords F.round3History)
+                , List.length (MatchHistory.toRecords F.round4History)
                 ]
                     |> Expect.equal [ 13, 13, 13, 13 ]
         , test "every team plays exactly 4 trials total" <|
             \_ ->
                 let
-                    allTrials =
-                        F.trialsThrough 4
+                    allRecords =
+                        MatchHistory.toRecords (F.historyThrough 4)
 
                     violations =
                         List.filter
@@ -342,11 +334,11 @@ trialCountTests =
                                     count =
                                         List.length
                                             (List.filter
-                                                (\t ->
-                                                    Team.sameTeam (Trial.prosecution t) team
-                                                        || Team.sameTeam (Trial.defense t) team
+                                                (\r ->
+                                                    Team.sameTeam r.prosecution team
+                                                        || Team.sameTeam r.defense team
                                                 )
-                                                allTrials
+                                                allRecords
                                             )
                                 in
                                 count /= 4
@@ -359,17 +351,17 @@ trialCountTests =
         , test "26 unique teams across all trials" <|
             \_ ->
                 let
-                    allTrials =
-                        F.trialsThrough 4
+                    allRecords =
+                        MatchHistory.toRecords (F.historyThrough 4)
 
                     allKeys =
                         List.concatMap
-                            (\t ->
-                                [ teamKey (Trial.prosecution t)
-                                , teamKey (Trial.defense t)
+                            (\r ->
+                                [ teamKey r.prosecution
+                                , teamKey r.defense
                                 ]
                             )
-                            allTrials
+                            allRecords
 
                     unique =
                         removeDuplicates allKeys
@@ -390,7 +382,7 @@ winLossTests =
             \_ ->
                 let
                     wins =
-                        countWins F.round1Trials
+                        countWins F.round1History
 
                     oneWin =
                         List.filter
@@ -408,7 +400,7 @@ winLossTests =
             \_ ->
                 let
                     wins =
-                        countWins F.round1Trials
+                        countWins F.round1History
 
                     winners =
                         F.allTeams
@@ -426,7 +418,7 @@ winLossTests =
             \_ ->
                 let
                     wins =
-                        countWins (F.trialsThrough 4)
+                        countWins (F.historyThrough 4)
 
                     byRecord =
                         List.map
@@ -444,7 +436,7 @@ winLossTests =
             \_ ->
                 let
                     wins =
-                        countWins (F.trialsThrough 4)
+                        countWins (F.historyThrough 4)
 
                     fourOh =
                         F.allTeams
@@ -466,13 +458,13 @@ chaparralRematchTests =
     describe "2026 R4: Chaparral moved to avoid Ramona rematch"
         [ test "Ramona (16) and Chaparral (22) played in R2" <|
             \_ ->
-                hasPlayed F.round2Trials F.team16 F.team22
+                MatchHistory.hasPlayed F.round2History F.team16 F.team22
                     |> Expect.equal True
         , test "both are 2-1 going into R4" <|
             \_ ->
                 let
                     wins =
-                        countWins (F.trialsThrough 3)
+                        countWins (F.historyThrough 3)
 
                     ramonaWins =
                         getWins wins F.team16
@@ -486,14 +478,14 @@ chaparralRematchTests =
             \_ ->
                 let
                     sides =
-                        sideHistory F.round3Trials F.team16
+                        MatchHistory.sideHistory F.round3History F.team16
                 in
                 sides |> Expect.equal { prosecution = 0, defense = 1 }
         , test "Chaparral needs D in R4 (played P in R3)" <|
             \_ ->
                 let
                     sides =
-                        sideHistory F.round3Trials F.team22
+                        MatchHistory.sideHistory F.round3History F.team22
                 in
                 sides |> Expect.equal { prosecution = 1, defense = 0 }
         , test "without the R2 matchup, they would be paired" <|
@@ -505,16 +497,17 @@ chaparralRematchTests =
                         ]
 
                     -- R3 sides only (no R2 matchup between them)
-                    priorTrials =
-                        [ -- Ramona played D in R3 → needs P
-                          F.makeTrial F.team19 F.team16
+                    priorHistory =
+                        MatchHistory.fromRecords
+                            [ -- Ramona played D in R3 -> needs P
+                              { prosecution = F.team19, defense = F.team16 }
 
-                        -- Chaparral played P in R3 → needs D
-                        , F.makeTrial F.team22 F.team09
-                        ]
+                            -- Chaparral played P in R3 -> needs D
+                            , { prosecution = F.team22, defense = F.team09 }
+                            ]
 
                     result =
-                        powerMatch HighHigh ranked priorTrials []
+                        powerMatch HighHigh ranked priorHistory MatchHistory.empty
 
                     paired =
                         List.any
@@ -533,16 +526,17 @@ chaparralRematchTests =
                         , F.makeRankedTeam 22 "Chaparral" 2 1 2
                         ]
 
-                    priorTrials =
-                        [ F.makeTrial F.team19 F.team16
-                        , F.makeTrial F.team22 F.team09
+                    priorHistory =
+                        MatchHistory.fromRecords
+                            [ { prosecution = F.team19, defense = F.team16 }
+                            , { prosecution = F.team22, defense = F.team09 }
 
-                        -- The R2 rematch
-                        , F.makeTrial F.team16 F.team22
-                        ]
+                            -- The R2 rematch
+                            , { prosecution = F.team16, defense = F.team22 }
+                            ]
 
                     result =
-                        powerMatch HighHigh ranked priorTrials []
+                        powerMatch HighHigh ranked priorHistory MatchHistory.empty
                 in
                 -- Can't pair them — only 2 teams and they're
                 -- a rematch, so zero pairings produced
@@ -551,14 +545,14 @@ chaparralRematchTests =
         , test "powerMatch does not pair Ramona with Chaparral in R4" <|
             \_ ->
                 let
-                    priorTrials =
-                        F.trialsThrough 3
+                    priorHistory =
+                        F.historyThrough 3
 
                     ranked =
                         rankedAfterR3
 
                     result =
-                        powerMatch HighHigh ranked priorTrials []
+                        powerMatch HighHigh ranked priorHistory MatchHistory.empty
 
                     pairsRamonaWithChaparral =
                         List.any
@@ -576,14 +570,14 @@ chaparralRematchTests =
         , test "powerMatch does not pair Ramona with Chaparral under HighLow either" <|
             \_ ->
                 let
-                    priorTrials =
-                        F.trialsThrough 3
+                    priorHistory =
+                        F.historyThrough 3
 
                     ranked =
                         rankedAfterR3
 
                     result =
-                        powerMatch HighLow ranked priorTrials []
+                        powerMatch HighLow ranked priorHistory MatchHistory.empty
 
                     pairsRamonaWithChaparral =
                         List.any
@@ -645,24 +639,27 @@ rankedAfterR3 =
 {-| Count wins for each team based on known 2026 results.
 Returns a list of (team key, win count) pairs.
 -}
-countWins : List Trial -> List ( Int, Int )
-countWins trials =
+countWins : MatchHistory -> List ( Int, Int )
+countWins history =
     let
+        records =
+            MatchHistory.toRecords history
+
         allTeamKeys =
             List.concatMap
-                (\t ->
-                    [ teamKey (Trial.prosecution t)
-                    , teamKey (Trial.defense t)
+                (\r ->
+                    [ teamKey r.prosecution
+                    , teamKey r.defense
                     ]
                 )
-                trials
+                records
                 |> removeDuplicates
 
         winCount key =
             List.length
                 (List.filter
-                    (\t -> isWinner t key)
-                    trials
+                    (\r -> isWinner r key)
+                    records
                 )
     in
     List.map (\key -> ( key, winCount key )) allTeamKeys
@@ -671,9 +668,9 @@ countWins trials =
 {-| Determine if a team won a trial based on the known
 2026 results.
 -}
-isWinner : Trial -> Int -> Bool
-isWinner trial key =
-    case trialWinner trial of
+isWinner : MatchRecord -> Int -> Bool
+isWinner record key =
+    case recordWinner record of
         Just winnerKey ->
             winnerKey == key
 
@@ -685,14 +682,14 @@ isWinner trial key =
 Maps each fixture trial (by prosecution/defense team keys)
 to the winning team based on the 2026 official results.
 -}
-trialWinner : Trial -> Maybe Int
-trialWinner trial =
+recordWinner : MatchRecord -> Maybe Int
+recordWinner record =
     let
         pKey =
-            teamKey (Trial.prosecution trial)
+            teamKey record.prosecution
 
         dKey =
-            teamKey (Trial.defense trial)
+            teamKey record.defense
 
         pWins =
             Just pKey

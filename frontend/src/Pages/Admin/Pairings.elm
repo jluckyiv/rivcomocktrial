@@ -2,22 +2,28 @@ module Pages.Admin.Pairings exposing (Model, Msg, page)
 
 import Api exposing (Courtroom, Round, Team, Trial)
 import Auth
+import Coach
 import Dict
+import District
 import Effect exposing (Effect)
+import Email
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
 import Http
 import Layouts
+import MatchHistory exposing (MatchHistory)
 import Page exposing (Page)
 import PowerMatch
     exposing
         ( CrossBracketStrategy(..)
         , PowerMatchResult
         , ProposedPairing
+        , RankedTeam
         )
 import Route exposing (Route)
 import Route.Path
+import School
 import Shared
 import Team as DomainTeam
 import View exposing (View)
@@ -394,17 +400,57 @@ update user msg model =
             ( { model | crossBracketStrategy = strategy }, Effect.none )
 
         GeneratePowerMatch ->
-            -- TODO: PowerMatch now uses domain types; this page still uses Api types.
-            -- Needs a dedicated refactor to bridge Api <-> domain types.
-            ( { model
-                | powerMatchResult =
-                    Just { pairings = [], warnings = [ "PowerMatch integration needs refactor to domain types." ] }
-              }
+            let
+                allHistory =
+                    buildMatchHistory model.teams model.allTrials
+
+                currentRoundHistory =
+                    buildMatchHistory model.teams model.trials
+
+                rankedTeams =
+                    buildRankedTeams model.teams model.allTrials
+
+                result =
+                    PowerMatch.powerMatch
+                        model.crossBracketStrategy
+                        rankedTeams
+                        allHistory
+                        currentRoundHistory
+            in
+            ( { model | powerMatchResult = Just result }
             , Effect.none
             )
 
         AcceptPowerMatch ->
-            ( { model | powerMatchResult = Nothing }, Effect.none )
+            case model.powerMatchResult of
+                Nothing ->
+                    ( model, Effect.none )
+
+                Just result ->
+                    let
+                        cmds =
+                            List.filterMap
+                                (\p ->
+                                    case ( apiIdForDomainTeam model.teams p.prosecutionTeam, apiIdForDomainTeam model.teams p.defenseTeam ) of
+                                        ( Just pId, Just dId ) ->
+                                            Just
+                                                (Api.createTrial user.token
+                                                    { round = model.roundId
+                                                    , prosecutionTeam = pId
+                                                    , defenseTeam = dId
+                                                    , courtroom = ""
+                                                    }
+                                                    GotSaveResponse
+                                                )
+
+                                        _ ->
+                                            Nothing
+                                )
+                                result.pairings
+                    in
+                    ( { model | powerMatchResult = Nothing }
+                    , Effect.batch (List.map Effect.sendCmd cmds)
+                    )
 
         ClearPowerMatch ->
             ( { model | powerMatchResult = Nothing }, Effect.none )
@@ -449,9 +495,102 @@ addErrorIf condition error errors =
 
 
 
--- LOCAL HELPERS FOR API TYPES
--- TODO: These duplicate PowerMatch logic using Api types.
--- Remove when Pairings page is refactored to domain types.
+-- DOMAIN CONVERSION HELPERS
+
+
+toDomainTeam : Team -> Maybe DomainTeam.Team
+toDomainTeam apiTeam =
+    Maybe.map2
+        (\num name ->
+            Maybe.map2
+                (\s c -> DomainTeam.create num name s c)
+                placeholderSchool
+                placeholderCoach
+        )
+        (DomainTeam.numberFromInt apiTeam.teamNumber |> Result.toMaybe)
+        (DomainTeam.nameFromString apiTeam.name |> Result.toMaybe)
+        |> Maybe.andThen identity
+
+
+placeholderSchool : Maybe School.School
+placeholderSchool =
+    case ( School.nameFromString "Placeholder", District.nameFromString "Placeholder" ) of
+        ( Ok sn, Ok dn ) ->
+            Just (School.create sn (District.create dn))
+
+        _ ->
+            Nothing
+
+
+placeholderCoach : Maybe Coach.TeacherCoach
+placeholderCoach =
+    case ( Coach.nameFromStrings "Placeholder" "Coach", Email.fromString "placeholder@example.com" ) of
+        ( Ok cn, Ok em ) ->
+            Just (Coach.verify (Coach.apply cn em))
+
+        _ ->
+            Nothing
+
+
+buildMatchHistory : List Team -> List Trial -> MatchHistory
+buildMatchHistory teams trials =
+    let
+        findDomainTeam teamId =
+            List.filter (\t -> t.id == teamId) teams
+                |> List.head
+                |> Maybe.andThen toDomainTeam
+
+        records =
+            List.filterMap
+                (\trial ->
+                    case ( findDomainTeam trial.prosecutionTeam, findDomainTeam trial.defenseTeam ) of
+                        ( Just p, Just d ) ->
+                            Just { prosecution = p, defense = d }
+
+                        _ ->
+                            Nothing
+                )
+                trials
+    in
+    MatchHistory.fromRecords records
+
+
+buildRankedTeams : List Team -> List Trial -> List RankedTeam
+buildRankedTeams teams allTrials =
+    List.filterMap
+        (\apiTeam ->
+            toDomainTeam apiTeam
+                |> Maybe.map
+                    (\domainTeam ->
+                        -- Without score data from API, treat all teams
+                        -- as 0-0. Round 1 random pairing works correctly;
+                        -- later rounds need score data to rank properly.
+                        { team = domainTeam
+                        , wins = 0
+                        , losses = 0
+                        , rank = apiTeam.teamNumber
+                        }
+                    )
+        )
+        teams
+
+
+apiIdForDomainTeam : List Team -> DomainTeam.Team -> Maybe String
+apiIdForDomainTeam teams domainTeam =
+    let
+        num =
+            DomainTeam.numberToInt (DomainTeam.teamNumber domainTeam)
+    in
+    List.filter (\t -> t.teamNumber == num) teams
+        |> List.head
+        |> Maybe.map .id
+
+
+toDomainTeamFromId : List Team -> String -> Maybe DomainTeam.Team
+toDomainTeamFromId teams teamId =
+    List.filter (\t -> t.id == teamId) teams
+        |> List.head
+        |> Maybe.andThen toDomainTeam
 
 
 proposedPairingLabel : DomainTeam.Team -> String
@@ -459,30 +598,6 @@ proposedPairingLabel team =
     String.fromInt (DomainTeam.numberToInt (DomainTeam.teamNumber team))
         ++ " - "
         ++ DomainTeam.nameToString (DomainTeam.teamName team)
-
-
-apiSideHistory : List Trial -> String -> { prosecution : Int, defense : Int }
-apiSideHistory trials teamId =
-    let
-        asP =
-            List.filter (\t -> t.prosecutionTeam == teamId) trials
-                |> List.length
-
-        asD =
-            List.filter (\t -> t.defenseTeam == teamId) trials
-                |> List.length
-    in
-    { prosecution = asP, defense = asD }
-
-
-apiHasPlayed : List Trial -> String -> String -> Bool
-apiHasPlayed trials teamA teamB =
-    List.any
-        (\t ->
-            (t.prosecutionTeam == teamA && t.defenseTeam == teamB)
-                || (t.prosecutionTeam == teamB && t.defenseTeam == teamA)
-        )
-        trials
 
 
 
@@ -1024,21 +1139,41 @@ viewTrialsTable model =
                         ]
                     ]
                 , tbody []
-                    (List.map
+                    (let
+                        allHistory =
+                            buildMatchHistory model.teams model.allTrials
+                     in
+                     List.map
                         (\trial ->
                             let
+                                pTeam =
+                                    toDomainTeamFromId model.teams trial.prosecutionTeam
+
+                                dTeam =
+                                    toDomainTeamFromId model.teams trial.defenseTeam
+
                                 pSides =
-                                    apiSideHistory model.allTrials trial.prosecutionTeam
+                                    pTeam
+                                        |> Maybe.map (MatchHistory.sideHistory allHistory)
+                                        |> Maybe.withDefault { prosecution = 0, defense = 0 }
 
                                 dSides =
-                                    apiSideHistory model.allTrials trial.defenseTeam
+                                    dTeam
+                                        |> Maybe.map (MatchHistory.sideHistory allHistory)
+                                        |> Maybe.withDefault { prosecution = 0, defense = 0 }
 
                                 rematch =
-                                    let
-                                        priorTrials =
-                                            List.filter (\t -> t.id /= trial.id) model.allTrials
-                                    in
-                                    apiHasPlayed priorTrials trial.prosecutionTeam trial.defenseTeam
+                                    case ( pTeam, dTeam ) of
+                                        ( Just p, Just d ) ->
+                                            let
+                                                priorHistory =
+                                                    buildMatchHistory model.teams
+                                                        (List.filter (\t -> t.id /= trial.id) model.allTrials)
+                                            in
+                                            MatchHistory.hasPlayed priorHistory p d
+
+                                        _ ->
+                                            False
                             in
                             tr
                                 [ Attr.class

@@ -1,12 +1,12 @@
 module PowerMatchFixtures exposing
     ( allTeams
+    , historyThrough
     , makeRankedTeam
     , makeTeam
-    , makeTrial
-    , round1Trials
-    , round2Trials
-    , round3Trials
-    , round4Trials
+    , round1History
+    , round2History
+    , round3History
+    , round4History
     , team01
     , team02
     , team03
@@ -33,10 +33,10 @@ module PowerMatchFixtures exposing
     , team26
     , team27
     , team28
-    , trialsThrough
     )
 
 import District
+import MatchHistory exposing (MatchHistory, MatchRecord)
 import PowerMatch exposing (RankedTeam)
 import School
 import Team exposing (Team)
@@ -47,9 +47,7 @@ import TestHelpers
         , schoolName
         , teamName
         , teamNumber
-        , trialFor
         )
-import Trial exposing (Trial)
 
 
 
@@ -243,118 +241,139 @@ allTeams =
 
 
 
--- TRIAL HELPERS
+-- MATCH HISTORY HELPERS
 
 
-makeTrial : Team -> Team -> Trial
-makeTrial =
-    trialFor
+makeRecord : Team -> Team -> MatchRecord
+makeRecord prosecution defense =
+    { prosecution = prosecution, defense = defense }
 
 
 
--- ROUND 1 TRIALS
+-- ROUND 1 HISTORY
 
 
-round1Trials : List Trial
-round1Trials =
-    [ makeTrial team06 team15
-    , makeTrial team24 team01
-    , makeTrial team19 team09
-    , makeTrial team08 team11
-    , makeTrial team05 team27
-    , makeTrial team26 team13
-    , makeTrial team10 team02
-    , makeTrial team03 team16
-    , makeTrial team04 team14
-    , makeTrial team28 team25
-    , makeTrial team22 team17
-    , makeTrial team21 team12
-    , makeTrial team23 team20
+round1Records : List MatchRecord
+round1Records =
+    [ makeRecord team06 team15
+    , makeRecord team24 team01
+    , makeRecord team19 team09
+    , makeRecord team08 team11
+    , makeRecord team05 team27
+    , makeRecord team26 team13
+    , makeRecord team10 team02
+    , makeRecord team03 team16
+    , makeRecord team04 team14
+    , makeRecord team28 team25
+    , makeRecord team22 team17
+    , makeRecord team21 team12
+    , makeRecord team23 team20
     ]
 
 
+round1History : MatchHistory
+round1History =
+    MatchHistory.fromRecords round1Records
 
--- ROUND 2 TRIALS
 
 
-round2Trials : List Trial
-round2Trials =
-    [ makeTrial team09 team23
-    , makeTrial team02 team19
-    , makeTrial team27 team21
-    , makeTrial team16 team22
-    , makeTrial team13 team04
-    , makeTrial team12 team06
-    , makeTrial team25 team03
-    , makeTrial team15 team05
-    , makeTrial team11 team24
-    , makeTrial team20 team26
-    , makeTrial team14 team28
-    , makeTrial team17 team10
-    , makeTrial team01 team08
+-- ROUND 2 HISTORY
+
+
+round2Records : List MatchRecord
+round2Records =
+    [ makeRecord team09 team23
+    , makeRecord team02 team19
+    , makeRecord team27 team21
+    , makeRecord team16 team22
+    , makeRecord team13 team04
+    , makeRecord team12 team06
+    , makeRecord team25 team03
+    , makeRecord team15 team05
+    , makeRecord team11 team24
+    , makeRecord team20 team26
+    , makeRecord team14 team28
+    , makeRecord team17 team10
+    , makeRecord team01 team08
     ]
 
 
+round2History : MatchHistory
+round2History =
+    MatchHistory.fromRecords round2Records
 
--- ROUND 3 TRIALS
 
 
-round3Trials : List Trial
-round3Trials =
-    [ makeTrial team25 team01
-    , makeTrial team28 team05
-    , makeTrial team23 team17
-    , makeTrial team20 team12
-    , makeTrial team06 team03
-    , makeTrial team04 team02
-    , makeTrial team26 team14
-    , makeTrial team10 team08
-    , makeTrial team19 team16
-    , makeTrial team22 team09
-    , makeTrial team21 team24
-    , makeTrial team15 team11
-    , makeTrial team27 team13
+-- ROUND 3 HISTORY
+
+
+round3Records : List MatchRecord
+round3Records =
+    [ makeRecord team25 team01
+    , makeRecord team28 team05
+    , makeRecord team23 team17
+    , makeRecord team20 team12
+    , makeRecord team06 team03
+    , makeRecord team04 team02
+    , makeRecord team26 team14
+    , makeRecord team10 team08
+    , makeRecord team19 team16
+    , makeRecord team22 team09
+    , makeRecord team21 team24
+    , makeRecord team15 team11
+    , makeRecord team27 team13
     ]
 
 
+round3History : MatchHistory
+round3History =
+    MatchHistory.fromRecords round3Records
 
--- ROUND 4 TRIALS
 
 
-round4Trials : List Trial
-round4Trials =
-    [ makeTrial team02 team15
-    , makeTrial team16 team25
-    , makeTrial team13 team21
-    , makeTrial team24 team26
-    , makeTrial team12 team22
-    , makeTrial team11 team28
-    , makeTrial team05 team10
-    , makeTrial team01 team27
-    , makeTrial team03 team23
-    , makeTrial team08 team04
-    , makeTrial team14 team06
-    , makeTrial team17 team19
-    , makeTrial team09 team20
+-- ROUND 4 HISTORY
+
+
+round4Records : List MatchRecord
+round4Records =
+    [ makeRecord team02 team15
+    , makeRecord team16 team25
+    , makeRecord team13 team21
+    , makeRecord team24 team26
+    , makeRecord team12 team22
+    , makeRecord team11 team28
+    , makeRecord team05 team10
+    , makeRecord team01 team27
+    , makeRecord team03 team23
+    , makeRecord team08 team04
+    , makeRecord team14 team06
+    , makeRecord team17 team19
+    , makeRecord team09 team20
     ]
+
+
+round4History : MatchHistory
+round4History =
+    MatchHistory.fromRecords round4Records
 
 
 
 -- HELPERS
 
 
-{-| Get all trials through a given round number.
+{-| Get combined match history through a given round number.
 -}
-trialsThrough : Int -> List Trial
-trialsThrough roundNum =
+historyThrough : Int -> MatchHistory
+historyThrough roundNum =
     let
         rounds =
-            [ ( 1, round1Trials )
-            , ( 2, round2Trials )
-            , ( 3, round3Trials )
-            , ( 4, round4Trials )
+            [ ( 1, round1Records )
+            , ( 2, round2Records )
+            , ( 3, round3Records )
+            , ( 4, round4Records )
             ]
     in
     rounds
         |> List.filter (\( n, _ ) -> n <= roundNum)
         |> List.concatMap Tuple.second
+        |> MatchHistory.fromRecords
