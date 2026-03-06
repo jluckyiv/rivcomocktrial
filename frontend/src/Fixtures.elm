@@ -1,6 +1,10 @@
 module Fixtures exposing
     ( districts
+    , palmDesertEligibleStudents
+    , palmDesertStudents
     , registrations
+    , santiagoEligibleStudents
+    , santiagoStudents
     , schools
     , teams
     , tournament
@@ -16,10 +20,12 @@ programming error is introduced.
 
 import Coach
 import District exposing (District)
+import EligibleStudents exposing (EligibleStudents)
 import Email exposing (Email)
 import Error exposing (Error(..))
 import Registration exposing (Registration)
 import School exposing (School)
+import Student exposing (Student)
 import Team exposing (Team)
 import Tournament exposing (Tournament)
 
@@ -103,6 +109,80 @@ tournamentConfig : Int -> Int -> Tournament.Config
 tournamentConfig prelim elim =
     crashOnError "tournament config"
         (Tournament.configFromInts prelim elim)
+
+
+studentName : String -> String -> Student.Name
+studentName first last =
+    crashOnError ("student name: " ++ first ++ " " ++ last)
+        (Student.nameFromStrings first last Nothing)
+
+
+student : String -> String -> Student.Pronouns -> Student
+student first last pron =
+    Student.create (studentName first last) pron
+
+
+
+-- STUDENTS
+
+
+palmDesertStudents : List Student
+palmDesertStudents =
+    [ student "Jordan" "Smith" Student.TheyThem
+    , student "Maria" "Garcia" Student.SheHer
+    , student "Alex" "Chen" Student.HeHim
+    , student "Sam" "Johnson" Student.HeHim
+    , student "Riley" "Williams" Student.SheHer
+    , student "Taylor" "Brown" Student.TheyThem
+    , student "Morgan" "Davis" Student.HeHim
+    , student "Casey" "Miller" Student.SheHer
+    , student "Avery" "Wilson" Student.TheyThem
+    , student "Quinn" "Moore" Student.HeHim
+    ]
+
+
+santiagoStudents : List Student
+santiagoStudents =
+    [ student "Jamie" "Rodriguez" Student.TheyThem
+    , student "Sofia" "Martinez" Student.SheHer
+    , student "Ethan" "Lee" Student.HeHim
+    , student "Mia" "Anderson" Student.SheHer
+    , student "Noah" "Thomas" Student.HeHim
+    , student "Zoe" "Jackson" Student.SheHer
+    , student "Liam" "White" Student.HeHim
+    , student "Ava" "Harris" Student.SheHer
+    , student "Dylan" "Clark" Student.TheyThem
+    , student "Harper" "Lewis" Student.SheHer
+    ]
+
+
+
+-- ELIGIBLE STUDENTS
+
+
+palmDesertEligibleStudents : EligibleStudents
+palmDesertEligibleStudents =
+    buildEligibleStudents "Palm Desert" palmDesertTeam palmDesertStudents
+
+
+santiagoEligibleStudents : EligibleStudents
+santiagoEligibleStudents =
+    buildEligibleStudents "Santiago" santiagoTeam santiagoStudents
+
+
+buildEligibleStudents : String -> Team -> List Student -> EligibleStudents
+buildEligibleStudents label t studs =
+    let
+        withStudents =
+            List.foldl
+                (\s result ->
+                    Result.andThen (EligibleStudents.addStudent s) result
+                )
+                (Ok (EligibleStudents.create EligibleStudents.defaultConfig t))
+                studs
+    in
+    crashOnError (label ++ " eligible students")
+        (Result.andThen EligibleStudents.submit withStudents)
 
 
 
@@ -380,20 +460,30 @@ makeTeam num name sch coachFirst coachLast coachEmail =
         (coach coachFirst coachLast coachEmail)
 
 
-teams : List Team
-teams =
-    [ makeTeam 1
+palmDesertTeam : Team
+palmDesertTeam =
+    makeTeam 1
         "Palm Desert"
         palmDesertSchool
         "Palm Desert"
         "Coach"
         "coach1@example.com"
-    , makeTeam 2
+
+
+santiagoTeam : Team
+santiagoTeam =
+    makeTeam 2
         "Santiago"
         santiagoSchool
         "Santiago"
         "Coach"
         "coach2@example.com"
+
+
+teams : List Team
+teams =
+    [ palmDesertTeam
+    , santiagoTeam
     , makeTeam 3
         "Vista del Lago"
         vistaDelLagoSchool

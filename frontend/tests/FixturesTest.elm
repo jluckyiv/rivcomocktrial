@@ -1,6 +1,7 @@
 module FixturesTest exposing (suite)
 
 import District
+import EligibleStudents
 import Expect
 import Fixtures
 import Registration
@@ -114,5 +115,29 @@ suite =
                         , Registration.Approved
                         ]
                         statuses
+            ]
+        , describe "students"
+            [ test "palmDesertStudents has 10 students" <|
+                \_ ->
+                    Fixtures.palmDesertStudents
+                        |> List.length
+                        |> Expect.equal 10
+            , test "santiagoStudents has 10 students" <|
+                \_ ->
+                    Fixtures.santiagoStudents
+                        |> List.length
+                        |> Expect.equal 10
+            ]
+        , describe "eligibleStudents"
+            [ test "palmDesertEligibleStudents status is Submitted" <|
+                \_ ->
+                    Fixtures.palmDesertEligibleStudents
+                        |> EligibleStudents.status
+                        |> Expect.equal EligibleStudents.Submitted
+            , test "santiagoEligibleStudents status is Submitted" <|
+                \_ ->
+                    Fixtures.santiagoEligibleStudents
+                        |> EligibleStudents.status
+                        |> Expect.equal EligibleStudents.Submitted
             ]
         ]
