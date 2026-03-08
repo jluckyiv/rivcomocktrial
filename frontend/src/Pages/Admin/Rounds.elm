@@ -6,9 +6,10 @@ import Effect exposing (Effect)
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
-import Http
+import Json.Decode
 import Layouts
 import Page exposing (Page)
+import Pb
 import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Route.Path
@@ -72,8 +73,8 @@ init user _ =
       , filterTournament = ""
       }
     , Effect.batch
-        [ Effect.sendCmd (Api.listRounds user.token GotRounds)
-        , Effect.sendCmd (Api.listTournaments user.token GotTournaments)
+        [ Pb.adminList { collection = "rounds", tag = "rounds", filter = "", sort = "" }
+        , Pb.adminList { collection = "tournaments", tag = "tournaments", filter = "", sort = "" }
         ]
     )
 
@@ -83,8 +84,7 @@ init user _ =
 
 
 type Msg
-    = GotRounds (Result Http.Error (Api.ListResponse Round))
-    | GotTournaments (Result Http.Error (Api.ListResponse Tournament))
+    = PbMsg Json.Decode.Value
     | FilterTournamentChanged String
     | ShowCreateForm
     | EditRound Round
@@ -94,27 +94,95 @@ type Msg
     | FormTypeChanged String
     | FormTournamentChanged String
     | SaveRound
-    | GotSaveResponse (Result Http.Error Round)
     | TogglePublished Round
-    | GotToggleResponse (Result Http.Error Round)
     | DeleteRound String
-    | GotDeleteResponse String (Result Http.Error ())
 
 
 update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
 update user msg model =
     case msg of
-        GotRounds (Ok response) ->
-            ( { model | rounds = Succeeded response.items }, Effect.none )
+        PbMsg value ->
+            case Pb.responseTag value of
+                Just "rounds" ->
+                    case Pb.decodeList Api.roundDecoder value of
+                        Ok items ->
+                            ( { model | rounds = Succeeded items }, Effect.none )
 
-        GotRounds (Err _) ->
-            ( { model | rounds = Failed "Failed to load rounds." }, Effect.none )
+                        Err _ ->
+                            ( { model | rounds = Failed "Failed to load rounds." }, Effect.none )
 
-        GotTournaments (Ok response) ->
-            ( { model | tournaments = response.items }, Effect.none )
+                Just "tournaments" ->
+                    case Pb.decodeList Api.tournamentDecoder value of
+                        Ok items ->
+                            ( { model | tournaments = items }, Effect.none )
 
-        GotTournaments (Err _) ->
-            ( model, Effect.none )
+                        Err _ ->
+                            ( model, Effect.none )
+
+                Just "save-round" ->
+                    case Pb.decodeRecord Api.roundDecoder value of
+                        Ok round ->
+                            let
+                                updateRound rounds =
+                                    List.map
+                                        (\r ->
+                                            if r.id == round.id then
+                                                round
+
+                                            else
+                                                r
+                                        )
+                                        rounds
+                            in
+                            case model.form of
+                                FormSaving context _ ->
+                                    let
+                                        updateRounds =
+                                            case context of
+                                                Editing _ ->
+                                                    updateRound
+
+                                                Creating ->
+                                                    \rounds -> rounds ++ [ round ]
+                                    in
+                                    ( { model
+                                        | rounds = RemoteData.map updateRounds model.rounds
+                                        , form = FormHidden
+                                      }
+                                    , Effect.none
+                                    )
+
+                                _ ->
+                                    -- Toggle published (no form open)
+                                    ( { model
+                                        | rounds = RemoteData.map updateRound model.rounds
+                                      }
+                                    , Effect.none
+                                    )
+
+                        Err _ ->
+                            case model.form of
+                                FormSaving context formData ->
+                                    ( { model | form = FormOpen context formData [ "Failed to save round." ] }, Effect.none )
+
+                                _ ->
+                                    ( model, Effect.none )
+
+                Just "delete-round" ->
+                    case Pb.decodeDelete value of
+                        Ok id ->
+                            ( { model
+                                | rounds = RemoteData.map (List.filter (\r -> r.id /= id)) model.rounds
+                                , deleting = Nothing
+                              }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            ( { model | deleting = Nothing }, Effect.none )
+
+                _ ->
+                    ( model, Effect.none )
 
         FilterTournamentChanged val ->
             ( { model | filterTournament = val }, Effect.none )
@@ -171,53 +239,24 @@ update user msg model =
 
                         Ok data ->
                             let
-                                cmd =
+                                effect =
                                     case context of
                                         Editing id ->
-                                            Api.updateRound user.token id data GotSaveResponse
+                                            Pb.adminUpdate
+                                                { collection = "rounds"
+                                                , id = id
+                                                , tag = "save-round"
+                                                , body = Api.encodeRound data
+                                                }
 
                                         Creating ->
-                                            Api.createRound user.token data GotSaveResponse
+                                            Pb.adminCreate
+                                                { collection = "rounds"
+                                                , tag = "save-round"
+                                                , body = Api.encodeRound data
+                                                }
                             in
-                            ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
-
-                _ ->
-                    ( model, Effect.none )
-
-        GotSaveResponse (Ok round) ->
-            let
-                updateRounds context rounds =
-                    case context of
-                        Editing _ ->
-                            List.map
-                                (\r ->
-                                    if r.id == round.id then
-                                        round
-
-                                    else
-                                        r
-                                )
-                                rounds
-
-                        Creating ->
-                            rounds ++ [ round ]
-            in
-            case model.form of
-                FormSaving context _ ->
-                    ( { model
-                        | rounds = RemoteData.map (updateRounds context) model.rounds
-                        , form = FormHidden
-                      }
-                    , Effect.none
-                    )
-
-                _ ->
-                    ( model, Effect.none )
-
-        GotSaveResponse (Err _) ->
-            case model.form of
-                FormSaving context formData ->
-                    ( { model | form = FormOpen context formData [ "Failed to save round." ] }, Effect.none )
+                            ( { model | form = FormSaving context formData }, effect )
 
                 _ ->
                     ( model, Effect.none )
@@ -232,44 +271,19 @@ update user msg model =
                     , tournament = round.tournament
                     }
             in
-            ( model, Effect.sendCmd (Api.updateRound user.token round.id data GotToggleResponse) )
-
-        GotToggleResponse (Ok round) ->
-            ( { model
-                | rounds =
-                    RemoteData.map
-                        (List.map
-                            (\r ->
-                                if r.id == round.id then
-                                    round
-
-                                else
-                                    r
-                            )
-                        )
-                        model.rounds
-              }
-            , Effect.none
+            ( model
+            , Pb.adminUpdate
+                { collection = "rounds"
+                , id = round.id
+                , tag = "save-round"
+                , body = Api.encodeRound data
+                }
             )
-
-        GotToggleResponse (Err _) ->
-            ( model, Effect.none )
 
         DeleteRound id ->
             ( { model | deleting = Just id }
-            , Effect.sendCmd (Api.deleteRound user.token id (GotDeleteResponse id))
+            , Pb.adminDelete { collection = "rounds", id = id, tag = "delete-round" }
             )
-
-        GotDeleteResponse id (Ok _) ->
-            ( { model
-                | rounds = RemoteData.map (List.filter (\r -> r.id /= id)) model.rounds
-                , deleting = Nothing
-              }
-            , Effect.none
-            )
-
-        GotDeleteResponse _ (Err _) ->
-            ( { model | deleting = Nothing }, Effect.none )
 
 
 
@@ -346,7 +360,7 @@ updateFormField transform state =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.none
+    Pb.subscribe PbMsg
 
 
 

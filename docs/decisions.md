@@ -5,6 +5,75 @@ rationale. Newest first.
 
 ---
 
+## ADR-010: PocketBase JS SDK as sole PB client
+
+**Date:** 2026-03-07
+
+**Context:** The frontend needs to communicate with
+PocketBase for CRUD operations, authentication, and
+eventually realtime subscriptions. The initial approach
+used hand-rolled Elm HTTP calls in `Api.elm` — each
+collection required list/create/update/delete functions
+that manually constructed URLs, headers, and JSON
+bodies.
+
+As the app grew to 11 pages across 8 collections, this
+approach didn't scale: every new collection required
+~100 lines of boilerplate HTTP functions in Elm, all
+reimplementing what the PocketBase JS SDK already
+handles (auth token management, pagination, error
+normalization, filter syntax, realtime SSE).
+
+**Decision:** Use the PocketBase JS SDK (`pocketbase`
+npm package v0.25.x) as the sole client for all
+PocketBase operations. All PB calls go through Elm
+ports to JavaScript, where two SDK instances handle
+the requests:
+
+- `pbAdmin` — superuser operations (admin CRUD)
+- `pb` — coach/public operations (login, registration)
+
+The architecture has three layers:
+
+1. **`Api.elm`** — data layer only: type aliases,
+   JSON decoders, JSON encoders. No HTTP, no effects.
+2. **`Pb.elm`** — port-based PB client: `adminList`,
+   `adminCreate`, `adminUpdate`, `adminDelete`,
+   `publicList`, `publicCreate`, `adminLogin`,
+   `coachLogin`. Each operation sends a tagged message
+   through `Effect.portSend` and responses arrive on
+   `Effect.incoming`.
+3. **`interop.js`** — JS glue: receives `PbSend` port
+   messages, routes to the appropriate SDK instance,
+   sends results back via the `incoming` port as
+   `{ tag, data }` or `{ tag, error }`.
+
+Pages subscribe to `Pb.subscribe PbMsg` and route
+responses via `Pb.responseTag value` pattern matching.
+
+**Rationale:**
+- **No duplication** — the SDK handles auth headers,
+  pagination, error formats, and will handle realtime
+  subscriptions when needed
+- **Fewer lines** — ~30 lines in `Pb.elm` replace
+  ~300 lines of HTTP functions that were in `Api.elm`
+- **Auth management** — the SDK manages token
+  refresh and auth store; we persist tokens to
+  localStorage
+- **Future-proof** — OAuth2, realtime, file uploads all
+  come free with the SDK
+- **Two instances** — separates admin superuser auth
+  from coach user auth cleanly, avoiding token conflicts
+
+**Trade-offs:**
+- Port indirection adds a layer vs direct HTTP
+- Responses are `Json.Decode.Value` (dynamic) rather
+  than typed `Result Http.Error a` — but `Pb.elm`
+  decoder helpers restore type safety at the boundary
+- JS SDK is a runtime dependency (~50KB)
+
+---
+
 ## ADR-009: Parse, don't validate — prefer types over booleans
 
 **Date:** 2026-03-04

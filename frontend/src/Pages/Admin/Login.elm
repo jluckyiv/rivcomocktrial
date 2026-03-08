@@ -1,12 +1,12 @@
 module Pages.Admin.Login exposing (Model, Msg, page)
 
-import Api
 import Effect exposing (Effect)
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
-import Http
+import Json.Decode
 import Page exposing (Page)
+import Pb
 import Route exposing (Route)
 import Shared
 import Shared.Msg
@@ -54,7 +54,7 @@ type Msg
     = EmailChanged String
     | PasswordChanged String
     | SubmitLogin
-    | GotLoginResponse (Result Http.Error String)
+    | PbMsg Json.Decode.Value
 
 
 update : Msg -> Model -> ( Model, Effect Msg )
@@ -72,24 +72,29 @@ update msg model =
 
         SubmitLogin ->
             ( { model | loading = True, error = Nothing }
-            , Effect.sendCmd
-                (Api.adminLogin
-                    { email = model.email
-                    , password = model.password
-                    }
-                    GotLoginResponse
-                )
+            , Pb.adminLogin
+                { email = model.email
+                , password = model.password
+                , tag = "admin-login"
+                }
             )
 
-        GotLoginResponse (Ok token) ->
-            ( { model | loading = False }
-            , Effect.sendSharedMsg (Shared.Msg.AdminLoggedIn token)
-            )
+        PbMsg value ->
+            case Pb.responseTag value of
+                Just "admin-login" ->
+                    case Pb.decodeToken value of
+                        Ok token ->
+                            ( { model | loading = False }
+                            , Effect.sendSharedMsg (Shared.Msg.AdminLoggedIn token)
+                            )
 
-        GotLoginResponse (Err _) ->
-            ( { model | loading = False, error = Just "Invalid email or password." }
-            , Effect.none
-            )
+                        Err _ ->
+                            ( { model | loading = False, error = Just "Invalid email or password." }
+                            , Effect.none
+                            )
+
+                _ ->
+                    ( model, Effect.none )
 
 
 
@@ -98,7 +103,7 @@ update msg model =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.none
+    Pb.subscribe PbMsg
 
 
 
