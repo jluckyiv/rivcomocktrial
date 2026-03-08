@@ -1,18 +1,19 @@
 module Pages.Register.TeacherCoach exposing (Model, Msg, page)
 
+import Api
 import Coach
 import Effect exposing (Effect)
 import Email
 import Error exposing (Error(..))
-import Fixtures
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
+import Json.Decode
 import Layouts
 import Page exposing (Page)
+import Pb
 import Route exposing (Route)
 import Route.Path
-import School
 import Shared
 import Team
 import View exposing (View)
@@ -37,9 +38,14 @@ type alias Model =
     { firstName : String
     , lastName : String
     , email : String
-    , schoolIndex : Maybe Int
+    , password : String
+    , passwordConfirm : String
+    , selectedSchoolId : Maybe String
     , teamName : String
     , errors : List String
+    , schools : List Api.School
+    , loadingSchools : Bool
+    , submitting : Bool
     }
 
 
@@ -48,11 +54,21 @@ init _ =
     ( { firstName = ""
       , lastName = ""
       , email = ""
-      , schoolIndex = Nothing
+      , password = ""
+      , passwordConfirm = ""
+      , selectedSchoolId = Nothing
       , teamName = ""
       , errors = []
+      , schools = []
+      , loadingSchools = True
+      , submitting = False
       }
-    , Effect.none
+    , Pb.publicList
+        { collection = "schools"
+        , tag = "schools"
+        , filter = ""
+        , sort = "name"
+        }
     )
 
 
@@ -64,9 +80,12 @@ type Msg
     = UpdateFirstName String
     | UpdateLastName String
     | UpdateEmail String
+    | UpdatePassword String
+    | UpdatePasswordConfirm String
     | SelectSchool String
     | UpdateTeamName String
     | Submit
+    | PbMsg Json.Decode.Value
 
 
 update : Msg -> Model -> ( Model, Effect Msg )
@@ -87,21 +106,36 @@ update msg model =
             , Effect.none
             )
 
+        UpdatePassword val ->
+            ( { model | password = val, errors = [] }
+            , Effect.none
+            )
+
+        UpdatePasswordConfirm val ->
+            ( { model
+                | passwordConfirm = val
+                , errors = []
+              }
+            , Effect.none
+            )
+
         SelectSchool val ->
             let
-                idx =
-                    String.toInt val
+                schoolId =
+                    if String.isEmpty val then
+                        Nothing
+
+                    else
+                        Just val
 
                 newTeamName =
-                    case idx of
-                        Just i ->
-                            Fixtures.schools
-                                |> List.drop i
+                    case schoolId of
+                        Just id ->
+                            model.schools
+                                |> List.filter
+                                    (\s -> s.id == id)
                                 |> List.head
-                                |> Maybe.map
-                                    (School.schoolName
-                                        >> School.nameToString
-                                    )
+                                |> Maybe.map .name
                                 |> Maybe.withDefault
                                     model.teamName
 
@@ -109,7 +143,7 @@ update msg model =
                             model.teamName
             in
             ( { model
-                | schoolIndex = idx
+                | selectedSchoolId = schoolId
                 , teamName = newTeamName
                 , errors = []
               }
@@ -128,11 +162,64 @@ update msg model =
                     , Effect.none
                     )
 
-                Ok _ ->
-                    ( model
-                    , Effect.pushRoutePath
-                        Route.Path.Register_Pending
+                Ok data ->
+                    ( { model
+                        | submitting = True
+                        , errors = []
+                      }
+                    , Pb.publicCreate
+                        { collection = "users"
+                        , tag = "register"
+                        , body =
+                            Api.encodeCoachRegistration
+                                data
+                        }
                     )
+
+        PbMsg value ->
+            case Pb.responseTag value of
+                Just "schools" ->
+                    case Pb.decodeList Api.schoolDecoder value of
+                        Ok schools ->
+                            ( { model
+                                | schools = schools
+                                , loadingSchools = False
+                              }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            ( { model
+                                | loadingSchools = False
+                                , errors =
+                                    [ "Failed to load schools. "
+                                        ++ "Please refresh the page."
+                                    ]
+                              }
+                            , Effect.none
+                            )
+
+                Just "register" ->
+                    case Pb.decodeRecord Api.coachUserDecoder value of
+                        Ok _ ->
+                            ( model
+                            , Effect.pushRoutePath
+                                Route.Path.Register_Pending
+                            )
+
+                        Err _ ->
+                            ( { model
+                                | submitting = False
+                                , errors =
+                                    [ "Registration failed. The email "
+                                        ++ "may already be in use."
+                                    ]
+                              }
+                            , Effect.none
+                            )
+
+                _ ->
+                    ( model, Effect.none )
 
 
 
@@ -141,11 +228,20 @@ update msg model =
 
 validateForm :
     Model
-    -> Result (List String) ()
+    ->
+        Result
+            (List String)
+            { email : String
+            , password : String
+            , passwordConfirm : String
+            , name : String
+            , school : String
+            , teamName : String
+            }
 validateForm model =
     let
         toStrings =
-            List.map (\(Error msg) -> msg)
+            List.map (\(Error m) -> m)
 
         nameValidation =
             Coach.nameFromStrings model.firstName
@@ -156,8 +252,21 @@ validateForm model =
             Email.fromString model.email
                 |> Result.mapError toStrings
 
+        passwordValidation =
+            if String.length model.password < 8 then
+                Err
+                    [ "Password must be at least "
+                        ++ "8 characters."
+                    ]
+
+            else if model.password /= model.passwordConfirm then
+                Err [ "Passwords do not match." ]
+
+            else
+                Ok ()
+
         schoolValidation =
-            case model.schoolIndex of
+            case model.selectedSchoolId of
                 Nothing ->
                     Err [ "Please select a school" ]
 
@@ -186,13 +295,30 @@ validateForm model =
                     |> Result.map (\_ -> ())
                 , emailValidation
                     |> Result.map (\_ -> ())
+                , passwordValidation
                 , schoolValidation
                 , teamNameValidation
                     |> Result.map (\_ -> ())
                 ]
     in
     if List.isEmpty allErrors then
-        Ok ()
+        case model.selectedSchoolId of
+            Just schoolId ->
+                Ok
+                    { email = model.email
+                    , password = model.password
+                    , passwordConfirm =
+                        model.passwordConfirm
+                    , name =
+                        model.firstName
+                            ++ " "
+                            ++ model.lastName
+                    , school = schoolId
+                    , teamName = model.teamName
+                    }
+
+            Nothing ->
+                Err [ "Please select a school" ]
 
     else
         Err allErrors
@@ -204,7 +330,7 @@ validateForm model =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.none
+    Pb.subscribe PbMsg
 
 
 
@@ -220,7 +346,12 @@ view model =
                 [ h1 [ Attr.class "title" ]
                     [ text "Teacher Coach Registration" ]
                 , viewErrors model.errors
-                , viewForm model
+                , if model.loadingSchools then
+                    p [ Attr.class "has-text-grey" ]
+                        [ text "Loading schools..." ]
+
+                  else
+                    viewForm model
                 ]
             ]
         ]
@@ -238,7 +369,10 @@ viewErrors errors =
                 "notification is-danger is-light"
             ]
             [ ul []
-                (List.map (\e -> li [] [ text e ]) errors)
+                (List.map
+                    (\e -> li [] [ text e ])
+                    errors
+                )
             ]
 
 
@@ -255,6 +389,7 @@ viewForm model =
                     , Attr.placeholder "First name"
                     , Attr.value model.firstName
                     , Events.onInput UpdateFirstName
+                    , Attr.disabled model.submitting
                     ]
                     []
                 ]
@@ -269,6 +404,7 @@ viewForm model =
                     , Attr.placeholder "Last name"
                     , Attr.value model.lastName
                     , Events.onInput UpdateLastName
+                    , Attr.disabled model.submitting
                     ]
                     []
                 ]
@@ -283,6 +419,38 @@ viewForm model =
                     , Attr.placeholder "you@school.edu"
                     , Attr.value model.email
                     , Events.onInput UpdateEmail
+                    , Attr.disabled model.submitting
+                    ]
+                    []
+                ]
+            ]
+        , div [ Attr.class "field" ]
+            [ label [ Attr.class "label" ]
+                [ text "Password" ]
+            , div [ Attr.class "control" ]
+                [ input
+                    [ Attr.class "input"
+                    , Attr.type_ "password"
+                    , Attr.placeholder
+                        "At least 8 characters"
+                    , Attr.value model.password
+                    , Events.onInput UpdatePassword
+                    , Attr.disabled model.submitting
+                    ]
+                    []
+                ]
+            ]
+        , div [ Attr.class "field" ]
+            [ label [ Attr.class "label" ]
+                [ text "Confirm Password" ]
+            , div [ Attr.class "control" ]
+                [ input
+                    [ Attr.class "input"
+                    , Attr.type_ "password"
+                    , Attr.placeholder "Confirm password"
+                    , Attr.value model.passwordConfirm
+                    , Events.onInput UpdatePasswordConfirm
+                    , Attr.disabled model.submitting
                     ]
                     []
                 ]
@@ -293,18 +461,22 @@ viewForm model =
             , div [ Attr.class "control" ]
                 [ div [ Attr.class "select is-fullwidth" ]
                     [ select
-                        [ Events.onInput SelectSchool ]
+                        [ Events.onInput SelectSchool
+                        , Attr.disabled model.submitting
+                        ]
                         (option
                             [ Attr.value ""
                             , Attr.selected
-                                (model.schoolIndex
+                                (model.selectedSchoolId
                                     == Nothing
                                 )
                             ]
-                            [ text "-- Select a school --" ]
-                            :: List.indexedMap
+                            [ text
+                                "-- Select a school --"
+                            ]
+                            :: List.map
                                 viewSchoolOption
-                                Fixtures.schools
+                                model.schools
                         )
                     ]
                 ]
@@ -319,30 +491,44 @@ viewForm model =
                     , Attr.placeholder "Team name"
                     , Attr.value model.teamName
                     , Events.onInput UpdateTeamName
+                    , Attr.disabled model.submitting
                     ]
                     []
                 ]
             , p [ Attr.class "help" ]
                 [ text
                     "Defaults to school name. Change "
-                    , text
-                        "if registering a second team."
+                , text
+                    "if registering a second team."
                 ]
             ]
         , div [ Attr.class "field" ]
             [ div [ Attr.class "control" ]
                 [ button
-                    [ Attr.class "button is-primary"
+                    [ Attr.class
+                        (if model.submitting then
+                            "button is-primary is-fullwidth is-loading"
+
+                         else
+                            "button is-primary is-fullwidth"
+                        )
                     , Attr.type_ "submit"
+                    , Attr.disabled model.submitting
                     ]
                     [ text "Submit Registration" ]
                 ]
             ]
+        , p [ Attr.class "has-text-centered mt-4" ]
+            [ text "Already have an account? "
+            , a
+                [ Route.Path.href Route.Path.Team_Login ]
+                [ text "Login here" ]
+            ]
         ]
 
 
-viewSchoolOption : Int -> School.School -> Html msg
-viewSchoolOption index sch =
+viewSchoolOption : Api.School -> Html msg
+viewSchoolOption sch =
     option
-        [ Attr.value (String.fromInt index) ]
-        [ text (School.schoolName sch |> School.nameToString) ]
+        [ Attr.value sch.id ]
+        [ text sch.name ]

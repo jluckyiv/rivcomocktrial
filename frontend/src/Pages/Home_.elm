@@ -17,6 +17,8 @@ page =
                 , Html.div [ Attr.class "buttons" ]
                     [ Html.a [ Attr.class "button is-light", Route.Path.href Route.Path.Register ]
                         [ Html.text "Register" ]
+                    , Html.a [ Attr.class "button is-info", Route.Path.href Route.Path.Team_Login ]
+                        [ Html.text "Coach Login" ]
                     , Html.a [ Attr.class "button is-light is-outlined", Route.Path.href Route.Path.Admin_Login ]
                         [ Html.text "Admin Login" ]
                     ]

@@ -7,9 +7,10 @@ import Error exposing (Error(..))
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
-import Http
+import Json.Decode
 import Layouts
 import Page exposing (Page)
+import Pb
 import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Route.Path
@@ -70,7 +71,7 @@ init user _ =
       , form = FormHidden
       , deleting = Nothing
       }
-    , Effect.sendCmd (Api.listTournaments user.token GotTournaments)
+    , Pb.adminList { collection = "tournaments", tag = "tournaments", filter = "", sort = "" }
     )
 
 
@@ -79,7 +80,7 @@ init user _ =
 
 
 type Msg
-    = GotTournaments (Result Http.Error (Api.ListResponse Tournament))
+    = PbMsg Json.Decode.Value
     | ShowCreateForm
     | EditTournament Tournament
     | CancelForm
@@ -89,19 +90,77 @@ type Msg
     | FormElimRoundsChanged String
     | FormStatusChanged String
     | SaveTournament
-    | GotSaveResponse (Result Http.Error Tournament)
     | DeleteTournament String
-    | GotDeleteResponse String (Result Http.Error ())
 
 
 update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
 update user msg model =
     case msg of
-        GotTournaments (Ok response) ->
-            ( { model | tournaments = Succeeded response.items }, Effect.none )
+        PbMsg value ->
+            case Pb.responseTag value of
+                Just "tournaments" ->
+                    case Pb.decodeList Api.tournamentDecoder value of
+                        Ok items ->
+                            ( { model | tournaments = Succeeded items }, Effect.none )
 
-        GotTournaments (Err _) ->
-            ( { model | tournaments = Failed "Failed to load tournaments." }, Effect.none )
+                        Err err ->
+                            ( { model | tournaments = Failed err }, Effect.none )
+
+                Just "save-tournament" ->
+                    case Pb.decodeRecord Api.tournamentDecoder value of
+                        Ok tournament ->
+                            let
+                                updateTournaments context tournaments =
+                                    case context of
+                                        Editing _ ->
+                                            List.map
+                                                (\t ->
+                                                    if t.id == tournament.id then
+                                                        tournament
+
+                                                    else
+                                                        t
+                                                )
+                                                tournaments
+
+                                        Creating ->
+                                            tournaments ++ [ tournament ]
+                            in
+                            case model.form of
+                                FormSaving context _ ->
+                                    ( { model
+                                        | tournaments = RemoteData.map (updateTournaments context) model.tournaments
+                                        , form = FormHidden
+                                      }
+                                    , Effect.none
+                                    )
+
+                                _ ->
+                                    ( model, Effect.none )
+
+                        Err _ ->
+                            case model.form of
+                                FormSaving context formData ->
+                                    ( { model | form = FormOpen context formData [ "Failed to save tournament." ] }, Effect.none )
+
+                                _ ->
+                                    ( model, Effect.none )
+
+                Just "delete-tournament" ->
+                    case Pb.decodeDelete value of
+                        Ok id ->
+                            ( { model
+                                | tournaments = RemoteData.map (List.filter (\t -> t.id /= id)) model.tournaments
+                                , deleting = Nothing
+                              }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            ( { model | deleting = Nothing }, Effect.none )
+
+                _ ->
+                    ( model, Effect.none )
 
         ShowCreateForm ->
             ( { model
@@ -160,72 +219,23 @@ update user msg model =
 
                         Ok data ->
                             let
-                                cmd =
+                                effect =
                                     case context of
                                         Editing id ->
-                                            Api.updateTournament user.token id data GotSaveResponse
+                                            Pb.adminUpdate { collection = "tournaments", id = id, tag = "save-tournament", body = Api.encodeTournament data }
 
                                         Creating ->
-                                            Api.createTournament user.token data GotSaveResponse
+                                            Pb.adminCreate { collection = "tournaments", tag = "save-tournament", body = Api.encodeTournament data }
                             in
-                            ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
-
-                _ ->
-                    ( model, Effect.none )
-
-        GotSaveResponse (Ok tournament) ->
-            let
-                updateTournaments context tournaments =
-                    case context of
-                        Editing _ ->
-                            List.map
-                                (\t ->
-                                    if t.id == tournament.id then
-                                        tournament
-
-                                    else
-                                        t
-                                )
-                                tournaments
-
-                        Creating ->
-                            tournaments ++ [ tournament ]
-            in
-            case model.form of
-                FormSaving context _ ->
-                    ( { model
-                        | tournaments = RemoteData.map (updateTournaments context) model.tournaments
-                        , form = FormHidden
-                      }
-                    , Effect.none
-                    )
-
-                _ ->
-                    ( model, Effect.none )
-
-        GotSaveResponse (Err _) ->
-            case model.form of
-                FormSaving context formData ->
-                    ( { model | form = FormOpen context formData [ "Failed to save tournament." ] }, Effect.none )
+                            ( { model | form = FormSaving context formData }, effect )
 
                 _ ->
                     ( model, Effect.none )
 
         DeleteTournament id ->
             ( { model | deleting = Just id }
-            , Effect.sendCmd (Api.deleteTournament user.token id (GotDeleteResponse id))
+            , Pb.adminDelete { collection = "tournaments", id = id, tag = "delete-tournament" }
             )
-
-        GotDeleteResponse id (Ok _) ->
-            ( { model
-                | tournaments = RemoteData.map (List.filter (\t -> t.id /= id)) model.tournaments
-                , deleting = Nothing
-              }
-            , Effect.none
-            )
-
-        GotDeleteResponse _ (Err _) ->
-            ( { model | deleting = Nothing }, Effect.none )
 
 
 
@@ -326,7 +336,7 @@ updateFormField transform state =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.none
+    Pb.subscribe PbMsg
 
 
 

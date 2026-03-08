@@ -8,9 +8,10 @@ import Error exposing (Error(..))
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
-import Http
+import Json.Decode
 import Layouts
 import Page exposing (Page)
+import Pb
 import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Shared
@@ -73,7 +74,7 @@ init user _ =
       , bulk = BulkIdle
       , deleting = Nothing
       }
-    , Effect.sendCmd (Api.listCourtrooms user.token GotCourtrooms)
+    , Pb.adminList { collection = "courtrooms", tag = "courtrooms", filter = "", sort = "" }
     )
 
 
@@ -82,29 +83,104 @@ init user _ =
 
 
 type Msg
-    = GotCourtrooms (Result Http.Error (Api.ListResponse Courtroom))
+    = PbMsg Json.Decode.Value
     | ShowCreateForm
     | EditCourtroom Courtroom
     | CancelForm
     | FormNameChanged String
     | FormLocationChanged String
     | SaveCourtroom
-    | GotSaveResponse (Result Http.Error Courtroom)
     | DeleteCourtroom String
-    | GotDeleteResponse String (Result Http.Error ())
     | BulkTextChanged String
     | BulkImport
-    | GotBulkResponse (Result Http.Error Courtroom)
 
 
 update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
 update user msg model =
     case msg of
-        GotCourtrooms (Ok response) ->
-            ( { model | courtrooms = Succeeded response.items }, Effect.none )
+        PbMsg value ->
+            case Pb.responseTag value of
+                Just "courtrooms" ->
+                    case Pb.decodeList Api.courtroomDecoder value of
+                        Ok items ->
+                            ( { model | courtrooms = Succeeded items }, Effect.none )
 
-        GotCourtrooms (Err _) ->
-            ( { model | courtrooms = Failed "Failed to load courtrooms." }, Effect.none )
+                        Err err ->
+                            ( { model | courtrooms = Failed err }, Effect.none )
+
+                Just "save-courtroom" ->
+                    case Pb.decodeRecord Api.courtroomDecoder value of
+                        Ok courtroom ->
+                            let
+                                updateCourtrooms context courtrooms =
+                                    case context of
+                                        Editing _ ->
+                                            List.map
+                                                (\c ->
+                                                    if c.id == courtroom.id then
+                                                        courtroom
+
+                                                    else
+                                                        c
+                                                )
+                                                courtrooms
+
+                                        Creating ->
+                                            courtrooms ++ [ courtroom ]
+                            in
+                            case model.form of
+                                FormSaving context _ ->
+                                    ( { model
+                                        | courtrooms = RemoteData.map (updateCourtrooms context) model.courtrooms
+                                        , form = FormHidden
+                                      }
+                                    , Effect.none
+                                    )
+
+                                _ ->
+                                    ( model, Effect.none )
+
+                        Err _ ->
+                            case model.form of
+                                FormSaving context formData ->
+                                    ( { model | form = FormOpen context formData [ "Failed to save courtroom." ] }, Effect.none )
+
+                                _ ->
+                                    ( model, Effect.none )
+
+                Just "delete-courtroom" ->
+                    case Pb.decodeDelete value of
+                        Ok id ->
+                            ( { model
+                                | courtrooms = RemoteData.map (List.filter (\c -> c.id /= id)) model.courtrooms
+                                , deleting = Nothing
+                              }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            ( { model | deleting = Nothing }, Effect.none )
+
+                Just "bulk-courtroom" ->
+                    case Pb.decodeRecord Api.courtroomDecoder value of
+                        Ok courtroom ->
+                            ( { model
+                                | courtrooms = RemoteData.map (\list -> list ++ [ courtroom ]) model.courtrooms
+                                , bulk = BulkIdle
+                              }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            case model.bulk of
+                                BulkSaving val ->
+                                    ( { model | bulk = BulkFailed val "Failed to create some courtrooms." }, Effect.none )
+
+                                _ ->
+                                    ( { model | bulk = BulkFailed "" "Failed to create some courtrooms." }, Effect.none )
+
+                _ ->
+                    ( model, Effect.none )
 
         ShowCreateForm ->
             ( { model | form = FormOpen Creating { name = "", location = "" } [] }, Effect.none )
@@ -130,94 +206,29 @@ update user msg model =
 
                         Ok data ->
                             let
-                                cmd =
+                                effect =
                                     case context of
                                         Editing id ->
-                                            Api.updateCourtroom user.token id data GotSaveResponse
+                                            Pb.adminUpdate { collection = "courtrooms", id = id, tag = "save-courtroom", body = Api.encodeCourtroom data }
 
                                         Creating ->
-                                            Api.createCourtroom user.token data GotSaveResponse
+                                            Pb.adminCreate { collection = "courtrooms", tag = "save-courtroom", body = Api.encodeCourtroom data }
                             in
-                            ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
-
-                _ ->
-                    ( model, Effect.none )
-
-        GotSaveResponse (Ok courtroom) ->
-            let
-                updateCourtrooms context courtrooms =
-                    case context of
-                        Editing _ ->
-                            List.map
-                                (\c ->
-                                    if c.id == courtroom.id then
-                                        courtroom
-
-                                    else
-                                        c
-                                )
-                                courtrooms
-
-                        Creating ->
-                            courtrooms ++ [ courtroom ]
-            in
-            case model.form of
-                FormSaving context _ ->
-                    ( { model
-                        | courtrooms = RemoteData.map (updateCourtrooms context) model.courtrooms
-                        , form = FormHidden
-                      }
-                    , Effect.none
-                    )
-
-                _ ->
-                    ( model, Effect.none )
-
-        GotSaveResponse (Err _) ->
-            case model.form of
-                FormSaving context formData ->
-                    ( { model | form = FormOpen context formData [ "Failed to save courtroom." ] }, Effect.none )
+                            ( { model | form = FormSaving context formData }, effect )
 
                 _ ->
                     ( model, Effect.none )
 
         DeleteCourtroom id ->
             ( { model | deleting = Just id }
-            , Effect.sendCmd (Api.deleteCourtroom user.token id (GotDeleteResponse id))
+            , Pb.adminDelete { collection = "courtrooms", id = id, tag = "delete-courtroom" }
             )
-
-        GotDeleteResponse id (Ok _) ->
-            ( { model
-                | courtrooms = RemoteData.map (List.filter (\c -> c.id /= id)) model.courtrooms
-                , deleting = Nothing
-              }
-            , Effect.none
-            )
-
-        GotDeleteResponse _ (Err _) ->
-            ( { model | deleting = Nothing }, Effect.none )
 
         BulkTextChanged val ->
             ( { model | bulk = BulkEditing val }, Effect.none )
 
         BulkImport ->
-            handleBulkImport user model
-
-        GotBulkResponse (Ok courtroom) ->
-            ( { model
-                | courtrooms = RemoteData.map (\list -> list ++ [ courtroom ]) model.courtrooms
-                , bulk = BulkIdle
-              }
-            , Effect.none
-            )
-
-        GotBulkResponse (Err _) ->
-            case model.bulk of
-                BulkSaving val ->
-                    ( { model | bulk = BulkFailed val "Failed to create some courtrooms." }, Effect.none )
-
-                _ ->
-                    ( { model | bulk = BulkFailed "" "Failed to create some courtrooms." }, Effect.none )
+            handleBulkImport model
 
 
 
@@ -258,8 +269,8 @@ updateFormField transform state =
             state
 
 
-handleBulkImport : Auth.User -> Model -> ( Model, Effect Msg )
-handleBulkImport user model =
+handleBulkImport : Model -> ( Model, Effect Msg )
+handleBulkImport model =
     let
         bulkText =
             case model.bulk of
@@ -293,7 +304,7 @@ handleBulkImport user model =
         ( { model | bulk = BulkSaving bulkText }
         , Effect.batch
             (List.map
-                (\data -> Effect.sendCmd (Api.createCourtroom user.token data GotBulkResponse))
+                (\data -> Pb.adminCreate { collection = "courtrooms", tag = "bulk-courtroom", body = Api.encodeCourtroom data })
                 parsed
             )
         )
@@ -330,7 +341,7 @@ parseBulkLine line =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.none
+    Pb.subscribe PbMsg
 
 
 

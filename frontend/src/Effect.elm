@@ -7,6 +7,10 @@ port module Effect exposing
     , pushRoutePath, replaceRoutePath
     , loadExternalUrl, back
     , saveAdminToken
+    , saveCoachToken
+    , saveCoachUser
+    , portSend
+    , incoming
     , map, toCmd
     )
 
@@ -101,6 +105,20 @@ port outgoing :
     -> Cmd msg
 
 
+port incoming :
+    (Json.Encode.Value -> msg)
+    -> Sub msg
+
+
+{-| Send a tagged message to JS via the outgoing port.
+-}
+portSend :
+    { tag : String, data : Json.Encode.Value }
+    -> Effect msg
+portSend msg =
+    SendCmd (outgoing msg)
+
+
 {-| Persist or clear the admin token in localStorage.
 -}
 saveAdminToken : Maybe String -> Effect msg
@@ -112,6 +130,52 @@ saveAdminToken token =
                 case token of
                     Just t ->
                         Json.Encode.string t
+
+                    Nothing ->
+                        Json.Encode.null
+            }
+        )
+
+
+{-| Persist or clear the coach token in localStorage.
+-}
+saveCoachToken : Maybe String -> Effect msg
+saveCoachToken token =
+    SendCmd
+        (outgoing
+            { tag = "SaveCoachToken"
+            , data =
+                case token of
+                    Just t ->
+                        Json.Encode.string t
+
+                    Nothing ->
+                        Json.Encode.null
+            }
+        )
+
+
+{-| Persist or clear the coach user in localStorage.
+-}
+saveCoachUser : Maybe Shared.Model.CoachUser -> Effect msg
+saveCoachUser maybeUser =
+    SendCmd
+        (outgoing
+            { tag = "SaveCoachUser"
+            , data =
+                case maybeUser of
+                    Just user ->
+                        Json.Encode.object
+                            [ ( "id"
+                              , Json.Encode.string user.id
+                              )
+                            , ( "email"
+                              , Json.Encode.string user.email
+                              )
+                            , ( "name"
+                              , Json.Encode.string user.name
+                              )
+                            ]
 
                     Nothing ->
                         Json.Encode.null

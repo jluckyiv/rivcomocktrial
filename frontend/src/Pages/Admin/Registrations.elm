@@ -1,28 +1,26 @@
 module Pages.Admin.Registrations exposing (Model, Msg, page)
 
+import Api
 import Auth
-import Coach
 import Effect exposing (Effect)
-import Email
-import Fixtures
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
+import Json.Decode
+import Json.Encode
 import Layouts
 import Page exposing (Page)
-import Registration exposing (Registration, Status(..))
+import Pb
 import Route exposing (Route)
-import School
 import Shared
-import Team
 import View exposing (View)
 
 
 page : Auth.User -> Shared.Model -> Route () -> Page Model Msg
 page user shared route =
     Page.new
-        { init = init
-        , update = update
+        { init = init user
+        , update = update user
         , view = view
         , subscriptions = subscriptions
         }
@@ -34,14 +32,24 @@ page user shared route =
 
 
 type alias Model =
-    { registrations : List Registration
+    { coaches : List Api.CoachUser
+    , loading : Bool
+    , error : Maybe String
     }
 
 
-init : () -> ( Model, Effect Msg )
-init _ =
-    ( { registrations = Fixtures.registrations }
-    , Effect.none
+init : Auth.User -> () -> ( Model, Effect Msg )
+init user _ =
+    ( { coaches = []
+      , loading = True
+      , error = Nothing
+      }
+    , Pb.adminList
+        { collection = "users"
+        , tag = "coaches"
+        , filter = "role='coach'"
+        , sort = ""
+        }
     )
 
 
@@ -50,54 +58,99 @@ init _ =
 
 
 type Msg
-    = ApproveRegistration Registration.RegistrationId
-    | RejectRegistration Registration.RegistrationId
+    = ApproveCoach String
+    | RejectCoach String
+    | PbMsg Json.Decode.Value
 
 
-update : Msg -> Model -> ( Model, Effect Msg )
-update msg model =
+update :
+    Auth.User
+    -> Msg
+    -> Model
+    -> ( Model, Effect Msg )
+update user msg model =
     case msg of
-        ApproveRegistration regId ->
-            ( { model
-                | registrations =
-                    List.map
-                        (\reg ->
-                            if
-                                Registration.idToString
-                                    (Registration.id reg)
-                                    == Registration.idToString
-                                        regId
-                            then
-                                Registration.approve reg
-
-                            else
-                                reg
-                        )
-                        model.registrations
-              }
-            , Effect.none
+        ApproveCoach id ->
+            ( model
+            , Pb.adminUpdate
+                { collection = "users"
+                , id = id
+                , tag = "status-update"
+                , body =
+                    Json.Encode.object
+                        [ ( "status"
+                          , Json.Encode.string "approved"
+                          )
+                        ]
+                }
             )
 
-        RejectRegistration regId ->
-            ( { model
-                | registrations =
-                    List.map
-                        (\reg ->
-                            if
-                                Registration.idToString
-                                    (Registration.id reg)
-                                    == Registration.idToString
-                                        regId
-                            then
-                                Registration.reject reg
-
-                            else
-                                reg
-                        )
-                        model.registrations
-              }
-            , Effect.none
+        RejectCoach id ->
+            ( model
+            , Pb.adminUpdate
+                { collection = "users"
+                , id = id
+                , tag = "status-update"
+                , body =
+                    Json.Encode.object
+                        [ ( "status"
+                          , Json.Encode.string "rejected"
+                          )
+                        ]
+                }
             )
+
+        PbMsg value ->
+            case Pb.responseTag value of
+                Just "coaches" ->
+                    case Pb.decodeList Api.coachUserDecoder value of
+                        Ok coaches ->
+                            ( { model
+                                | coaches = coaches
+                                , loading = False
+                              }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            ( { model
+                                | loading = False
+                                , error =
+                                    Just
+                                        "Failed to load registrations."
+                              }
+                            , Effect.none
+                            )
+
+                Just "status-update" ->
+                    case Pb.decodeRecord Api.coachUserDecoder value of
+                        Ok updated ->
+                            ( { model
+                                | coaches =
+                                    List.map
+                                        (\c ->
+                                            if c.id == updated.id then
+                                                updated
+
+                                            else
+                                                c
+                                        )
+                                        model.coaches
+                              }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            ( { model
+                                | error =
+                                    Just
+                                        "Failed to update status."
+                              }
+                            , Effect.none
+                            )
+
+                _ ->
+                    ( model, Effect.none )
 
 
 
@@ -106,7 +159,7 @@ update msg model =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.none
+    Pb.subscribe PbMsg
 
 
 
@@ -119,103 +172,89 @@ view model =
     , body =
         [ h1 [ Attr.class "title" ]
             [ text "Registrations" ]
-        , viewRegistrationsTable model.registrations
+        , case model.error of
+            Just err ->
+                div
+                    [ Attr.class
+                        "notification is-danger is-light"
+                    ]
+                    [ text err ]
+
+            Nothing ->
+                text ""
+        , if model.loading then
+            p [ Attr.class "has-text-grey" ]
+                [ text "Loading..." ]
+
+          else
+            viewCoachTable model.coaches
         ]
     }
 
 
-viewRegistrationsTable : List Registration -> Html Msg
-viewRegistrationsTable regs =
+viewCoachTable : List Api.CoachUser -> Html Msg
+viewCoachTable coaches =
     table [ Attr.class "table is-fullwidth is-striped" ]
         [ thead []
             [ tr []
                 [ th [] [ text "Name" ]
                 , th [] [ text "Email" ]
-                , th [] [ text "School" ]
                 , th [] [ text "Team Name" ]
                 , th [] [ text "Status" ]
                 , th [] [ text "Actions" ]
                 ]
             ]
         , tbody []
-            (List.map viewRegistrationRow regs)
+            (List.map viewCoachRow coaches)
         ]
 
 
-viewRegistrationRow : Registration -> Html Msg
-viewRegistrationRow reg =
-    let
-        app =
-            Registration.applicant reg
-
-        name =
-            Coach.teacherCoachApplicantName app
-                |> Coach.nameToString
-
-        emailStr =
-            Coach.teacherCoachApplicantEmail app
-                |> Email.toString
-
-        schoolStr =
-            Registration.school reg
-                |> School.schoolName
-                |> School.nameToString
-
-        teamNameStr =
-            Registration.teamName reg
-                |> Team.nameToString
-
-        regStatus =
-            Registration.status reg
-
-        regId =
-            Registration.id reg
-    in
+viewCoachRow : Api.CoachUser -> Html Msg
+viewCoachRow coach =
     tr []
-        [ td [] [ text name ]
-        , td [] [ text emailStr ]
-        , td [] [ text schoolStr ]
-        , td [] [ text teamNameStr ]
-        , td [] [ viewStatusTag regStatus ]
-        , td [] [ viewActions regId regStatus ]
+        [ td [] [ text coach.name ]
+        , td [] [ text coach.email ]
+        , td [] [ text coach.teamName ]
+        , td [] [ viewStatusTag coach.status ]
+        , td [] [ viewActions coach.id coach.status ]
         ]
 
 
-viewStatusTag : Status -> Html msg
+viewStatusTag : String -> Html msg
 viewStatusTag s =
     let
         ( tagClass, label ) =
             case s of
-                Pending ->
+                "pending" ->
                     ( "tag is-warning", "Pending" )
 
-                Approved ->
+                "approved" ->
                     ( "tag is-success", "Approved" )
 
-                Rejected ->
+                "rejected" ->
                     ( "tag is-danger", "Rejected" )
+
+                _ ->
+                    ( "tag", s )
     in
     span [ Attr.class tagClass ] [ text label ]
 
 
-viewActions :
-    Registration.RegistrationId
-    -> Status
-    -> Html Msg
-viewActions regId s =
+viewActions : String -> String -> Html Msg
+viewActions coachId s =
     case s of
-        Pending ->
+        "pending" ->
             div [ Attr.class "buttons are-small" ]
                 [ button
                     [ Attr.class "button is-success"
                     , Events.onClick
-                        (ApproveRegistration regId)
+                        (ApproveCoach coachId)
                     ]
                     [ text "Approve" ]
                 , button
                     [ Attr.class "button is-danger"
                     , Events.onClick
-                        (RejectRegistration regId)
+                        (RejectCoach coachId)
                     ]
                     [ text "Reject" ]
                 ]
