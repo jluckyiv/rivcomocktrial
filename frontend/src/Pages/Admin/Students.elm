@@ -6,9 +6,10 @@ import Effect exposing (Effect)
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
-import Http
+import Json.Decode
 import Layouts
 import Page exposing (Page)
+import Pb
 import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Shared
@@ -76,8 +77,8 @@ init user _ =
       , filterSchool = ""
       }
     , Effect.batch
-        [ Effect.sendCmd (Api.listStudents user.token GotStudents)
-        , Effect.sendCmd (Api.listSchools user.token GotSchools)
+        [ Pb.adminList { collection = "students", tag = "students", filter = "", sort = "" }
+        , Pb.adminList { collection = "schools", tag = "schools", filter = "", sort = "" }
         ]
     )
 
@@ -87,8 +88,7 @@ init user _ =
 
 
 type Msg
-    = GotStudents (Result Http.Error (Api.ListResponse Student))
-    | GotSchools (Result Http.Error (Api.ListResponse School))
+    = PbMsg Json.Decode.Value
     | FilterSchoolChanged String
     | ShowCreateForm
     | EditStudent Student
@@ -96,28 +96,105 @@ type Msg
     | FormNameChanged String
     | FormSchoolChanged String
     | SaveStudent
-    | GotSaveResponse (Result Http.Error Student)
     | DeleteStudent String
-    | GotDeleteResponse String (Result Http.Error ())
     | BulkTextChanged String
     | BulkImport
-    | GotBulkResponse (Result Http.Error Student)
 
 
 update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
 update user msg model =
     case msg of
-        GotStudents (Ok response) ->
-            ( { model | students = Succeeded response.items }, Effect.none )
+        PbMsg value ->
+            case Pb.responseTag value of
+                Just "students" ->
+                    case Pb.decodeList Api.studentDecoder value of
+                        Ok items ->
+                            ( { model | students = Succeeded items }, Effect.none )
 
-        GotStudents (Err _) ->
-            ( { model | students = Failed "Failed to load students." }, Effect.none )
+                        Err _ ->
+                            ( { model | students = Failed "Failed to load students." }, Effect.none )
 
-        GotSchools (Ok response) ->
-            ( { model | schools = response.items }, Effect.none )
+                Just "schools" ->
+                    case Pb.decodeList Api.schoolDecoder value of
+                        Ok items ->
+                            ( { model | schools = items }, Effect.none )
 
-        GotSchools (Err _) ->
-            ( model, Effect.none )
+                        Err _ ->
+                            ( model, Effect.none )
+
+                Just "save-student" ->
+                    case Pb.decodeRecord Api.studentDecoder value of
+                        Ok student ->
+                            let
+                                updateStudents context students =
+                                    case context of
+                                        Editing _ ->
+                                            List.map
+                                                (\s ->
+                                                    if s.id == student.id then
+                                                        student
+
+                                                    else
+                                                        s
+                                                )
+                                                students
+
+                                        Creating ->
+                                            students ++ [ student ]
+                            in
+                            case model.form of
+                                FormSaving context _ ->
+                                    ( { model
+                                        | students = RemoteData.map (updateStudents context) model.students
+                                        , form = FormHidden
+                                      }
+                                    , Effect.none
+                                    )
+
+                                _ ->
+                                    ( model, Effect.none )
+
+                        Err _ ->
+                            case model.form of
+                                FormSaving context formData ->
+                                    ( { model | form = FormOpen context formData [ "Failed to save student." ] }, Effect.none )
+
+                                _ ->
+                                    ( model, Effect.none )
+
+                Just "delete-student" ->
+                    case Pb.decodeDelete value of
+                        Ok id ->
+                            ( { model
+                                | students = RemoteData.map (List.filter (\s -> s.id /= id)) model.students
+                                , deleting = Nothing
+                              }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            ( { model | deleting = Nothing }, Effect.none )
+
+                Just "bulk-student" ->
+                    case Pb.decodeRecord Api.studentDecoder value of
+                        Ok student ->
+                            ( { model
+                                | students = RemoteData.map (\list -> list ++ [ student ]) model.students
+                                , bulk = BulkIdle
+                              }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            case model.bulk of
+                                BulkSaving val ->
+                                    ( { model | bulk = BulkFailed val "Failed to create some students." }, Effect.none )
+
+                                _ ->
+                                    ( { model | bulk = BulkFailed "" "Failed to create some students." }, Effect.none )
+
+                _ ->
+                    ( model, Effect.none )
 
         FilterSchoolChanged val ->
             ( { model | filterSchool = val }, Effect.none )
@@ -146,94 +223,38 @@ update user msg model =
 
                         Ok data ->
                             let
-                                cmd =
+                                effect =
                                     case context of
                                         Editing id ->
-                                            Api.updateStudent user.token id data GotSaveResponse
+                                            Pb.adminUpdate
+                                                { collection = "students"
+                                                , id = id
+                                                , tag = "save-student"
+                                                , body = Api.encodeStudent data
+                                                }
 
                                         Creating ->
-                                            Api.createStudent user.token data GotSaveResponse
+                                            Pb.adminCreate
+                                                { collection = "students"
+                                                , tag = "save-student"
+                                                , body = Api.encodeStudent data
+                                                }
                             in
-                            ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
-
-                _ ->
-                    ( model, Effect.none )
-
-        GotSaveResponse (Ok student) ->
-            let
-                updateStudents context students =
-                    case context of
-                        Editing _ ->
-                            List.map
-                                (\s ->
-                                    if s.id == student.id then
-                                        student
-
-                                    else
-                                        s
-                                )
-                                students
-
-                        Creating ->
-                            students ++ [ student ]
-            in
-            case model.form of
-                FormSaving context _ ->
-                    ( { model
-                        | students = RemoteData.map (updateStudents context) model.students
-                        , form = FormHidden
-                      }
-                    , Effect.none
-                    )
-
-                _ ->
-                    ( model, Effect.none )
-
-        GotSaveResponse (Err _) ->
-            case model.form of
-                FormSaving context formData ->
-                    ( { model | form = FormOpen context formData [ "Failed to save student." ] }, Effect.none )
+                            ( { model | form = FormSaving context formData }, effect )
 
                 _ ->
                     ( model, Effect.none )
 
         DeleteStudent id ->
             ( { model | deleting = Just id }
-            , Effect.sendCmd (Api.deleteStudent user.token id (GotDeleteResponse id))
+            , Pb.adminDelete { collection = "students", id = id, tag = "delete-student" }
             )
-
-        GotDeleteResponse id (Ok _) ->
-            ( { model
-                | students = RemoteData.map (List.filter (\s -> s.id /= id)) model.students
-                , deleting = Nothing
-              }
-            , Effect.none
-            )
-
-        GotDeleteResponse _ (Err _) ->
-            ( { model | deleting = Nothing }, Effect.none )
 
         BulkTextChanged val ->
             ( { model | bulk = BulkEditing val }, Effect.none )
 
         BulkImport ->
             handleBulkImport user model
-
-        GotBulkResponse (Ok student) ->
-            ( { model
-                | students = RemoteData.map (\list -> list ++ [ student ]) model.students
-                , bulk = BulkIdle
-              }
-            , Effect.none
-            )
-
-        GotBulkResponse (Err _) ->
-            case model.bulk of
-                BulkSaving val ->
-                    ( { model | bulk = BulkFailed val "Failed to create some students." }, Effect.none )
-
-                _ ->
-                    ( { model | bulk = BulkFailed "" "Failed to create some students." }, Effect.none )
 
 
 
@@ -309,7 +330,13 @@ handleBulkImport user model =
         ( { model | bulk = BulkSaving bulkText }
         , Effect.batch
             (List.map
-                (\data -> Effect.sendCmd (Api.createStudent user.token data GotBulkResponse))
+                (\data ->
+                    Pb.adminCreate
+                        { collection = "students"
+                        , tag = "bulk-student"
+                        , body = Api.encodeStudent data
+                        }
+                )
                 parsed
             )
         )
@@ -351,7 +378,7 @@ parseBulkLine schools line =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.none
+    Pb.subscribe PbMsg
 
 
 

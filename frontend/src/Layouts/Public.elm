@@ -95,11 +95,22 @@ viewNavbar route =
                 ]
             , div [ Attr.class "navbar-end" ]
                 [ div [ Attr.class "navbar-item" ]
-                    [ a
-                        [ Attr.class "button is-light is-small"
-                        , Route.Path.href Route.Path.Admin_Login
+                    [ div [ Attr.class "buttons" ]
+                        [ a
+                            [ Attr.class
+                                "button is-info is-small"
+                            , Route.Path.href
+                                Route.Path.Team_Login
+                            ]
+                            [ text "Coach Login" ]
+                        , a
+                            [ Attr.class
+                                "button is-light is-small"
+                            , Route.Path.href
+                                Route.Path.Admin_Login
+                            ]
+                            [ text "Admin" ]
                         ]
-                        [ text "Admin" ]
                     ]
                 ]
             ]
