@@ -87,8 +87,10 @@ init user _ =
 type Msg
     = PbMsg Json.Decode.Value
     | ShowCreateForm
+    | ShowBulkImport
     | EditSchool School
     | CancelForm
+    | CancelBulk
     | FormNameChanged String
     | FormDistrictChanged String
     | SaveSchool
@@ -185,13 +187,19 @@ update user msg model =
                     ( model, Effect.none )
 
         ShowCreateForm ->
-            ( { model | form = FormOpen Creating { name = "", district = "" } [] }, Effect.none )
+            ( { model | form = FormOpen Creating { name = "", district = "" } [], bulk = BulkIdle }, Effect.none )
+
+        ShowBulkImport ->
+            ( { model | bulk = BulkEditing "", form = FormHidden }, Effect.none )
 
         EditSchool s ->
-            ( { model | form = FormOpen (Editing s.id) { name = s.name, district = s.district } [] }, Effect.none )
+            ( { model | form = FormOpen (Editing s.id) { name = s.name, district = s.district } [], bulk = BulkIdle }, Effect.none )
 
         CancelForm ->
             ( { model | form = FormHidden }, Effect.none )
+
+        CancelBulk ->
+            ( { model | bulk = BulkIdle }, Effect.none )
 
         FormNameChanged val ->
             ( { model | form = updateFormField (\f -> { f | name = val }) model.form }, Effect.none )
@@ -382,7 +390,10 @@ view model =
     , body =
         [ UI.titleBar
             { title = "Schools"
-            , action = Just { label = "New School", msg = ShowCreateForm }
+            , actions =
+                [ { label = "New School", msg = ShowCreateForm }
+                , { label = "Bulk Import", msg = ShowBulkImport }
+                ]
             }
         , viewForm model.form
         , viewBulkInput model.bulk
@@ -466,65 +477,65 @@ viewFormCard context formData errors saving =
 
 viewBulkInput : BulkState -> Html Msg
 viewBulkInput state =
-    let
-        ( bulkText, bulkError, saving ) =
-            case state of
-                BulkIdle ->
-                    ( "", Nothing, False )
+    case state of
+        BulkIdle ->
+            UI.empty
 
-                BulkEditing val ->
-                    ( val, Nothing, False )
+        _ ->
+            let
+                ( bulkText, bulkError, saving ) =
+                    case state of
+                        BulkEditing val ->
+                            ( val, Nothing, False )
 
-                BulkSaving val ->
-                    ( val, Nothing, True )
+                        BulkSaving val ->
+                            ( val, Nothing, True )
 
-                BulkFailed val err ->
-                    ( val, Just err, False )
-    in
-    UI.card
-        [ UI.cardBody
-            [ UI.cardTitle "Bulk Import"
-            , p [ Attr.class "text-sm text-base-content/70 mb-3" ]
-                [ text "One school per line. Format: "
-                , code [] [ text "Name, District" ]
-                , text " (district is optional)"
-                ]
-            , UI.textareaField
-                { label = ""
-                , value = bulkText
-                , onInput = BulkTextChanged
-                , rows = 6
-                , placeholder = "Lincoln High, Riverside USD\nKennedy Middle, Alvord USD\nNorth High"
-                }
-            , case bulkError of
-                Just err ->
-                    div [ Attr.class "mt-2" ] [ UI.error err ]
+                        BulkFailed val err ->
+                            ( val, Just err, False )
 
-                Nothing ->
-                    UI.empty
-            , div [ Attr.class "mt-4" ]
-                [ button
-                    [ Attr.class
-                        (if saving then
-                            "btn btn-info"
-
-                         else
-                            "btn btn-info"
-                        )
-                    , Events.onClick BulkImport
-                    , Attr.disabled (saving || String.trim bulkText == "")
-                    ]
-                    (if saving then
-                        [ span [ Attr.class "loading loading-spinner loading-sm" ] []
-                        , text "Importing..."
+                        BulkIdle ->
+                            ( "", Nothing, False )
+            in
+            UI.card
+                [ UI.cardBody
+                    [ UI.cardTitle "Bulk Import"
+                    , p [ Attr.class "text-sm text-base-content/70 mb-3" ]
+                        [ text "One school per line. Format: "
+                        , code [] [ text "Name, District" ]
+                        , text " (district is optional)"
                         ]
+                    , UI.textareaField
+                        { label = ""
+                        , value = bulkText
+                        , onInput = BulkTextChanged
+                        , rows = 6
+                        , placeholder = "Lincoln High, Riverside USD\nKennedy Middle, Alvord USD\nNorth High"
+                        }
+                    , case bulkError of
+                        Just err ->
+                            div [ Attr.class "mt-2" ] [ UI.error err ]
 
-                     else
-                        [ text "Import" ]
-                    )
+                        Nothing ->
+                            UI.empty
+                    , div [ Attr.class "flex gap-2 mt-4" ]
+                        [ button
+                            [ Attr.class "btn btn-info"
+                            , Events.onClick BulkImport
+                            , Attr.disabled (saving || String.trim bulkText == "")
+                            ]
+                            (if saving then
+                                [ span [ Attr.class "loading loading-spinner loading-sm" ] []
+                                , text "Importing..."
+                                ]
+
+                             else
+                                [ text "Import" ]
+                            )
+                        , UI.cancelButton CancelBulk
+                        ]
+                    ]
                 ]
-            ]
-        ]
 
 
 viewRow : Maybe String -> School -> Html Msg

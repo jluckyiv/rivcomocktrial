@@ -17,8 +17,11 @@ module UI exposing
     )
 
 {-| DaisyUI view helpers. All page modules must use these instead of
-writing raw Html.Attributes.class patterns directly. If a helper you
+writing raw `Html.Attributes.class` patterns directly. If a helper you
 need does not exist here, add it before using it in a page.
+
+`titleBar` takes `actions : List { label, msg }`. First action =
+`btn-primary`; subsequent = `btn-outline`.
 -}
 
 import Html exposing (Html, button, div, h1, h2, input, label, li, p, span, table, tbody, td, text, textarea, th, thead, tr, ul)
@@ -30,32 +33,45 @@ import Html.Events as Events
 -- LAYOUT
 
 
-{-| Page title bar: title on the left, optional primary action on the right.
+{-| Page title bar: title on the left, action buttons on the right.
+
+The first action renders as `btn-primary`; subsequent actions render
+as `btn-outline`. Pass an empty list for no buttons.
 
     UI.titleBar
         { title = "Schools"
-        , action = Just { label = "New School", msg = ShowCreateForm }
+        , actions =
+            [ { label = "New School", msg = ShowCreateForm }
+            , { label = "Bulk Import", msg = ShowBulkImport }
+            ]
         }
 
 -}
 titleBar :
     { title : String
-    , action : Maybe { label : String, msg : msg }
+    , actions : List { label : String, msg : msg }
     }
     -> Html msg
 titleBar config =
     div [ Attr.class "flex justify-between items-center mb-6" ]
         [ h1 [ Attr.class "text-2xl font-bold" ] [ text config.title ]
-        , case config.action of
-            Nothing ->
-                text ""
+        , div [ Attr.class "flex gap-2" ]
+            (List.indexedMap
+                (\i action ->
+                    button
+                        [ Attr.class
+                            (if i == 0 then
+                                "btn btn-primary"
 
-            Just action ->
-                button
-                    [ Attr.class "btn btn-primary"
-                    , Events.onClick action.msg
-                    ]
-                    [ text action.label ]
+                             else
+                                "btn btn-outline"
+                            )
+                        , Events.onClick action.msg
+                        ]
+                        [ text action.label ]
+                )
+                config.actions
+            )
         ]
 
 

@@ -181,7 +181,7 @@ view model =
     , body =
         [ UI.titleBar
             { title = "Schools"
-            , action = Just { label = "New School", msg = ShowCreateForm }
+            , actions = [ { label = "New School", msg = ShowCreateForm } ]
             }
         , viewForm model.form
         , viewDataTable model
