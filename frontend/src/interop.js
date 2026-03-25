@@ -5,7 +5,7 @@
 // Auth tokens are persisted to localStorage manually; SDK auth
 // stores are in-memory only to avoid key conflicts.
 
-import "./catppuccin.css"
+import "./app.css"
 import PocketBase from "pocketbase"
 
 const pb = new PocketBase(window.location.origin)

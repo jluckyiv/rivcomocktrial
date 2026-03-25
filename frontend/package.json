@@ -3,6 +3,9 @@
     "pocketbase": "^0.25.0"
   },
   "devDependencies": {
-    "elm": "^0.19.1-6"
+    "@tailwindcss/postcss": "^4.2.2",
+    "daisyui": "^5.5.19",
+    "elm": "^0.19.1-6",
+    "postcss": "^8.5.8"
   }
 }

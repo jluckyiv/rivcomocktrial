@@ -16,6 +16,7 @@ import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import School
 import Shared
+import UI
 import View exposing (View)
 
 
@@ -379,125 +380,88 @@ view : Model -> View Msg
 view model =
     { title = "Schools"
     , body =
-        [ div [ Attr.class "level" ]
-            [ div [ Attr.class "level-left" ]
-                [ h1 [ Attr.class "title" ] [ text "Schools" ] ]
-            , div [ Attr.class "level-right" ]
-                [ button [ Attr.class "button is-primary", Events.onClick ShowCreateForm ]
-                    [ text "New School" ]
-                ]
-            ]
+        [ UI.titleBar
+            { title = "Schools"
+            , action = Just { label = "New School", msg = ShowCreateForm }
+            }
         , viewForm model.form
         , viewBulkInput model.bulk
-        , viewSchools model.schools model.deleting
+        , viewDataTable model
         ]
     }
 
 
-viewSchools : RemoteData (List School) -> Maybe String -> Html Msg
-viewSchools schools deleting =
-    case schools of
+viewDataTable : Model -> Html Msg
+viewDataTable model =
+    case model.schools of
         NotAsked ->
-            text ""
+            UI.empty
 
         Loading ->
-            div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
+            UI.loading
 
         Failed err ->
-            div [ Attr.class "notification is-danger" ] [ text err ]
+            UI.error err
 
-        Succeeded list ->
-            viewTable list deleting
+        Succeeded [] ->
+            UI.emptyState "No schools yet. Add one to get started."
+
+        Succeeded schools ->
+            UI.dataTable
+                { columns = [ "Name", "District", "Actions" ]
+                , rows = schools
+                , rowView = viewRow model.deleting
+                }
 
 
 viewForm : FormState -> Html Msg
 viewForm state =
     case state of
         FormHidden ->
-            text ""
+            UI.empty
 
         FormOpen context formData errors ->
-            viewFormBox context formData errors False
+            viewFormCard context formData errors False
 
         FormSaving context formData ->
-            viewFormBox context formData [] True
+            viewFormCard context formData [] True
 
 
-viewFormBox : FormContext -> SchoolForm -> List String -> Bool -> Html Msg
-viewFormBox context formData errors saving =
-    div [ Attr.class "box mb-5" ]
-        [ h2 [ Attr.class "subtitle" ]
-            [ text
+viewFormCard : FormContext -> SchoolForm -> List String -> Bool -> Html Msg
+viewFormCard context formData errors saving =
+    UI.card
+        [ UI.cardBody
+            [ UI.cardTitle
                 (case context of
-                    Editing _ ->
-                        "Edit School"
-
                     Creating ->
                         "New School"
-                )
-            ]
-        , viewErrors errors
-        , Html.form [ Events.onSubmit SaveSchool ]
-            [ div [ Attr.class "columns" ]
-                [ div [ Attr.class "column" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Name" ]
-                        , div [ Attr.class "control" ]
-                            [ input
-                                [ Attr.class "input"
-                                , Attr.value formData.name
-                                , Events.onInput FormNameChanged
-                                , Attr.required True
-                                ]
-                                []
-                            ]
-                        ]
-                    ]
-                , div [ Attr.class "column" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "District" ]
-                        , div [ Attr.class "control" ]
-                            [ input
-                                [ Attr.class "input"
-                                , Attr.value formData.district
-                                , Events.onInput FormDistrictChanged
-                                ]
-                                []
-                            ]
-                        ]
-                    ]
-                ]
-            , div [ Attr.class "field is-grouped" ]
-                [ div [ Attr.class "control" ]
-                    [ button
-                        [ Attr.class
-                            (if saving then
-                                "button is-primary is-loading"
 
-                             else
-                                "button is-primary"
-                            )
-                        , Attr.type_ "submit"
-                        ]
-                        [ text "Save" ]
+                    Editing _ ->
+                        "Edit School"
+                )
+            , UI.errorList errors
+            , Html.form [ Events.onSubmit SaveSchool ]
+                [ UI.formColumns
+                    [ UI.textField
+                        { label = "Name"
+                        , value = formData.name
+                        , onInput = FormNameChanged
+                        , required = True
+                        }
+                    , UI.textField
+                        { label = "District"
+                        , value = formData.district
+                        , onInput = FormDistrictChanged
+                        , required = False
+                        }
                     ]
-                , div [ Attr.class "control" ]
-                    [ button [ Attr.class "button", Attr.type_ "button", Events.onClick CancelForm ]
-                        [ text "Cancel" ]
+                , div [ Attr.class "flex gap-2 mt-4" ]
+                    [ UI.primaryButton { label = "Save", loading = saving }
+                    , UI.cancelButton CancelForm
                     ]
                 ]
             ]
         ]
-
-
-viewErrors : List String -> Html msg
-viewErrors errors =
-    if List.isEmpty errors then
-        text ""
-
-    else
-        div [ Attr.class "notification is-danger is-light" ]
-            [ ul [] (List.map (\e -> li [] [ text e ]) errors) ]
 
 
 viewBulkInput : BulkState -> Html Msg
@@ -517,65 +481,50 @@ viewBulkInput state =
                 BulkFailed val err ->
                     ( val, Just err, False )
     in
-    div [ Attr.class "box mb-5" ]
-        [ h2 [ Attr.class "subtitle" ] [ text "Bulk Import" ]
-        , p [ Attr.class "help mb-3" ]
-            [ text "One school per line. Format: "
-            , code [] [ text "Name, District" ]
-            , text " (district is optional)"
-            ]
-        , div [ Attr.class "field" ]
-            [ div [ Attr.class "control" ]
-                [ textarea
-                    [ Attr.class "textarea"
-                    , Attr.rows 6
-                    , Attr.placeholder "Lincoln High, Riverside USD\nKennedy Middle, Alvord USD\nNorth High"
-                    , Attr.value bulkText
-                    , Events.onInput BulkTextChanged
-                    ]
-                    []
+    UI.card
+        [ UI.cardBody
+            [ UI.cardTitle "Bulk Import"
+            , p [ Attr.class "text-sm text-base-content/70 mb-3" ]
+                [ text "One school per line. Format: "
+                , code [] [ text "Name, District" ]
+                , text " (district is optional)"
                 ]
-            ]
-        , case bulkError of
-            Just err ->
-                div [ Attr.class "notification is-danger is-light" ] [ text err ]
+            , UI.textareaField
+                { label = ""
+                , value = bulkText
+                , onInput = BulkTextChanged
+                , rows = 6
+                , placeholder = "Lincoln High, Riverside USD\nKennedy Middle, Alvord USD\nNorth High"
+                }
+            , case bulkError of
+                Just err ->
+                    div [ Attr.class "mt-2" ] [ UI.error err ]
 
-            Nothing ->
-                text ""
-        , div [ Attr.class "field" ]
-            [ button
-                [ Attr.class
+                Nothing ->
+                    UI.empty
+            , div [ Attr.class "mt-4" ]
+                [ button
+                    [ Attr.class
+                        (if saving then
+                            "btn btn-info"
+
+                         else
+                            "btn btn-info"
+                        )
+                    , Events.onClick BulkImport
+                    , Attr.disabled (saving || String.trim bulkText == "")
+                    ]
                     (if saving then
-                        "button is-info is-loading"
+                        [ span [ Attr.class "loading loading-spinner loading-sm" ] []
+                        , text "Importing..."
+                        ]
 
                      else
-                        "button is-info"
+                        [ text "Import" ]
                     )
-                , Events.onClick BulkImport
-                , Attr.disabled (String.trim bulkText == "")
                 ]
-                [ text "Import" ]
             ]
         ]
-
-
-viewTable : List School -> Maybe String -> Html Msg
-viewTable schools deleting =
-    if List.isEmpty schools then
-        div [ Attr.class "has-text-centered has-text-grey" ]
-            [ p [] [ text "No schools yet. Add one to get started." ] ]
-
-    else
-        table [ Attr.class "table is-fullwidth is-striped" ]
-            [ thead []
-                [ tr []
-                    [ th [] [ text "Name" ]
-                    , th [] [ text "District" ]
-                    , th [] [ text "Actions" ]
-                    ]
-                ]
-            , tbody [] (List.map (viewRow deleting) schools)
-            ]
 
 
 viewRow : Maybe String -> School -> Html Msg
@@ -584,20 +533,23 @@ viewRow deleting s =
         [ td [] [ text s.name ]
         , td [] [ text s.district ]
         , td []
-            [ div [ Attr.class "buttons are-small" ]
-                [ button [ Attr.class "button is-info is-outlined", Events.onClick (EditSchool s) ]
+            [ div [ Attr.class "flex gap-2" ]
+                [ button
+                    [ Attr.class "btn btn-sm btn-outline btn-info"
+                    , Events.onClick (EditSchool s)
+                    ]
                     [ text "Edit" ]
                 , button
-                    [ Attr.class
-                        (if deleting == Just s.id then
-                            "button is-danger is-outlined is-loading"
-
-                         else
-                            "button is-danger is-outlined"
-                        )
+                    [ Attr.class "btn btn-sm btn-outline btn-error"
                     , Events.onClick (DeleteSchool s.id)
+                    , Attr.disabled (deleting == Just s.id)
                     ]
-                    [ text "Delete" ]
+                    (if deleting == Just s.id then
+                        [ span [ Attr.class "loading loading-spinner loading-sm" ] [] ]
+
+                     else
+                        [ text "Delete" ]
+                    )
                 ]
             ]
         ]
