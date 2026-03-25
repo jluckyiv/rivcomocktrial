@@ -10,10 +10,11 @@ import Email
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
-import Http
+import Json.Decode
 import Layouts
 import MatchHistory exposing (MatchHistory)
 import Page exposing (Page)
+import Pb
 import PowerMatch
     exposing
         ( CrossBracketStrategy(..)
@@ -116,10 +117,30 @@ init user route _ =
 
       else
         Effect.batch
-            [ Effect.sendCmd (Api.listTrialsByRound user.token roundId GotTrials)
-            , Effect.sendCmd (Api.listTrials user.token GotAllTrials)
-            , Effect.sendCmd (Api.listRounds user.token GotRounds)
-            , Effect.sendCmd (Api.listCourtrooms user.token GotCourtrooms)
+            [ Pb.adminList
+                { collection = "trials"
+                , tag = "trials"
+                , filter = "round='" ++ roundId ++ "'"
+                , sort = ""
+                }
+            , Pb.adminList
+                { collection = "trials"
+                , tag = "all-trials"
+                , filter = ""
+                , sort = ""
+                }
+            , Pb.adminList
+                { collection = "rounds"
+                , tag = "rounds"
+                , filter = ""
+                , sort = ""
+                }
+            , Pb.adminList
+                { collection = "courtrooms"
+                , tag = "courtrooms"
+                , filter = ""
+                , sort = ""
+                }
             ]
     )
 
@@ -129,86 +150,28 @@ init user route _ =
 
 
 type Msg
-    = GotRounds (Result Http.Error (Api.ListResponse Round))
-    | GotTrials (Result Http.Error (Api.ListResponse Trial))
-    | GotAllTrials (Result Http.Error (Api.ListResponse Trial))
-    | GotTeams (Result Http.Error (Api.ListResponse Team))
-    | GotCourtrooms (Result Http.Error (Api.ListResponse Courtroom))
-    | SwitchMode InputMode
+    = SwitchMode InputMode
     | FormProsecutionChanged String
     | FormDefenseChanged String
     | FormCourtroomChanged String
     | SaveTrial
-    | GotSaveResponse (Result Http.Error Trial)
     | EditTrial Trial
     | CancelEdit
     | DeleteTrial String
-    | GotDeleteResponse String (Result Http.Error ())
     | BulkTextChanged String
     | ParseBulkText
     | ConfirmBulkCreate
-    | GotBulkCreateResponse (Result Http.Error Trial)
     | CancelBulkPreview
     | SetCrossBracketStrategy CrossBracketStrategy
     | GeneratePowerMatch
     | AcceptPowerMatch
     | ClearPowerMatch
+    | PbMsg Json.Decode.Value
 
 
 update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
 update user msg model =
     case msg of
-        GotRounds (Ok response) ->
-            let
-                round =
-                    List.filter (\r -> r.id == model.roundId) response.items
-                        |> List.head
-
-                tournamentId =
-                    round |> Maybe.map .tournament |> Maybe.withDefault ""
-            in
-            ( { model | round = round }
-            , if tournamentId /= "" then
-                Effect.sendCmd (Api.listTeams user.token GotTeams)
-
-              else
-                Effect.none
-            )
-
-        GotRounds (Err _) ->
-            ( { model | formErrors = [ "Failed to load rounds." ] }, Effect.none )
-
-        GotTrials (Ok response) ->
-            ( { model | trials = response.items, loading = False }, Effect.none )
-
-        GotTrials (Err _) ->
-            ( { model | loading = False, formErrors = [ "Failed to load trials." ] }, Effect.none )
-
-        GotAllTrials (Ok response) ->
-            ( { model | allTrials = response.items }, Effect.none )
-
-        GotAllTrials (Err _) ->
-            ( model, Effect.none )
-
-        GotTeams (Ok response) ->
-            let
-                tournamentId =
-                    model.round |> Maybe.map .tournament |> Maybe.withDefault ""
-
-                filtered =
-                    List.filter (\t -> t.tournament == tournamentId) response.items
-            in
-            ( { model | teams = filtered }, Effect.none )
-
-        GotTeams (Err _) ->
-            ( { model | formErrors = [ "Failed to load teams." ] }, Effect.none )
-
-        GotCourtrooms (Ok response) ->
-            ( { model | courtrooms = response.items }, Effect.none )
-
-        GotCourtrooms (Err _) ->
-            ( model, Effect.none )
-
         SwitchMode mode ->
             ( { model | inputMode = mode }, Effect.none )
 
@@ -227,65 +190,23 @@ update user msg model =
                     ( { model | formErrors = errors }, Effect.none )
 
                 Ok data ->
-                    let
-                        cmd =
-                            case model.editingId of
-                                Just id ->
-                                    Api.updateTrial user.token id data GotSaveResponse
-
-                                Nothing ->
-                                    Api.createTrial user.token data GotSaveResponse
-                    in
-                    ( { model | formSaving = True, formErrors = [] }, Effect.sendCmd cmd )
-
-        GotSaveResponse (Ok trial) ->
-            let
-                updatedTrials =
-                    case model.editingId of
-                        Just _ ->
-                            List.map
-                                (\t ->
-                                    if t.id == trial.id then
-                                        trial
-
-                                    else
-                                        t
-                                )
-                                model.trials
+                    ( { model | formSaving = True, formErrors = [] }
+                    , case model.editingId of
+                        Just id ->
+                            Pb.adminUpdate
+                                { collection = "trials"
+                                , id = id
+                                , tag = "save-trial"
+                                , body = Api.encodeTrial data
+                                }
 
                         Nothing ->
-                            model.trials ++ [ trial ]
-
-                updatedAll =
-                    case model.editingId of
-                        Just _ ->
-                            List.map
-                                (\t ->
-                                    if t.id == trial.id then
-                                        trial
-
-                                    else
-                                        t
-                                )
-                                model.allTrials
-
-                        Nothing ->
-                            model.allTrials ++ [ trial ]
-            in
-            ( { model
-                | trials = updatedTrials
-                , allTrials = updatedAll
-                , formProsecution = ""
-                , formDefense = ""
-                , formCourtroom = ""
-                , formSaving = False
-                , editingId = Nothing
-              }
-            , Effect.none
-            )
-
-        GotSaveResponse (Err _) ->
-            ( { model | formSaving = False, formErrors = [ "Failed to save trial." ] }, Effect.none )
+                            Pb.adminCreate
+                                { collection = "trials"
+                                , tag = "save-trial"
+                                , body = Api.encodeTrial data
+                                }
+                    )
 
         EditTrial trial ->
             ( { model
@@ -309,20 +230,12 @@ update user msg model =
 
         DeleteTrial id ->
             ( { model | deleting = Just id }
-            , Effect.sendCmd (Api.deleteTrial user.token id (GotDeleteResponse id))
+            , Pb.adminDelete
+                { collection = "trials"
+                , id = id
+                , tag = "delete-trial"
+                }
             )
-
-        GotDeleteResponse id (Ok _) ->
-            ( { model
-                | trials = List.filter (\t -> t.id /= id) model.trials
-                , allTrials = List.filter (\t -> t.id /= id) model.allTrials
-                , deleting = Nothing
-              }
-            , Effect.none
-            )
-
-        GotDeleteResponse _ (Err _) ->
-            ( { model | deleting = Nothing, formErrors = [ "Failed to delete trial." ] }, Effect.none )
 
         BulkTextChanged val ->
             ( { model | bulkText = val, showBulkPreview = False, bulkErrors = [] }, Effect.none )
@@ -360,13 +273,17 @@ update user msg model =
                             case ( pTeam, dTeam ) of
                                 ( Just pt, Just dt ) ->
                                     Just
-                                        (Api.createTrial user.token
-                                            { round = model.roundId
-                                            , prosecutionTeam = pt.id
-                                            , defenseTeam = dt.id
-                                            , courtroom = courtroom |> Maybe.map .id |> Maybe.withDefault ""
+                                        (Pb.adminCreate
+                                            { collection = "trials"
+                                            , tag = "bulk-trial"
+                                            , body =
+                                                Api.encodeTrial
+                                                    { round = model.roundId
+                                                    , prosecutionTeam = pt.id
+                                                    , defenseTeam = dt.id
+                                                    , courtroom = courtroom |> Maybe.map .id |> Maybe.withDefault ""
+                                                    }
                                             }
-                                            GotBulkCreateResponse
                                         )
 
                                 _ ->
@@ -375,23 +292,8 @@ update user msg model =
                         model.bulkParsed
             in
             ( { model | bulkSaving = True }
-            , Effect.batch (List.map Effect.sendCmd cmds)
+            , Effect.batch cmds
             )
-
-        GotBulkCreateResponse (Ok trial) ->
-            ( { model
-                | trials = model.trials ++ [ trial ]
-                , allTrials = model.allTrials ++ [ trial ]
-                , bulkSaving = False
-                , showBulkPreview = False
-                , bulkText = ""
-                , bulkParsed = []
-              }
-            , Effect.none
-            )
-
-        GotBulkCreateResponse (Err _) ->
-            ( { model | bulkSaving = False, formErrors = [ "Failed to create some trials." ] }, Effect.none )
 
         CancelBulkPreview ->
             ( { model | showBulkPreview = False, bulkParsed = [] }, Effect.none )
@@ -434,13 +336,17 @@ update user msg model =
                                     case ( apiIdForDomainTeam model.teams p.prosecutionTeam, apiIdForDomainTeam model.teams p.defenseTeam ) of
                                         ( Just pId, Just dId ) ->
                                             Just
-                                                (Api.createTrial user.token
-                                                    { round = model.roundId
-                                                    , prosecutionTeam = pId
-                                                    , defenseTeam = dId
-                                                    , courtroom = ""
+                                                (Pb.adminCreate
+                                                    { collection = "trials"
+                                                    , tag = "save-trial"
+                                                    , body =
+                                                        Api.encodeTrial
+                                                            { round = model.roundId
+                                                            , prosecutionTeam = pId
+                                                            , defenseTeam = dId
+                                                            , courtroom = ""
+                                                            }
                                                     }
-                                                    GotSaveResponse
                                                 )
 
                                         _ ->
@@ -449,11 +355,164 @@ update user msg model =
                                 result.pairings
                     in
                     ( { model | powerMatchResult = Nothing }
-                    , Effect.batch (List.map Effect.sendCmd cmds)
+                    , Effect.batch cmds
                     )
 
         ClearPowerMatch ->
             ( { model | powerMatchResult = Nothing }, Effect.none )
+
+        PbMsg value ->
+            case Pb.responseTag value of
+                Just "trials" ->
+                    case Pb.decodeList Api.trialDecoder value of
+                        Ok trials ->
+                            ( { model | trials = trials, loading = False }, Effect.none )
+
+                        Err _ ->
+                            ( { model | loading = False, formErrors = [ "Failed to load trials." ] }, Effect.none )
+
+                Just "all-trials" ->
+                    case Pb.decodeList Api.trialDecoder value of
+                        Ok trials ->
+                            ( { model | allTrials = trials }, Effect.none )
+
+                        Err _ ->
+                            ( model, Effect.none )
+
+                Just "rounds" ->
+                    case Pb.decodeList Api.roundDecoder value of
+                        Ok rounds ->
+                            let
+                                round =
+                                    List.filter (\r -> r.id == model.roundId) rounds
+                                        |> List.head
+
+                                tournamentId =
+                                    round |> Maybe.map .tournament |> Maybe.withDefault ""
+                            in
+                            ( { model | round = round }
+                            , if tournamentId /= "" then
+                                Pb.adminList
+                                    { collection = "teams"
+                                    , tag = "teams"
+                                    , filter = ""
+                                    , sort = ""
+                                    }
+
+                              else
+                                Effect.none
+                            )
+
+                        Err _ ->
+                            ( { model | formErrors = [ "Failed to load rounds." ] }, Effect.none )
+
+                Just "teams" ->
+                    case Pb.decodeList Api.teamDecoder value of
+                        Ok teams ->
+                            let
+                                tournamentId =
+                                    model.round |> Maybe.map .tournament |> Maybe.withDefault ""
+
+                                filtered =
+                                    List.filter (\t -> t.tournament == tournamentId) teams
+                            in
+                            ( { model | teams = filtered }, Effect.none )
+
+                        Err _ ->
+                            ( { model | formErrors = [ "Failed to load teams." ] }, Effect.none )
+
+                Just "courtrooms" ->
+                    case Pb.decodeList Api.courtroomDecoder value of
+                        Ok courtrooms ->
+                            ( { model | courtrooms = courtrooms }, Effect.none )
+
+                        Err _ ->
+                            ( model, Effect.none )
+
+                Just "save-trial" ->
+                    case Pb.decodeRecord Api.trialDecoder value of
+                        Ok trial ->
+                            let
+                                updatedTrials =
+                                    case model.editingId of
+                                        Just _ ->
+                                            List.map
+                                                (\t ->
+                                                    if t.id == trial.id then
+                                                        trial
+
+                                                    else
+                                                        t
+                                                )
+                                                model.trials
+
+                                        Nothing ->
+                                            model.trials ++ [ trial ]
+
+                                updatedAll =
+                                    case model.editingId of
+                                        Just _ ->
+                                            List.map
+                                                (\t ->
+                                                    if t.id == trial.id then
+                                                        trial
+
+                                                    else
+                                                        t
+                                                )
+                                                model.allTrials
+
+                                        Nothing ->
+                                            model.allTrials ++ [ trial ]
+                            in
+                            ( { model
+                                | trials = updatedTrials
+                                , allTrials = updatedAll
+                                , formProsecution = ""
+                                , formDefense = ""
+                                , formCourtroom = ""
+                                , formSaving = False
+                                , editingId = Nothing
+                              }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            ( { model | formSaving = False, formErrors = [ "Failed to save trial." ] }, Effect.none )
+
+                Just "delete-trial" ->
+                    case Pb.decodeDelete value of
+                        Ok id ->
+                            ( { model
+                                | trials = List.filter (\t -> t.id /= id) model.trials
+                                , allTrials = List.filter (\t -> t.id /= id) model.allTrials
+                                , deleting = Nothing
+                              }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            ( { model | deleting = Nothing, formErrors = [ "Failed to delete trial." ] }, Effect.none )
+
+                Just "bulk-trial" ->
+                    case Pb.decodeRecord Api.trialDecoder value of
+                        Ok trial ->
+                            ( { model
+                                | trials = model.trials ++ [ trial ]
+                                , allTrials = model.allTrials ++ [ trial ]
+                                , bulkSaving = False
+                                , showBulkPreview = False
+                                , bulkText = ""
+                                , bulkParsed = []
+                              }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            ( { model | bulkSaving = False, formErrors = [ "Failed to create some trials." ] }, Effect.none )
+
+                _ ->
+                    ( model, Effect.none )
 
 
 
@@ -698,7 +757,7 @@ findCourtroomByName courtrooms name =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.none
+    Pb.subscribe PbMsg
 
 
 

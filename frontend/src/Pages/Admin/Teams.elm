@@ -7,9 +7,10 @@ import Error exposing (Error(..))
 import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
-import Http
+import Json.Decode
 import Layouts
 import Page exposing (Page)
+import Pb
 import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Shared
@@ -84,9 +85,9 @@ init user _ =
       , filterTournament = ""
       }
     , Effect.batch
-        [ Effect.sendCmd (Api.listTeams user.token GotTeams)
-        , Effect.sendCmd (Api.listTournaments user.token GotTournaments)
-        , Effect.sendCmd (Api.listSchools user.token GotSchools)
+        [ Pb.adminList { collection = "teams", tag = "teams", filter = "", sort = "" }
+        , Pb.adminList { collection = "tournaments", tag = "tournaments", filter = "", sort = "" }
+        , Pb.adminList { collection = "schools", tag = "schools", filter = "", sort = "" }
         ]
     )
 
@@ -96,9 +97,7 @@ init user _ =
 
 
 type Msg
-    = GotTeams (Result Http.Error (Api.ListResponse Team))
-    | GotTournaments (Result Http.Error (Api.ListResponse Tournament))
-    | GotSchools (Result Http.Error (Api.ListResponse School))
+    = PbMsg Json.Decode.Value
     | FilterTournamentChanged String
     | ShowCreateForm
     | EditTeam Team
@@ -108,34 +107,113 @@ type Msg
     | FormTeamNumberChanged String
     | FormNameChanged String
     | SaveTeam
-    | GotSaveResponse (Result Http.Error Team)
     | DeleteTeam String
-    | GotDeleteResponse String (Result Http.Error ())
     | BulkTextChanged String
     | BulkImport
-    | GotBulkResponse (Result Http.Error Team)
 
 
 update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
 update user msg model =
     case msg of
-        GotTeams (Ok response) ->
-            ( { model | teams = Succeeded response.items }, Effect.none )
+        PbMsg value ->
+            case Pb.responseTag value of
+                Just "teams" ->
+                    case Pb.decodeList Api.teamDecoder value of
+                        Ok items ->
+                            ( { model | teams = Succeeded items }, Effect.none )
 
-        GotTeams (Err _) ->
-            ( { model | teams = Failed "Failed to load teams." }, Effect.none )
+                        Err _ ->
+                            ( { model | teams = Failed "Failed to load teams." }, Effect.none )
 
-        GotTournaments (Ok response) ->
-            ( { model | tournaments = response.items }, Effect.none )
+                Just "tournaments" ->
+                    case Pb.decodeList Api.tournamentDecoder value of
+                        Ok items ->
+                            ( { model | tournaments = items }, Effect.none )
 
-        GotTournaments (Err _) ->
-            ( model, Effect.none )
+                        Err _ ->
+                            ( model, Effect.none )
 
-        GotSchools (Ok response) ->
-            ( { model | schools = response.items }, Effect.none )
+                Just "schools" ->
+                    case Pb.decodeList Api.schoolDecoder value of
+                        Ok items ->
+                            ( { model | schools = items }, Effect.none )
 
-        GotSchools (Err _) ->
-            ( model, Effect.none )
+                        Err _ ->
+                            ( model, Effect.none )
+
+                Just "save-team" ->
+                    case Pb.decodeRecord Api.teamDecoder value of
+                        Ok team ->
+                            let
+                                updateTeams context teams =
+                                    case context of
+                                        Editing _ ->
+                                            List.map
+                                                (\t ->
+                                                    if t.id == team.id then
+                                                        team
+
+                                                    else
+                                                        t
+                                                )
+                                                teams
+
+                                        Creating ->
+                                            teams ++ [ team ]
+                            in
+                            case model.form of
+                                FormSaving context _ ->
+                                    ( { model
+                                        | teams = RemoteData.map (updateTeams context) model.teams
+                                        , form = FormHidden
+                                      }
+                                    , Effect.none
+                                    )
+
+                                _ ->
+                                    ( model, Effect.none )
+
+                        Err _ ->
+                            case model.form of
+                                FormSaving context formData ->
+                                    ( { model | form = FormOpen context formData [ "Failed to save team." ] }, Effect.none )
+
+                                _ ->
+                                    ( model, Effect.none )
+
+                Just "delete-team" ->
+                    case Pb.decodeDelete value of
+                        Ok id ->
+                            ( { model
+                                | teams = RemoteData.map (List.filter (\t -> t.id /= id)) model.teams
+                                , deleting = Nothing
+                              }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            ( { model | deleting = Nothing }, Effect.none )
+
+                Just "bulk-team" ->
+                    case Pb.decodeRecord Api.teamDecoder value of
+                        Ok team ->
+                            ( { model
+                                | teams = RemoteData.map (\list -> list ++ [ team ]) model.teams
+                                , bulk = BulkIdle
+                              }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            case model.bulk of
+                                BulkSaving val ->
+                                    ( { model | bulk = BulkFailed val "Failed to create some teams." }, Effect.none )
+
+                                _ ->
+                                    ( { model | bulk = BulkFailed "" "Failed to create some teams." }, Effect.none )
+
+                _ ->
+                    ( model, Effect.none )
 
         FilterTournamentChanged val ->
             ( { model | filterTournament = val }, Effect.none )
@@ -192,94 +270,38 @@ update user msg model =
 
                         Ok data ->
                             let
-                                cmd =
+                                effect =
                                     case context of
                                         Editing id ->
-                                            Api.updateTeam user.token id data GotSaveResponse
+                                            Pb.adminUpdate
+                                                { collection = "teams"
+                                                , id = id
+                                                , tag = "save-team"
+                                                , body = Api.encodeTeam data
+                                                }
 
                                         Creating ->
-                                            Api.createTeam user.token data GotSaveResponse
+                                            Pb.adminCreate
+                                                { collection = "teams"
+                                                , tag = "save-team"
+                                                , body = Api.encodeTeam data
+                                                }
                             in
-                            ( { model | form = FormSaving context formData }, Effect.sendCmd cmd )
-
-                _ ->
-                    ( model, Effect.none )
-
-        GotSaveResponse (Ok team) ->
-            let
-                updateTeams context teams =
-                    case context of
-                        Editing _ ->
-                            List.map
-                                (\t ->
-                                    if t.id == team.id then
-                                        team
-
-                                    else
-                                        t
-                                )
-                                teams
-
-                        Creating ->
-                            teams ++ [ team ]
-            in
-            case model.form of
-                FormSaving context _ ->
-                    ( { model
-                        | teams = RemoteData.map (updateTeams context) model.teams
-                        , form = FormHidden
-                      }
-                    , Effect.none
-                    )
-
-                _ ->
-                    ( model, Effect.none )
-
-        GotSaveResponse (Err _) ->
-            case model.form of
-                FormSaving context formData ->
-                    ( { model | form = FormOpen context formData [ "Failed to save team." ] }, Effect.none )
+                            ( { model | form = FormSaving context formData }, effect )
 
                 _ ->
                     ( model, Effect.none )
 
         DeleteTeam id ->
             ( { model | deleting = Just id }
-            , Effect.sendCmd (Api.deleteTeam user.token id (GotDeleteResponse id))
+            , Pb.adminDelete { collection = "teams", id = id, tag = "delete-team" }
             )
-
-        GotDeleteResponse id (Ok _) ->
-            ( { model
-                | teams = RemoteData.map (List.filter (\t -> t.id /= id)) model.teams
-                , deleting = Nothing
-              }
-            , Effect.none
-            )
-
-        GotDeleteResponse _ (Err _) ->
-            ( { model | deleting = Nothing }, Effect.none )
 
         BulkTextChanged val ->
             ( { model | bulk = BulkEditing val }, Effect.none )
 
         BulkImport ->
             handleBulkImport user model
-
-        GotBulkResponse (Ok team) ->
-            ( { model
-                | teams = RemoteData.map (\list -> list ++ [ team ]) model.teams
-                , bulk = BulkIdle
-              }
-            , Effect.none
-            )
-
-        GotBulkResponse (Err _) ->
-            case model.bulk of
-                BulkSaving val ->
-                    ( { model | bulk = BulkFailed val "Failed to create some teams." }, Effect.none )
-
-                _ ->
-                    ( { model | bulk = BulkFailed "" "Failed to create some teams." }, Effect.none )
 
 
 
@@ -308,7 +330,7 @@ validateForm : TeamForm -> Result (List String) ValidatedTeam
 validateForm formData =
     let
         toStrings =
-            List.map (\(Error msg) -> msg)
+            List.map (\(Error msg_) -> msg_)
 
         tournamentValidation =
             if String.trim formData.tournament == "" then
@@ -399,15 +421,17 @@ handleBulkImport user model =
             , Effect.batch
                 (List.map
                     (\data ->
-                        Effect.sendCmd
-                            (Api.createTeam user.token
-                                { tournament = model.filterTournament
-                                , school = data.school
-                                , teamNumber = data.teamNumber
-                                , name = data.name
-                                }
-                                GotBulkResponse
-                            )
+                        Pb.adminCreate
+                            { collection = "teams"
+                            , tag = "bulk-team"
+                            , body =
+                                Api.encodeTeam
+                                    { tournament = model.filterTournament
+                                    , school = data.school
+                                    , teamNumber = data.teamNumber
+                                    , name = data.name
+                                    }
+                            }
                     )
                     parsed
                 )
@@ -477,7 +501,7 @@ parseBulkLine schools line =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.none
+    Pb.subscribe PbMsg
 
 
 

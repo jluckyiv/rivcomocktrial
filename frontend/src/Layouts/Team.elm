@@ -9,6 +9,7 @@ import Layout exposing (Layout)
 import Route exposing (Route)
 import Route.Path
 import Shared
+import Shared.Model exposing (CoachAuth(..))
 import Shared.Msg
 import View exposing (View)
 
@@ -22,7 +23,7 @@ layout props shared route =
     Layout.new
         { init = init
         , update = update
-        , view = view route
+        , view = view shared route
         , subscriptions = subscriptions
         }
 
@@ -62,7 +63,7 @@ update msg model =
 
         Logout ->
             ( model
-            , Effect.sendSharedMsg Shared.Msg.AdminLoggedOut
+            , Effect.sendSharedMsg Shared.Msg.CoachLoggedOut
             )
 
 
@@ -79,11 +80,20 @@ subscriptions model =
 -- VIEW
 
 
-view : Route () -> { toContentMsg : Msg -> contentMsg, content : View contentMsg, model : Model } -> View contentMsg
-view route { toContentMsg, content, model } =
+view :
+    Shared.Model
+    -> Route ()
+    ->
+        { toContentMsg : Msg -> contentMsg
+        , content : View contentMsg
+        , model : Model
+        }
+    -> View contentMsg
+view shared route { toContentMsg, content, model } =
     { title = content.title ++ " | Team"
     , body =
-        [ Html.map toContentMsg (viewNavbar model route)
+        [ Html.map toContentMsg
+            (viewNavbar shared model route)
         , div [ Attr.class "section" ]
             [ div [ Attr.class "container" ]
                 content.body
@@ -92,12 +102,31 @@ view route { toContentMsg, content, model } =
     }
 
 
-viewNavbar : Model -> Route () -> Html Msg
-viewNavbar model route =
-    nav [ Attr.class "navbar is-info", Attr.attribute "role" "navigation" ]
+viewNavbar :
+    Shared.Model
+    -> Model
+    -> Route ()
+    -> Html Msg
+viewNavbar shared model route =
+    let
+        displayName =
+            case shared.coachAuth of
+                LoggedIn credentials ->
+                    credentials.user.name
+
+                _ ->
+                    "Coach"
+    in
+    nav
+        [ Attr.class "navbar is-info"
+        , Attr.attribute "role" "navigation"
+        ]
         [ div [ Attr.class "navbar-brand" ]
-            [ a [ Attr.class "navbar-item", Route.Path.href Route.Path.Home_ ]
-                [ strong [] [ text "Palm Desert" ] ]
+            [ a
+                [ Attr.class "navbar-item"
+                , Route.Path.href Route.Path.Home_
+                ]
+                [ strong [] [ text displayName ] ]
             , a
                 [ Attr.class
                     (if model.burgerOpen then
@@ -110,7 +139,11 @@ viewNavbar model route =
                 , Attr.attribute "role" "button"
                 , Attr.attribute "aria-label" "menu"
                 ]
-                [ span [] [], span [] [], span [] [], span [] [] ]
+                [ span [] []
+                , span [] []
+                , span [] []
+                , span [] []
+                ]
             ]
         , div
             [ Attr.class
@@ -129,7 +162,8 @@ viewNavbar model route =
             , div [ Attr.class "navbar-end" ]
                 [ div [ Attr.class "navbar-item" ]
                     [ button
-                        [ Attr.class "button is-light is-small"
+                        [ Attr.class
+                            "button is-light is-small"
                         , Events.onClick Logout
                         ]
                         [ text "Logout" ]
@@ -139,7 +173,11 @@ viewNavbar model route =
         ]
 
 
-navLink : Route () -> Route.Path.Path -> String -> Html Msg
+navLink :
+    Route ()
+    -> Route.Path.Path
+    -> String
+    -> Html Msg
 navLink route path label =
     a
         [ Attr.class

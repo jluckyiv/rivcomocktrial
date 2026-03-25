@@ -79,13 +79,13 @@ in and manage tournaments.
 | Role           | Access                         | Auth method                           |
 | -------------- | ------------------------------ | ------------------------------------- |
 | Admin          | Full access                    | PocketBase superuser (email/password) |
-| Teacher coach  | Submit rosters, view published | OAuth (Google/MS), linked to school   |
+| Teacher coach  | Submit rosters, view published | Email/password, linked to school      |
 | Attorney coach | View published                 | View-only                             |
 | Scorer         | Enter ballots                  | No auth — anonymous via link          |
 | Public         | View published                 | No auth                               |
 
 **Note:** Milestone 1 implements admin auth only. Coach
-OAuth and other roles come later.
+auth added in the Registration & Auth section below.
 
 ---
 
@@ -328,6 +328,56 @@ Students (non-empty checks, form restructure deferred).
 
 **Remaining:** Pairings page (issue #46) — uses a
 different error pattern (model-level, not FormState).
+
+---
+
+## Registration & Coach Auth ✅
+
+**Status:** Done (issue #54 step 3, issue #64, PR #65)
+
+Coach registration and login workflow using the
+PocketBase JS SDK as the sole PB client (ADR-010).
+
+### Architecture
+
+- **PB JS SDK** (`pocketbase` v0.25.x) replaces all
+  Elm HTTP calls to PocketBase
+- **Elm ports**: `outgoing` sends commands, `incoming`
+  receives responses, tag-based routing
+- **Dual SDK instances**: `pbAdmin` (superuser) and
+  `pb` (coach/public) in `interop.js`
+- **Pb.elm module**: typed Elm interface over the port
+  layer (`adminList`, `coachLogin`, etc.)
+- All 11 pages converted from `Api.*` HTTP to `Pb.*`
+  port calls
+
+### Registration Flow
+
+1. Coach visits `/register/teacher-coach`, fills form
+   (name, email, password, school, team name)
+2. `Pb.publicCreate` creates user record with status
+   `pending`
+3. Redirect to `/register/pending` confirmation page
+4. Admin reviews at `/admin/registrations`, approves
+   or rejects
+5. Server-side hook (`auth_guard.pb.js`) blocks login
+   for non-approved coaches
+6. Approved coach logs in at `/team/login` with
+   email/password
+
+### Collections
+
+| Collection | Changes                            |
+| ---------- | ---------------------------------- |
+| users      | Auth collection with role, school, |
+|            | team_name, status fields           |
+| schools    | Made publicly readable (list/view) |
+
+### Remaining (separate issues)
+
+- Issue #61: Round rosters & eligible students API
+- Issue #62: Tournament day workflow
+- Issue #63: Results & standings
 
 ---
 

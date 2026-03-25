@@ -23,7 +23,6 @@ Admin-side competition management tool + public-facing site for Riverside County
 - PocketBase data (`pb_data/`) is gitignored — never commit SQLite files
 - Frontend builds are copied into PocketBase's `pb_public/` via multi-stage Docker build
 - No custom Go extensions — using PocketBase out-of-the-box
-- No mocks in tests — use real PocketBase instances or skip
 
 ## Dev Commands
 
@@ -46,11 +45,14 @@ Admin-side competition management tool + public-facing site for Riverside County
 7. **Tag** — at milestones only (not every PR)
 8. **Update memory** — capture patterns, decisions, and lessons learned
 
+## UI Conventions
+
+Read and follow `docs/ui-conventions.md` for all frontend UI work.
+This is mandatory — do not write view code without consulting it first.
+
 ## Testing
 
-- TDD by default — ask before skipping
-- No mocks — use the real local PocketBase instance for integration tests
-- Dev data is local only; migrations are version-controlled
+- Integration tests use the real local PocketBase instance; dev data is local only
 
 ## Key URLs (local dev)
 
