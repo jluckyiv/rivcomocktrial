@@ -14,6 +14,7 @@ import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Route.Path
 import Shared
+import UI
 import View exposing (View)
 
 
@@ -154,9 +155,7 @@ update user msg model =
 
                                 _ ->
                                     -- Toggle published (no form open)
-                                    ( { model
-                                        | rounds = RemoteData.map updateRound model.rounds
-                                      }
+                                    ( { model | rounds = RemoteData.map updateRound model.rounds }
                                     , Effect.none
                                     )
 
@@ -242,19 +241,10 @@ update user msg model =
                                 effect =
                                     case context of
                                         Editing id ->
-                                            Pb.adminUpdate
-                                                { collection = "rounds"
-                                                , id = id
-                                                , tag = "save-round"
-                                                , body = Api.encodeRound data
-                                                }
+                                            Pb.adminUpdate { collection = "rounds", id = id, tag = "save-round", body = Api.encodeRound data }
 
                                         Creating ->
-                                            Pb.adminCreate
-                                                { collection = "rounds"
-                                                , tag = "save-round"
-                                                , body = Api.encodeRound data
-                                                }
+                                            Pb.adminCreate { collection = "rounds", tag = "save-round", body = Api.encodeRound data }
                             in
                             ( { model | form = FormSaving context formData }, effect )
 
@@ -272,12 +262,7 @@ update user msg model =
                     }
             in
             ( model
-            , Pb.adminUpdate
-                { collection = "rounds"
-                , id = round.id
-                , tag = "save-round"
-                , body = Api.encodeRound data
-                }
+            , Pb.adminUpdate { collection = "rounds", id = round.id, tag = "save-round", body = Api.encodeRound data }
             )
 
         DeleteRound id ->
@@ -336,9 +321,9 @@ validateForm formData =
 
 
 addErrorIf : Bool -> String -> List String -> List String
-addErrorIf condition error errors =
+addErrorIf condition err errors =
     if condition then
-        errors ++ [ error ]
+        errors ++ [ err ]
 
     else
         errors
@@ -352,6 +337,16 @@ updateFormField transform state =
 
         _ ->
             state
+
+
+capitalize : String -> String
+capitalize str =
+    case String.uncons str of
+        Just ( first, rest ) ->
+            String.fromChar (Char.toUpper first) ++ rest
+
+        Nothing ->
+            str
 
 
 
@@ -371,212 +366,130 @@ view : Model -> View Msg
 view model =
     { title = "Rounds"
     , body =
-        [ div [ Attr.class "level" ]
-            [ div [ Attr.class "level-left" ]
-                [ h1 [ Attr.class "title" ] [ text "Rounds" ] ]
-            , div [ Attr.class "level-right" ]
-                [ div [ Attr.class "field has-addons" ]
-                    [ div [ Attr.class "control" ]
-                        [ div [ Attr.class "select" ]
-                            [ select [ Events.onInput FilterTournamentChanged ]
-                                (option [ Attr.value "" ] [ text "All Tournaments" ]
-                                    :: List.map
-                                        (\t ->
-                                            option [ Attr.value t.id, Attr.selected (model.filterTournament == t.id) ]
-                                                [ text (t.name ++ " (" ++ String.fromInt t.year ++ ")") ]
-                                        )
-                                        model.tournaments
-                                )
-                            ]
-                        ]
-                    , div [ Attr.class "control" ]
-                        [ button [ Attr.class "button is-primary", Events.onClick ShowCreateForm ]
-                            [ text "New Round" ]
-                        ]
-                    ]
-                ]
-            ]
+        [ UI.titleBar
+            { title = "Rounds"
+            , actions = [ { label = "New Round", msg = ShowCreateForm } ]
+            }
+        , UI.filterSelect
+            { label = "Tournament:"
+            , value = model.filterTournament
+            , onInput = FilterTournamentChanged
+            , options =
+                { value = "", label = "All Tournaments" }
+                    :: List.map (\t -> { value = t.id, label = t.name ++ " (" ++ String.fromInt t.year ++ ")" }) model.tournaments
+            }
         , viewForm model.form model.tournaments
-        , viewRounds model.rounds model.tournaments model.deleting model.filterTournament
+        , viewDataTable model
         ]
     }
 
 
-viewRounds : RemoteData (List Round) -> List Tournament -> Maybe String -> String -> Html Msg
-viewRounds rounds tournaments deleting filterTournament =
-    case rounds of
+viewDataTable : Model -> Html Msg
+viewDataTable model =
+    case model.rounds of
         NotAsked ->
-            text ""
+            UI.empty
 
         Loading ->
-            div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
+            UI.loading
 
         Failed err ->
-            div [ Attr.class "notification is-danger" ] [ text err ]
+            UI.error err
 
-        Succeeded list ->
-            viewTable list tournaments deleting filterTournament
+        Succeeded rounds ->
+            let
+                filtered =
+                    if model.filterTournament == "" then
+                        rounds
+
+                    else
+                        List.filter (\r -> r.tournament == model.filterTournament) rounds
+
+                sorted =
+                    List.sortBy .number filtered
+
+                findTournamentName id =
+                    List.filter (\t -> t.id == id) model.tournaments
+                        |> List.head
+                        |> Maybe.map .name
+                        |> Maybe.withDefault id
+            in
+            if List.isEmpty sorted then
+                UI.emptyState "No rounds yet."
+
+            else
+                UI.dataTable
+                    { columns = [ "#", "Type", "Date", "Tournament", "Published", "Actions" ]
+                    , rows = sorted
+                    , rowView = viewRow model.deleting findTournamentName
+                    }
 
 
 viewForm : FormState -> List Tournament -> Html Msg
 viewForm state tournaments =
     case state of
         FormHidden ->
-            text ""
+            UI.empty
 
         FormOpen context formData errors ->
-            viewFormBox context formData errors False tournaments
+            viewFormCard context formData errors False tournaments
 
         FormSaving context formData ->
-            viewFormBox context formData [] True tournaments
+            viewFormCard context formData [] True tournaments
 
 
-viewFormBox : FormContext -> RoundForm -> List String -> Bool -> List Tournament -> Html Msg
-viewFormBox context formData errors saving tournaments =
-    div [ Attr.class "box mb-5" ]
-        [ h2 [ Attr.class "subtitle" ]
-            [ text
+viewFormCard : FormContext -> RoundForm -> List String -> Bool -> List Tournament -> Html Msg
+viewFormCard context formData errors saving tournaments =
+    UI.card
+        [ UI.cardBody
+            [ UI.cardTitle
                 (case context of
-                    Editing _ ->
-                        "Edit Round"
-
                     Creating ->
                         "New Round"
-                )
-            ]
-        , viewErrors errors
-        , Html.form [ Events.onSubmit SaveRound ]
-            [ div [ Attr.class "columns" ]
-                [ div [ Attr.class "column" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Tournament" ]
-                        , div [ Attr.class "control" ]
-                            [ div [ Attr.class "select is-fullwidth" ]
-                                [ select [ Events.onInput FormTournamentChanged ]
-                                    (option [ Attr.value "" ] [ text "Select tournament..." ]
-                                        :: List.map
-                                            (\t ->
-                                                option [ Attr.value t.id, Attr.selected (formData.tournament == t.id) ]
-                                                    [ text (t.name ++ " (" ++ String.fromInt t.year ++ ")") ]
-                                            )
-                                            tournaments
-                                    )
-                                ]
-                            ]
-                        ]
-                    ]
-                , div [ Attr.class "column is-2" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Round #" ]
-                        , div [ Attr.class "control" ]
-                            [ input
-                                [ Attr.class "input"
-                                , Attr.type_ "number"
-                                , Attr.value formData.number
-                                , Events.onInput FormNumberChanged
-                                ]
-                                []
-                            ]
-                        ]
-                    ]
-                , div [ Attr.class "column" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Type" ]
-                        , div [ Attr.class "control" ]
-                            [ div [ Attr.class "select is-fullwidth" ]
-                                [ select [ Events.onInput FormTypeChanged ]
-                                    [ option [ Attr.value "preliminary", Attr.selected (formData.roundType == "preliminary") ] [ text "Preliminary" ]
-                                    , option [ Attr.value "elimination", Attr.selected (formData.roundType == "elimination") ] [ text "Elimination" ]
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                , div [ Attr.class "column" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Date" ]
-                        , div [ Attr.class "control" ]
-                            [ input
-                                [ Attr.class "input"
-                                , Attr.value formData.date
-                                , Attr.placeholder "e.g. Feb 15, 2025"
-                                , Events.onInput FormDateChanged
-                                ]
-                                []
-                            ]
-                        ]
-                    ]
-                ]
-            , div [ Attr.class "field is-grouped" ]
-                [ div [ Attr.class "control" ]
-                    [ button
-                        [ Attr.class
-                            (if saving then
-                                "button is-primary is-loading"
 
-                             else
-                                "button is-primary"
-                            )
-                        , Attr.type_ "submit"
-                        ]
-                        [ text "Save" ]
+                    Editing _ ->
+                        "Edit Round"
+                )
+            , UI.errorList errors
+            , Html.form [ Events.onSubmit SaveRound ]
+                [ UI.formColumns
+                    [ UI.selectField
+                        { label = "Tournament"
+                        , value = formData.tournament
+                        , onInput = FormTournamentChanged
+                        , options =
+                            { value = "", label = "Select tournament..." }
+                                :: List.map (\t -> { value = t.id, label = t.name ++ " (" ++ String.fromInt t.year ++ ")" }) tournaments
+                        }
+                    , UI.numberField
+                        { label = "Round #"
+                        , value = formData.number
+                        , onInput = FormNumberChanged
+                        , required = False
+                        }
+                    , UI.selectField
+                        { label = "Type"
+                        , value = formData.roundType
+                        , onInput = FormTypeChanged
+                        , options =
+                            [ { value = "preliminary", label = "Preliminary" }
+                            , { value = "elimination", label = "Elimination" }
+                            ]
+                        }
+                    , UI.textField
+                        { label = "Date"
+                        , value = formData.date
+                        , onInput = FormDateChanged
+                        , required = False
+                        }
                     ]
-                , div [ Attr.class "control" ]
-                    [ button [ Attr.class "button", Attr.type_ "button", Events.onClick CancelForm ]
-                        [ text "Cancel" ]
+                , div [ Attr.class "flex gap-2 mt-4" ]
+                    [ UI.primaryButton { label = "Save", loading = saving }
+                    , UI.cancelButton CancelForm
                     ]
                 ]
             ]
         ]
-
-
-viewErrors : List String -> Html msg
-viewErrors errors =
-    if List.isEmpty errors then
-        text ""
-
-    else
-        div [ Attr.class "notification is-danger is-light" ]
-            [ ul [] (List.map (\e -> li [] [ text e ]) errors) ]
-
-
-viewTable : List Round -> List Tournament -> Maybe String -> String -> Html Msg
-viewTable rounds tournaments deleting filterTournament =
-    let
-        filtered =
-            if filterTournament == "" then
-                rounds
-
-            else
-                List.filter (\r -> r.tournament == filterTournament) rounds
-
-        sorted =
-            List.sortBy .number filtered
-
-        findTournamentName id =
-            List.filter (\t -> t.id == id) tournaments
-                |> List.head
-                |> Maybe.map .name
-                |> Maybe.withDefault id
-    in
-    if List.isEmpty sorted then
-        div [ Attr.class "has-text-centered has-text-grey" ]
-            [ p [] [ text "No rounds yet." ] ]
-
-    else
-        table [ Attr.class "table is-fullwidth is-striped" ]
-            [ thead []
-                [ tr []
-                    [ th [] [ text "#" ]
-                    , th [] [ text "Type" ]
-                    , th [] [ text "Date" ]
-                    , th [] [ text "Tournament" ]
-                    , th [] [ text "Published" ]
-                    , th [] [ text "Actions" ]
-                    ]
-                ]
-            , tbody [] (List.map (viewRow deleting findTournamentName) sorted)
-            ]
 
 
 viewRow : Maybe String -> (String -> String) -> Round -> Html Msg
@@ -590,10 +503,10 @@ viewRow deleting findTournamentName r =
             [ button
                 [ Attr.class
                     (if r.published then
-                        "button is-small is-success"
+                        "btn btn-sm btn-success"
 
                      else
-                        "button is-small is-light"
+                        "btn btn-sm btn-ghost"
                     )
                 , Events.onClick (TogglePublished r)
                 ]
@@ -607,35 +520,28 @@ viewRow deleting findTournamentName r =
                 ]
             ]
         , td []
-            [ div [ Attr.class "buttons are-small" ]
+            [ div [ Attr.class "flex gap-2" ]
                 [ a
-                    [ Attr.class "button is-link is-outlined"
+                    [ Attr.class "btn btn-sm btn-outline"
                     , Attr.href ("/admin/pairings?round=" ++ r.id)
                     ]
                     [ text "Pairings" ]
-                , button [ Attr.class "button is-info is-outlined", Events.onClick (EditRound r) ]
+                , button
+                    [ Attr.class "btn btn-sm btn-outline btn-info"
+                    , Events.onClick (EditRound r)
+                    ]
                     [ text "Edit" ]
                 , button
-                    [ Attr.class
-                        (if deleting == Just r.id then
-                            "button is-danger is-outlined is-loading"
-
-                         else
-                            "button is-danger is-outlined"
-                        )
+                    [ Attr.class "btn btn-sm btn-outline btn-error"
                     , Events.onClick (DeleteRound r.id)
+                    , Attr.disabled (deleting == Just r.id)
                     ]
-                    [ text "Delete" ]
+                    (if deleting == Just r.id then
+                        [ span [ Attr.class "loading loading-spinner loading-sm" ] [] ]
+
+                     else
+                        [ text "Delete" ]
+                    )
                 ]
             ]
         ]
-
-
-capitalize : String -> String
-capitalize str =
-    case String.uncons str of
-        Just ( first, rest ) ->
-            String.fromChar (Char.toUpper first) ++ rest
-
-        Nothing ->
-            str
