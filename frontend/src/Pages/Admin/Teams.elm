@@ -15,6 +15,7 @@ import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Shared
 import Team
+import UI
 import View exposing (View)
 
 
@@ -100,8 +101,10 @@ type Msg
     = PbMsg Json.Decode.Value
     | FilterTournamentChanged String
     | ShowCreateForm
+    | ShowBulkImport
     | EditTeam Team
     | CancelForm
+    | CancelBulk
     | FormTournamentChanged String
     | FormSchoolChanged String
     | FormTeamNumberChanged String
@@ -228,9 +231,13 @@ update user msg model =
                         , name = ""
                         }
                         []
+                , bulk = BulkIdle
               }
             , Effect.none
             )
+
+        ShowBulkImport ->
+            ( { model | bulk = BulkEditing "", form = FormHidden }, Effect.none )
 
         EditTeam t ->
             ( { model
@@ -242,12 +249,16 @@ update user msg model =
                         , name = t.name
                         }
                         []
+                , bulk = BulkIdle
               }
             , Effect.none
             )
 
         CancelForm ->
             ( { model | form = FormHidden }, Effect.none )
+
+        CancelBulk ->
+            ( { model | bulk = BulkIdle }, Effect.none )
 
         FormTournamentChanged val ->
             ( { model | form = updateFormField (\f -> { f | tournament = val }) model.form }, Effect.none )
@@ -512,166 +523,134 @@ view : Model -> View Msg
 view model =
     { title = "Teams"
     , body =
-        [ div [ Attr.class "level" ]
-            [ div [ Attr.class "level-left" ]
-                [ h1 [ Attr.class "title" ] [ text "Teams" ] ]
-            , div [ Attr.class "level-right" ]
-                [ div [ Attr.class "field has-addons" ]
-                    [ div [ Attr.class "control" ]
-                        [ div [ Attr.class "select" ]
-                            [ select [ Events.onInput FilterTournamentChanged ]
-                                (option [ Attr.value "" ] [ text "All Tournaments" ]
-                                    :: List.map
-                                        (\t ->
-                                            option [ Attr.value t.id, Attr.selected (model.filterTournament == t.id) ]
-                                                [ text (t.name ++ " (" ++ String.fromInt t.year ++ ")") ]
-                                        )
-                                        model.tournaments
-                                )
-                            ]
-                        ]
-                    , div [ Attr.class "control" ]
-                        [ button [ Attr.class "button is-primary", Events.onClick ShowCreateForm ]
-                            [ text "New Team" ]
-                        ]
-                    ]
+        [ UI.titleBar
+            { title = "Teams"
+            , actions =
+                [ { label = "New Team", msg = ShowCreateForm }
+                , { label = "Bulk Import", msg = ShowBulkImport }
                 ]
-            ]
+            }
+        , UI.filterSelect
+            { label = "Tournament:"
+            , value = model.filterTournament
+            , onInput = FilterTournamentChanged
+            , options =
+                { value = "", label = "All Tournaments" }
+                    :: List.map (\t -> { value = t.id, label = t.name ++ " (" ++ String.fromInt t.year ++ ")" }) model.tournaments
+            }
         , viewForm model.form model.tournaments model.schools
         , viewBulkInput model.bulk model.filterTournament
-        , viewTeams model.teams model.tournaments model.schools model.deleting model.filterTournament
+        , viewDataTable model
         ]
     }
 
 
-viewTeams : RemoteData (List Team) -> List Tournament -> List School -> Maybe String -> String -> Html Msg
-viewTeams teams tournaments schools deleting filterTournament =
-    case teams of
+viewDataTable : Model -> Html Msg
+viewDataTable model =
+    case model.teams of
         NotAsked ->
-            text ""
+            UI.empty
 
         Loading ->
-            div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
+            UI.loading
 
         Failed err ->
-            div [ Attr.class "notification is-danger" ] [ text err ]
+            UI.error err
 
-        Succeeded list ->
-            viewTable list tournaments schools deleting filterTournament
+        Succeeded teams ->
+            let
+                filtered =
+                    if model.filterTournament == "" then
+                        teams
+
+                    else
+                        List.filter (\t -> t.tournament == model.filterTournament) teams
+
+                findName items id =
+                    List.filter (\item -> item.id == id) items
+                        |> List.head
+                        |> Maybe.map .name
+                        |> Maybe.withDefault id
+
+                schoolName =
+                    findName (List.map (\s -> { id = s.id, name = s.name }) model.schools)
+
+                tournamentName =
+                    findName (List.map (\t -> { id = t.id, name = t.name }) model.tournaments)
+            in
+            if List.isEmpty filtered then
+                UI.emptyState "No teams yet."
+
+            else
+                UI.dataTable
+                    { columns = [ "#", "Name", "School", "Tournament", "Actions" ]
+                    , rows = filtered
+                    , rowView = viewRow model.deleting schoolName tournamentName
+                    }
 
 
 viewForm : FormState -> List Tournament -> List School -> Html Msg
 viewForm state tournaments schools =
     case state of
         FormHidden ->
-            text ""
+            UI.empty
 
         FormOpen context formData errors ->
-            viewFormBox context formData errors False tournaments schools
+            viewFormCard context formData errors False tournaments schools
 
         FormSaving context formData ->
-            viewFormBox context formData [] True tournaments schools
+            viewFormCard context formData [] True tournaments schools
 
 
-viewFormBox : FormContext -> TeamForm -> List String -> Bool -> List Tournament -> List School -> Html Msg
-viewFormBox context formData errors saving tournaments schools =
-    div [ Attr.class "box mb-5" ]
-        [ h2 [ Attr.class "subtitle" ]
-            [ text
+viewFormCard : FormContext -> TeamForm -> List String -> Bool -> List Tournament -> List School -> Html Msg
+viewFormCard context formData errors saving tournaments schools =
+    UI.card
+        [ UI.cardBody
+            [ UI.cardTitle
                 (case context of
-                    Editing _ ->
-                        "Edit Team"
-
                     Creating ->
                         "New Team"
-                )
-            ]
-        , viewErrors errors
-        , Html.form [ Events.onSubmit SaveTeam ]
-            [ div [ Attr.class "columns" ]
-                [ div [ Attr.class "column" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Tournament" ]
-                        , div [ Attr.class "control" ]
-                            [ div [ Attr.class "select is-fullwidth" ]
-                                [ select [ Events.onInput FormTournamentChanged ]
-                                    (option [ Attr.value "" ] [ text "Select tournament..." ]
-                                        :: List.map
-                                            (\t ->
-                                                option [ Attr.value t.id, Attr.selected (formData.tournament == t.id) ]
-                                                    [ text (t.name ++ " (" ++ String.fromInt t.year ++ ")") ]
-                                            )
-                                            tournaments
-                                    )
-                                ]
-                            ]
-                        ]
-                    ]
-                , div [ Attr.class "column" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "School" ]
-                        , div [ Attr.class "control" ]
-                            [ div [ Attr.class "select is-fullwidth" ]
-                                [ select [ Events.onInput FormSchoolChanged ]
-                                    (option [ Attr.value "" ] [ text "Select school..." ]
-                                        :: List.map
-                                            (\s ->
-                                                option [ Attr.value s.id, Attr.selected (formData.school == s.id) ]
-                                                    [ text s.name ]
-                                            )
-                                            schools
-                                    )
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            , div [ Attr.class "columns" ]
-                [ div [ Attr.class "column is-3" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Team Number" ]
-                        , div [ Attr.class "control" ]
-                            [ input
-                                [ Attr.class "input"
-                                , Attr.type_ "number"
-                                , Attr.value formData.teamNumber
-                                , Events.onInput FormTeamNumberChanged
-                                ]
-                                []
-                            ]
-                        ]
-                    ]
-                , div [ Attr.class "column" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Team Name/Label" ]
-                        , div [ Attr.class "control" ]
-                            [ input
-                                [ Attr.class "input"
-                                , Attr.value formData.name
-                                , Events.onInput FormNameChanged
-                                ]
-                                []
-                            ]
-                        ]
-                    ]
-                ]
-            , div [ Attr.class "field is-grouped" ]
-                [ div [ Attr.class "control" ]
-                    [ button
-                        [ Attr.class
-                            (if saving then
-                                "button is-primary is-loading"
 
-                             else
-                                "button is-primary"
-                            )
-                        , Attr.type_ "submit"
-                        ]
-                        [ text "Save" ]
+                    Editing _ ->
+                        "Edit Team"
+                )
+            , UI.errorList errors
+            , Html.form [ Events.onSubmit SaveTeam ]
+                [ UI.formColumns
+                    [ UI.selectField
+                        { label = "Tournament"
+                        , value = formData.tournament
+                        , onInput = FormTournamentChanged
+                        , options =
+                            { value = "", label = "Select tournament..." }
+                                :: List.map (\t -> { value = t.id, label = t.name ++ " (" ++ String.fromInt t.year ++ ")" }) tournaments
+                        }
+                    , UI.selectField
+                        { label = "School"
+                        , value = formData.school
+                        , onInput = FormSchoolChanged
+                        , options =
+                            { value = "", label = "Select school..." }
+                                :: List.map (\s -> { value = s.id, label = s.name }) schools
+                        }
                     ]
-                , div [ Attr.class "control" ]
-                    [ button [ Attr.class "button", Attr.type_ "button", Events.onClick CancelForm ]
-                        [ text "Cancel" ]
+                , UI.formColumns
+                    [ UI.numberField
+                        { label = "Team Number"
+                        , value = formData.teamNumber
+                        , onInput = FormTeamNumberChanged
+                        , required = False
+                        }
+                    , UI.textField
+                        { label = "Team Name/Label"
+                        , value = formData.name
+                        , onInput = FormNameChanged
+                        , required = False
+                        }
+                    ]
+                , div [ Attr.class "flex gap-2 mt-4" ]
+                    [ UI.primaryButton { label = "Save", loading = saving }
+                    , UI.cancelButton CancelForm
                     ]
                 ]
             ]
@@ -680,106 +659,66 @@ viewFormBox context formData errors saving tournaments schools =
 
 viewBulkInput : BulkState -> String -> Html Msg
 viewBulkInput state filterTournament =
-    let
-        ( bulkText, bulkError, saving ) =
-            case state of
-                BulkIdle ->
-                    ( "", Nothing, False )
+    case state of
+        BulkIdle ->
+            UI.empty
 
-                BulkEditing val ->
-                    ( val, Nothing, False )
+        _ ->
+            let
+                ( bulkText, bulkError, saving ) =
+                    case state of
+                        BulkEditing val ->
+                            ( val, Nothing, False )
 
-                BulkSaving val ->
-                    ( val, Nothing, True )
+                        BulkSaving val ->
+                            ( val, Nothing, True )
 
-                BulkFailed val err ->
-                    ( val, Just err, False )
-    in
-    div [ Attr.class "box mb-5" ]
-        [ h2 [ Attr.class "subtitle" ] [ text "Bulk Import" ]
-        , p [ Attr.class "help mb-3" ]
-            [ text "One team per line. Format: "
-            , code [] [ text "{number} {name}, {school_name}" ]
-            , br [] []
-            , text "Teams are added to the selected tournament filter."
-            ]
-        , div [ Attr.class "field" ]
-            [ div [ Attr.class "control" ]
-                [ textarea
-                    [ Attr.class "textarea"
-                    , Attr.rows 6
-                    , Attr.placeholder "101 Lions A, Lincoln High\n102 Lions B, Lincoln High\n201 Eagles, Kennedy Middle"
-                    , Attr.value bulkText
-                    , Events.onInput BulkTextChanged
-                    ]
-                    []
-                ]
-            ]
-        , case bulkError of
-            Just err ->
-                div [ Attr.class "notification is-danger is-light" ] [ text err ]
+                        BulkFailed val err ->
+                            ( val, Just err, False )
 
-            Nothing ->
-                text ""
-        , div [ Attr.class "field" ]
-            [ button
-                [ Attr.class
-                    (if saving then
-                        "button is-info is-loading"
+                        BulkIdle ->
+                            ( "", Nothing, False )
+            in
+            UI.card
+                [ UI.cardBody
+                    [ UI.cardTitle "Bulk Import"
+                    , p [ Attr.class "text-sm text-base-content/70 mb-3" ]
+                        [ text "One team per line. Format: "
+                        , code [] [ text "{number} {name}, {school_name}" ]
+                        , br [] []
+                        , text "Teams are added to the selected tournament filter."
+                        ]
+                    , UI.textareaField
+                        { label = ""
+                        , value = bulkText
+                        , onInput = BulkTextChanged
+                        , rows = 6
+                        , placeholder = "101 Lions A, Lincoln High\n102 Lions B, Lincoln High\n201 Eagles, Kennedy Middle"
+                        }
+                    , case bulkError of
+                        Just err ->
+                            div [ Attr.class "mt-2" ] [ UI.error err ]
 
-                     else
-                        "button is-info"
-                    )
-                , Events.onClick BulkImport
-                , Attr.disabled (String.trim bulkText == "" || filterTournament == "")
-                ]
-                [ text "Import" ]
-            ]
-        ]
+                        Nothing ->
+                            UI.empty
+                    , div [ Attr.class "flex gap-2 mt-4" ]
+                        [ button
+                            [ Attr.class "btn btn-info"
+                            , Events.onClick BulkImport
+                            , Attr.disabled (saving || String.trim bulkText == "" || filterTournament == "")
+                            ]
+                            (if saving then
+                                [ span [ Attr.class "loading loading-spinner loading-sm" ] []
+                                , text "Importing..."
+                                ]
 
-
-viewTable : List Team -> List Tournament -> List School -> Maybe String -> String -> Html Msg
-viewTable teams tournaments schools deleting filterTournament =
-    let
-        filtered =
-            if filterTournament == "" then
-                teams
-
-            else
-                List.filter (\t -> t.tournament == filterTournament) teams
-
-        findName items id =
-            List.filter (\item -> item.id == id) items
-                |> List.head
-                |> Maybe.map .name
-                |> Maybe.withDefault id
-    in
-    if List.isEmpty filtered then
-        div [ Attr.class "has-text-centered has-text-grey" ]
-            [ p [] [ text "No teams yet." ] ]
-
-    else
-        table [ Attr.class "table is-fullwidth is-striped" ]
-            [ thead []
-                [ tr []
-                    [ th [] [ text "#" ]
-                    , th [] [ text "Name" ]
-                    , th [] [ text "School" ]
-                    , th [] [ text "Tournament" ]
-                    , th [] [ text "Actions" ]
+                             else
+                                [ text "Import" ]
+                            )
+                        , UI.cancelButton CancelBulk
+                        ]
                     ]
                 ]
-            , tbody []
-                (List.map
-                    (\t ->
-                        viewRow deleting
-                            (findName (List.map (\s -> { id = s.id, name = s.name }) schools))
-                            (findName (List.map (\tn -> { id = tn.id, name = tn.name }) tournaments))
-                            t
-                    )
-                    filtered
-                )
-            ]
 
 
 viewRow : Maybe String -> (String -> String) -> (String -> String) -> Team -> Html Msg
@@ -790,30 +729,23 @@ viewRow deleting schoolName tournamentName t =
         , td [] [ text (schoolName t.school) ]
         , td [] [ text (tournamentName t.tournament) ]
         , td []
-            [ div [ Attr.class "buttons are-small" ]
-                [ button [ Attr.class "button is-info is-outlined", Events.onClick (EditTeam t) ]
+            [ div [ Attr.class "flex gap-2" ]
+                [ button
+                    [ Attr.class "btn btn-sm btn-outline btn-info"
+                    , Events.onClick (EditTeam t)
+                    ]
                     [ text "Edit" ]
                 , button
-                    [ Attr.class
-                        (if deleting == Just t.id then
-                            "button is-danger is-outlined is-loading"
-
-                         else
-                            "button is-danger is-outlined"
-                        )
+                    [ Attr.class "btn btn-sm btn-outline btn-error"
                     , Events.onClick (DeleteTeam t.id)
+                    , Attr.disabled (deleting == Just t.id)
                     ]
-                    [ text "Delete" ]
+                    (if deleting == Just t.id then
+                        [ span [ Attr.class "loading loading-spinner loading-sm" ] [] ]
+
+                     else
+                        [ text "Delete" ]
+                    )
                 ]
             ]
         ]
-
-
-viewErrors : List String -> Html msg
-viewErrors errors =
-    if List.isEmpty errors then
-        text ""
-
-    else
-        div [ Attr.class "notification is-danger is-light" ]
-            [ ul [] (List.map (\e -> li [] [ text e ]) errors) ]
