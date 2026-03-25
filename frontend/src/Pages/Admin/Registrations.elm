@@ -13,6 +13,7 @@ import Page exposing (Page)
 import Pb
 import Route exposing (Route)
 import Shared
+import UI
 import View exposing (View)
 
 
@@ -76,12 +77,7 @@ update user msg model =
                 { collection = "users"
                 , id = id
                 , tag = "status-update"
-                , body =
-                    Json.Encode.object
-                        [ ( "status"
-                          , Json.Encode.string "approved"
-                          )
-                        ]
+                , body = Json.Encode.object [ ( "status", Json.Encode.string "approved" ) ]
                 }
             )
 
@@ -91,12 +87,7 @@ update user msg model =
                 { collection = "users"
                 , id = id
                 , tag = "status-update"
-                , body =
-                    Json.Encode.object
-                        [ ( "status"
-                          , Json.Encode.string "rejected"
-                          )
-                        ]
+                , body = Json.Encode.object [ ( "status", Json.Encode.string "rejected" ) ]
                 }
             )
 
@@ -105,22 +96,10 @@ update user msg model =
                 Just "coaches" ->
                     case Pb.decodeList Api.coachUserDecoder value of
                         Ok coaches ->
-                            ( { model
-                                | coaches = coaches
-                                , loading = False
-                              }
-                            , Effect.none
-                            )
+                            ( { model | coaches = coaches, loading = False }, Effect.none )
 
                         Err _ ->
-                            ( { model
-                                | loading = False
-                                , error =
-                                    Just
-                                        "Failed to load registrations."
-                              }
-                            , Effect.none
-                            )
+                            ( { model | loading = False, error = Just "Failed to load registrations." }, Effect.none )
 
                 Just "status-update" ->
                     case Pb.decodeRecord Api.coachUserDecoder value of
@@ -141,13 +120,7 @@ update user msg model =
                             )
 
                         Err _ ->
-                            ( { model
-                                | error =
-                                    Just
-                                        "Failed to update status."
-                              }
-                            , Effect.none
-                            )
+                            ( { model | error = Just "Failed to update status." }, Effect.none )
 
                 _ ->
                     ( model, Effect.none )
@@ -170,43 +143,27 @@ view : Model -> View Msg
 view model =
     { title = "Registrations"
     , body =
-        [ h1 [ Attr.class "title" ]
-            [ text "Registrations" ]
+        [ UI.titleBar { title = "Registrations", actions = [] }
         , case model.error of
             Just err ->
-                div
-                    [ Attr.class
-                        "notification is-danger is-light"
-                    ]
-                    [ text err ]
+                UI.error err
 
             Nothing ->
-                text ""
+                UI.empty
         , if model.loading then
-            p [ Attr.class "has-text-grey" ]
-                [ text "Loading..." ]
+            UI.loading
+
+          else if List.isEmpty model.coaches then
+            UI.emptyState "No registrations yet."
 
           else
-            viewCoachTable model.coaches
+            UI.dataTable
+                { columns = [ "Name", "Email", "Team Name", "Status", "Actions" ]
+                , rows = model.coaches
+                , rowView = viewCoachRow
+                }
         ]
     }
-
-
-viewCoachTable : List Api.CoachUser -> Html Msg
-viewCoachTable coaches =
-    table [ Attr.class "table is-fullwidth is-striped" ]
-        [ thead []
-            [ tr []
-                [ th [] [ text "Name" ]
-                , th [] [ text "Email" ]
-                , th [] [ text "Team Name" ]
-                , th [] [ text "Status" ]
-                , th [] [ text "Actions" ]
-                ]
-            ]
-        , tbody []
-            (List.map viewCoachRow coaches)
-        ]
 
 
 viewCoachRow : Api.CoachUser -> Html Msg
@@ -215,49 +172,43 @@ viewCoachRow coach =
         [ td [] [ text coach.name ]
         , td [] [ text coach.email ]
         , td [] [ text coach.teamName ]
-        , td [] [ viewStatusTag coach.status ]
+        , td [] [ viewStatusBadge coach.status ]
         , td [] [ viewActions coach.id coach.status ]
         ]
 
 
-viewStatusTag : String -> Html msg
-viewStatusTag s =
-    let
-        ( tagClass, label ) =
-            case s of
-                "pending" ->
-                    ( "tag is-warning", "Pending" )
+viewStatusBadge : String -> Html msg
+viewStatusBadge s =
+    case s of
+        "pending" ->
+            UI.badge { label = "Pending", variant = "warning" }
 
-                "approved" ->
-                    ( "tag is-success", "Approved" )
+        "approved" ->
+            UI.badge { label = "Approved", variant = "success" }
 
-                "rejected" ->
-                    ( "tag is-danger", "Rejected" )
+        "rejected" ->
+            UI.badge { label = "Rejected", variant = "error" }
 
-                _ ->
-                    ( "tag", s )
-    in
-    span [ Attr.class tagClass ] [ text label ]
+        _ ->
+            UI.badge { label = s, variant = "ghost" }
 
 
 viewActions : String -> String -> Html Msg
 viewActions coachId s =
     case s of
         "pending" ->
-            div [ Attr.class "buttons are-small" ]
+            div [ Attr.class "flex gap-2" ]
                 [ button
-                    [ Attr.class "button is-success"
-                    , Events.onClick
-                        (ApproveCoach coachId)
+                    [ Attr.class "btn btn-sm btn-success"
+                    , Events.onClick (ApproveCoach coachId)
                     ]
                     [ text "Approve" ]
                 , button
-                    [ Attr.class "button is-danger"
-                    , Events.onClick
-                        (RejectCoach coachId)
+                    [ Attr.class "btn btn-sm btn-error"
+                    , Events.onClick (RejectCoach coachId)
                     ]
                     [ text "Reject" ]
                 ]
 
         _ ->
-            text ""
+            UI.empty

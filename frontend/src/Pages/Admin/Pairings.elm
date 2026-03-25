@@ -27,6 +27,7 @@ import Route.Path
 import School
 import Shared
 import Team as DomainTeam
+import UI
 import View exposing (View)
 
 
@@ -545,9 +546,9 @@ validateDropdownForm model =
 
 
 addErrorIf : Bool -> String -> List String -> List String
-addErrorIf condition error errors =
+addErrorIf condition err errors =
     if condition then
-        errors ++ [ error ]
+        errors ++ [ err ]
 
     else
         errors
@@ -769,7 +770,7 @@ view model =
     { title = "Pairings"
     , body =
         if model.roundId == "" then
-            [ div [ Attr.class "notification is-warning" ]
+            [ div [ Attr.class "alert alert-warning mb-4" ]
                 [ text "No round selected. "
                 , a [ Attr.href "/admin/rounds" ] [ text "Go to Rounds" ]
                 , text " and click \"Pairings\" on a round."
@@ -778,7 +779,7 @@ view model =
 
         else
             [ viewHeader model
-            , viewErrors model.formErrors
+            , UI.errorList model.formErrors
             , viewModeToggle model
             , case model.inputMode of
                 DropdownMode ->
@@ -790,7 +791,7 @@ view model =
                 BulkTextMode ->
                     viewBulkTextSection model
             , if model.loading then
-                div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
+                UI.loading
 
               else
                 viewTrialsTable model
@@ -809,52 +810,38 @@ viewHeader model =
                 Nothing ->
                     "Pairings"
     in
-    div [ Attr.class "level" ]
-        [ div [ Attr.class "level-left" ]
-            [ h1 [ Attr.class "title" ] [ text roundLabel ]
-            ]
-        , div [ Attr.class "level-right" ]
-            [ a [ Attr.class "button is-light", Attr.href "/admin/rounds" ]
-                [ text "Back to Rounds" ]
-            ]
+    div [ Attr.class "flex justify-between items-center mb-6" ]
+        [ h1 [ Attr.class "text-2xl font-bold" ] [ text roundLabel ]
+        , a [ Attr.class "btn btn-ghost", Attr.href "/admin/rounds" ]
+            [ text "Back to Rounds" ]
         ]
-
-
-viewErrors : List String -> Html msg
-viewErrors errors =
-    if List.isEmpty errors then
-        text ""
-
-    else
-        div [ Attr.class "notification is-danger is-light" ]
-            [ ul [] (List.map (\e -> li [] [ text e ]) errors) ]
 
 
 viewModeToggle : Model -> Html Msg
 viewModeToggle model =
-    div [ Attr.class "tabs is-boxed mb-4" ]
-        [ ul []
-            [ li
-                [ Attr.class
-                    (if model.inputMode == DropdownMode then
-                        "is-active"
+    div [ Attr.class "tabs tabs-border mb-4" ]
+        [ a
+            [ Attr.class
+                (if model.inputMode == DropdownMode then
+                    "tab tab-active"
 
-                     else
-                        ""
-                    )
-                ]
-                [ a [ Events.onClick (SwitchMode DropdownMode) ] [ text "Dropdown" ] ]
-            , li
-                [ Attr.class
-                    (if model.inputMode == BulkTextMode then
-                        "is-active"
-
-                     else
-                        ""
-                    )
-                ]
-                [ a [ Events.onClick (SwitchMode BulkTextMode) ] [ text "Bulk Text" ] ]
+                 else
+                    "tab"
+                )
+            , Events.onClick (SwitchMode DropdownMode)
             ]
+            [ text "Dropdown" ]
+        , a
+            [ Attr.class
+                (if model.inputMode == BulkTextMode then
+                    "tab tab-active"
+
+                 else
+                    "tab"
+                )
+            , Events.onClick (SwitchMode BulkTextMode)
+            ]
+            [ text "Bulk Text" ]
         ]
 
 
@@ -901,9 +888,9 @@ viewDropdownForm model =
                             || not (List.member c.id usedCourtroomIds)
                     )
     in
-    div [ Attr.class "box mb-5" ]
-        [ h2 [ Attr.class "subtitle" ]
-            [ text
+    UI.card
+        [ UI.cardBody
+            [ UI.cardTitle
                 (case model.editingId of
                     Just _ ->
                         "Edit Trial"
@@ -911,87 +898,42 @@ viewDropdownForm model =
                     Nothing ->
                         "Add Trial"
                 )
-            ]
-        , Html.form [ Events.onSubmit SaveTrial ]
-            [ div [ Attr.class "columns" ]
-                [ div [ Attr.class "column" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Prosecution" ]
-                        , div [ Attr.class "control" ]
-                            [ div [ Attr.class "select is-fullwidth" ]
-                                [ select [ Events.onInput FormProsecutionChanged ]
-                                    (option [ Attr.value "" ] [ text "Select team..." ]
-                                        :: List.map
-                                            (\t ->
-                                                option [ Attr.value t.id, Attr.selected (model.formProsecution == t.id) ]
-                                                    [ text (String.fromInt t.teamNumber ++ " - " ++ t.name) ]
-                                            )
-                                            availableForProsecution
-                                    )
-                                ]
-                            ]
-                        ]
+            , Html.form [ Events.onSubmit SaveTrial ]
+                [ UI.formColumns
+                    [ UI.selectField
+                        { label = "Prosecution"
+                        , value = model.formProsecution
+                        , onInput = FormProsecutionChanged
+                        , options =
+                            { value = "", label = "Select team..." }
+                                :: List.map (\t -> { value = t.id, label = String.fromInt t.teamNumber ++ " - " ++ t.name }) availableForProsecution
+                        }
+                    , UI.selectField
+                        { label = "Defense"
+                        , value = model.formDefense
+                        , onInput = FormDefenseChanged
+                        , options =
+                            { value = "", label = "Select team..." }
+                                :: List.map (\t -> { value = t.id, label = String.fromInt t.teamNumber ++ " - " ++ t.name }) availableForDefense
+                        }
+                    , UI.selectField
+                        { label = "Courtroom"
+                        , value = model.formCourtroom
+                        , onInput = FormCourtroomChanged
+                        , options =
+                            { value = "", label = "None" }
+                                :: List.map (\c -> { value = c.id, label = c.name }) availableCourtrooms
+                        }
                     ]
-                , div [ Attr.class "column" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Defense" ]
-                        , div [ Attr.class "control" ]
-                            [ div [ Attr.class "select is-fullwidth" ]
-                                [ select [ Events.onInput FormDefenseChanged ]
-                                    (option [ Attr.value "" ] [ text "Select team..." ]
-                                        :: List.map
-                                            (\t ->
-                                                option [ Attr.value t.id, Attr.selected (model.formDefense == t.id) ]
-                                                    [ text (String.fromInt t.teamNumber ++ " - " ++ t.name) ]
-                                            )
-                                            availableForDefense
-                                    )
-                                ]
-                            ]
-                        ]
-                    ]
-                , div [ Attr.class "column" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Courtroom" ]
-                        , div [ Attr.class "control" ]
-                            [ div [ Attr.class "select is-fullwidth" ]
-                                [ select [ Events.onInput FormCourtroomChanged ]
-                                    (option [ Attr.value "" ] [ text "None" ]
-                                        :: List.map
-                                            (\c ->
-                                                option [ Attr.value c.id, Attr.selected (model.formCourtroom == c.id) ]
-                                                    [ text c.name ]
-                                            )
-                                            availableCourtrooms
-                                    )
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            , div [ Attr.class "field is-grouped" ]
-                [ div [ Attr.class "control" ]
-                    [ button
-                        [ Attr.class
-                            (if model.formSaving then
-                                "button is-primary is-loading"
+                , div [ Attr.class "flex gap-2 mt-4" ]
+                    [ UI.primaryButton { label = "Save", loading = model.formSaving }
+                    , case model.editingId of
+                        Just _ ->
+                            UI.cancelButton CancelEdit
 
-                             else
-                                "button is-primary"
-                            )
-                        , Attr.type_ "submit"
-                        ]
-                        [ text "Save" ]
+                        Nothing ->
+                            UI.empty
                     ]
-                , case model.editingId of
-                    Just _ ->
-                        div [ Attr.class "control" ]
-                            [ button [ Attr.class "button", Attr.type_ "button", Events.onClick CancelEdit ]
-                                [ text "Cancel" ]
-                            ]
-
-                    Nothing ->
-                        text ""
                 ]
             ]
         ]
@@ -1003,85 +945,80 @@ viewPowerMatchSection model =
         roundNumber =
             model.round |> Maybe.map .number |> Maybe.withDefault 1
     in
-    div [ Attr.class "mb-5" ]
-        ([ if roundNumber >= 2 then
-            div [ Attr.class "field is-grouped is-align-items-center" ]
-                [ div [ Attr.class "control" ]
-                    [ button [ Attr.class "button is-info", Events.onClick GeneratePowerMatch ]
+    div [ Attr.class "mb-6" ]
+        ([ div [ Attr.class "flex items-center gap-3 flex-wrap" ]
+            [ if roundNumber >= 2 then
+                div [ Attr.class "flex items-center gap-2" ]
+                    [ button [ Attr.class "btn btn-info", Events.onClick GeneratePowerMatch ]
                         [ text "Generate Power Match" ]
-                    ]
-                , div [ Attr.class "control" ]
-                    [ div [ Attr.class "select" ]
-                        [ select
-                            [ Events.onInput
-                                (\val ->
-                                    if val == "HighLow" then
-                                        SetCrossBracketStrategy HighLow
+                    , select
+                        [ Attr.class "select select-bordered select-sm"
+                        , Events.onInput
+                            (\val ->
+                                if val == "HighLow" then
+                                    SetCrossBracketStrategy HighLow
 
-                                    else
-                                        SetCrossBracketStrategy HighHigh
-                                )
-                            ]
-                            [ option
-                                [ Attr.value "HighHigh"
-                                , Attr.selected (model.crossBracketStrategy == HighHigh)
-                                ]
-                                [ text "High-High" ]
-                            , option
-                                [ Attr.value "HighLow"
-                                , Attr.selected (model.crossBracketStrategy == HighLow)
-                                ]
-                                [ text "High-Low" ]
-                            ]
+                                else
+                                    SetCrossBracketStrategy HighHigh
+                            )
                         ]
+                        [ option
+                            [ Attr.value "HighHigh"
+                            , Attr.selected (model.crossBracketStrategy == HighHigh)
+                            ]
+                            [ text "High-High" ]
+                        , option
+                            [ Attr.value "HighLow"
+                            , Attr.selected (model.crossBracketStrategy == HighLow)
+                            ]
+                            [ text "High-Low" ]
+                        ]
+                    , span [ Attr.class "text-sm text-base-content/70" ]
+                        [ text "Cross-bracket strategy" ]
                     ]
-                , div [ Attr.class "control" ]
-                    [ span [ Attr.class "help" ]
-                        [ text "Cross-bracket pairing strategy" ]
-                    ]
-                ]
 
-           else
-            button [ Attr.class "button is-info", Events.onClick GeneratePowerMatch ]
-                [ text "Generate Random Pairing" ]
+              else
+                button [ Attr.class "btn btn-info", Events.onClick GeneratePowerMatch ]
+                    [ text "Generate Random Pairing" ]
+            ]
          ]
             ++ (case model.powerMatchResult of
                     Just result ->
-                        [ div [ Attr.class "box mt-4" ]
-                            ([ h3 [ Attr.class "subtitle" ] [ text "Proposed Pairings" ] ]
-                                ++ List.map
-                                    (\w -> div [ Attr.class "notification is-warning is-light" ] [ text w ])
-                                    result.warnings
-                                ++ [ table [ Attr.class "table is-fullwidth" ]
-                                        [ thead []
-                                            [ tr []
-                                                [ th [] [ text "Prosecution" ]
-                                                , th [] [ text "Defense" ]
+                        [ UI.card
+                            [ UI.cardBody
+                                ([ UI.cardTitle "Proposed Pairings" ]
+                                    ++ List.map
+                                        (\w -> div [ Attr.class "alert alert-warning mb-2" ] [ text w ])
+                                        result.warnings
+                                    ++ [ div [ Attr.class "overflow-x-auto" ]
+                                            [ table [ Attr.class "table table-zebra w-full" ]
+                                                [ thead []
+                                                    [ tr []
+                                                        [ th [] [ text "Prosecution" ]
+                                                        , th [] [ text "Defense" ]
+                                                        ]
+                                                    ]
+                                                , tbody []
+                                                    (List.map
+                                                        (\p ->
+                                                            tr []
+                                                                [ td [] [ text (proposedPairingLabel p.prosecutionTeam) ]
+                                                                , td [] [ text (proposedPairingLabel p.defenseTeam) ]
+                                                                ]
+                                                        )
+                                                        result.pairings
+                                                    )
                                                 ]
                                             ]
-                                        , tbody []
-                                            (List.map
-                                                (\p ->
-                                                    tr []
-                                                        [ td [] [ text (proposedPairingLabel p.prosecutionTeam) ]
-                                                        , td [] [ text (proposedPairingLabel p.defenseTeam) ]
-                                                        ]
-                                                )
-                                                result.pairings
-                                            )
-                                        ]
-                                   , div [ Attr.class "field is-grouped" ]
-                                        [ div [ Attr.class "control" ]
-                                            [ button [ Attr.class "button is-success", Events.onClick AcceptPowerMatch ]
+                                       , div [ Attr.class "flex gap-2 mt-4" ]
+                                            [ button [ Attr.class "btn btn-success", Events.onClick AcceptPowerMatch ]
                                                 [ text "Accept & Create" ]
-                                            ]
-                                        , div [ Attr.class "control" ]
-                                            [ button [ Attr.class "button", Events.onClick ClearPowerMatch ]
+                                            , button [ Attr.class "btn btn-ghost", Events.onClick ClearPowerMatch ]
                                                 [ text "Discard" ]
                                             ]
-                                        ]
-                                   ]
-                            )
+                                       ]
+                                )
+                            ]
                         ]
 
                     Nothing ->
@@ -1092,87 +1029,83 @@ viewPowerMatchSection model =
 
 viewBulkTextSection : Model -> Html Msg
 viewBulkTextSection model =
-    div [ Attr.class "box mb-5" ]
-        [ h2 [ Attr.class "subtitle" ] [ text "Bulk Text Entry" ]
-        , p [ Attr.class "help mb-3" ]
-            [ text "Format: "
-            , code [] [ text "{team_number} v {team_number} [{courtroom_name}]" ]
-            , br [] []
-            , text "One pairing per line. Courtroom is optional."
-            ]
-        , div [ Attr.class "field" ]
-            [ div [ Attr.class "control" ]
-                [ textarea
-                    [ Attr.class "textarea"
-                    , Attr.rows 8
-                    , Attr.placeholder "101 v 202 [Dept A]\n103 v 204\n105 v 206 [Dept B]"
-                    , Attr.value model.bulkText
-                    , Events.onInput BulkTextChanged
-                    ]
-                    []
+    UI.card
+        [ UI.cardBody
+            [ UI.cardTitle "Bulk Text Entry"
+            , p [ Attr.class "text-sm text-base-content/70 mb-3" ]
+                [ text "Format: "
+                , code [] [ text "{team_number} v {team_number} [{courtroom_name}]" ]
+                , br [] []
+                , text "One pairing per line. Courtroom is optional."
                 ]
-            ]
-        , viewErrors model.bulkErrors
-        , if model.showBulkPreview then
-            viewBulkPreview model
+            , UI.textareaField
+                { label = ""
+                , value = model.bulkText
+                , onInput = BulkTextChanged
+                , rows = 8
+                , placeholder = "101 v 202 [Dept A]\n103 v 204\n105 v 206 [Dept B]"
+                }
+            , UI.errorList model.bulkErrors
+            , if model.showBulkPreview then
+                viewBulkPreview model
 
-          else
-            div [ Attr.class "field" ]
-                [ button [ Attr.class "button is-info", Events.onClick ParseBulkText ]
-                    [ text "Preview" ]
-                ]
+              else
+                div [ Attr.class "mt-4" ]
+                    [ button [ Attr.class "btn btn-info", Events.onClick ParseBulkText ]
+                        [ text "Preview" ]
+                    ]
+            ]
         ]
 
 
 viewBulkPreview : Model -> Html Msg
 viewBulkPreview model =
     div [ Attr.class "mt-4" ]
-        [ h3 [ Attr.class "subtitle is-5" ] [ text "Preview" ]
-        , table [ Attr.class "table is-fullwidth" ]
-            [ thead []
-                [ tr []
-                    [ th [] [ text "Prosecution" ]
-                    , th [] [ text "Defense" ]
-                    , th [] [ text "Courtroom" ]
+        [ h3 [ Attr.class "font-semibold mb-2" ] [ text "Preview" ]
+        , div [ Attr.class "overflow-x-auto" ]
+            [ table [ Attr.class "table table-zebra w-full" ]
+                [ thead []
+                    [ tr []
+                        [ th [] [ text "Prosecution" ]
+                        , th [] [ text "Defense" ]
+                        , th [] [ text "Courtroom" ]
+                        ]
                     ]
-                ]
-            , tbody []
-                (List.map
-                    (\p ->
-                        let
-                            pTeam =
-                                findTeamByNumber model.teams p.prosecutionTeamNumber
+                , tbody []
+                    (List.map
+                        (\p ->
+                            let
+                                pTeam =
+                                    findTeamByNumber model.teams p.prosecutionTeamNumber
 
-                            dTeam =
-                                findTeamByNumber model.teams p.defenseTeamNumber
-                        in
-                        tr []
-                            [ td [] [ text (teamLabelFromMaybe pTeam p.prosecutionTeamNumber) ]
-                            , td [] [ text (teamLabelFromMaybe dTeam p.defenseTeamNumber) ]
-                            , td [] [ text p.courtroomName ]
-                            ]
-                    )
-                    model.bulkParsed
-                )
-            ]
-        , div [ Attr.class "field is-grouped" ]
-            [ div [ Attr.class "control" ]
-                [ button
-                    [ Attr.class
-                        (if model.bulkSaving then
-                            "button is-success is-loading"
-
-                         else
-                            "button is-success"
+                                dTeam =
+                                    findTeamByNumber model.teams p.defenseTeamNumber
+                            in
+                            tr []
+                                [ td [] [ text (teamLabelFromMaybe pTeam p.prosecutionTeamNumber) ]
+                                , td [] [ text (teamLabelFromMaybe dTeam p.defenseTeamNumber) ]
+                                , td [] [ text p.courtroomName ]
+                                ]
                         )
-                    , Events.onClick ConfirmBulkCreate
+                        model.bulkParsed
+                    )
+                ]
+            ]
+        , div [ Attr.class "flex gap-2 mt-4" ]
+            [ button
+                [ Attr.class "btn btn-success"
+                , Events.onClick ConfirmBulkCreate
+                , Attr.disabled model.bulkSaving
+                ]
+                (if model.bulkSaving then
+                    [ span [ Attr.class "loading loading-spinner loading-sm" ] []
+                    , text "Creating..."
                     ]
+
+                 else
                     [ text "Create All" ]
-                ]
-            , div [ Attr.class "control" ]
-                [ button [ Attr.class "button", Events.onClick CancelBulkPreview ]
-                    [ text "Cancel" ]
-                ]
+                )
+            , UI.cancelButton CancelBulkPreview
             ]
         ]
 
@@ -1180,95 +1113,99 @@ viewBulkPreview model =
 viewTrialsTable : Model -> Html Msg
 viewTrialsTable model =
     if List.isEmpty model.trials then
-        div [ Attr.class "has-text-centered has-text-grey mt-5" ]
-            [ p [] [ text "No pairings yet for this round." ] ]
+        UI.emptyState "No pairings yet for this round."
 
     else
-        div [ Attr.class "mt-5" ]
-            [ h2 [ Attr.class "subtitle" ] [ text "Current Pairings" ]
-            , table [ Attr.class "table is-fullwidth is-striped" ]
-                [ thead []
-                    [ tr []
-                        [ th [] [ text "Prosecution" ]
-                        , th [] [ text "P History" ]
-                        , th [] [ text "Defense" ]
-                        , th [] [ text "D History" ]
-                        , th [] [ text "Courtroom" ]
-                        , th [] [ text "Actions" ]
+        div [ Attr.class "mt-6" ]
+            [ h2 [ Attr.class "text-lg font-semibold mb-3" ] [ text "Current Pairings" ]
+            , div [ Attr.class "overflow-x-auto" ]
+                [ table [ Attr.class "table table-zebra w-full" ]
+                    [ thead []
+                        [ tr []
+                            [ th [] [ text "Prosecution" ]
+                            , th [] [ text "P History" ]
+                            , th [] [ text "Defense" ]
+                            , th [] [ text "D History" ]
+                            , th [] [ text "Courtroom" ]
+                            , th [] [ text "Actions" ]
+                            ]
                         ]
-                    ]
-                , tbody []
-                    (let
-                        allHistory =
-                            buildMatchHistory model.teams model.allTrials
-                     in
-                     List.map
-                        (\trial ->
-                            let
-                                pTeam =
-                                    toDomainTeamFromId model.teams trial.prosecutionTeam
+                    , tbody []
+                        (let
+                            allHistory =
+                                buildMatchHistory model.teams model.allTrials
+                         in
+                         List.map
+                            (\trial ->
+                                let
+                                    pTeam =
+                                        toDomainTeamFromId model.teams trial.prosecutionTeam
 
-                                dTeam =
-                                    toDomainTeamFromId model.teams trial.defenseTeam
+                                    dTeam =
+                                        toDomainTeamFromId model.teams trial.defenseTeam
 
-                                pSides =
-                                    pTeam
-                                        |> Maybe.map (MatchHistory.sideHistory allHistory)
-                                        |> Maybe.withDefault { prosecution = 0, defense = 0 }
+                                    pSides =
+                                        pTeam
+                                            |> Maybe.map (MatchHistory.sideHistory allHistory)
+                                            |> Maybe.withDefault { prosecution = 0, defense = 0 }
 
-                                dSides =
-                                    dTeam
-                                        |> Maybe.map (MatchHistory.sideHistory allHistory)
-                                        |> Maybe.withDefault { prosecution = 0, defense = 0 }
+                                    dSides =
+                                        dTeam
+                                            |> Maybe.map (MatchHistory.sideHistory allHistory)
+                                            |> Maybe.withDefault { prosecution = 0, defense = 0 }
 
-                                rematch =
-                                    case ( pTeam, dTeam ) of
-                                        ( Just p, Just d ) ->
-                                            let
-                                                priorHistory =
-                                                    buildMatchHistory model.teams
-                                                        (List.filter (\t -> t.id /= trial.id) model.allTrials)
-                                            in
-                                            MatchHistory.hasPlayed priorHistory p d
+                                    rematch =
+                                        case ( pTeam, dTeam ) of
+                                            ( Just p, Just d ) ->
+                                                let
+                                                    priorHistory =
+                                                        buildMatchHistory model.teams
+                                                            (List.filter (\t -> t.id /= trial.id) model.allTrials)
+                                                in
+                                                MatchHistory.hasPlayed priorHistory p d
 
-                                        _ ->
-                                            False
-                            in
-                            tr
-                                [ Attr.class
-                                    (if rematch then
-                                        "has-background-warning-light"
+                                            _ ->
+                                                False
+                                in
+                                tr
+                                    [ Attr.class
+                                        (if rematch then
+                                            "bg-warning/20"
 
-                                     else
-                                        ""
-                                    )
-                                ]
-                                [ td [] [ text (teamLabel model.teams trial.prosecutionTeam) ]
-                                , td [] [ text ("P:" ++ String.fromInt pSides.prosecution ++ " D:" ++ String.fromInt pSides.defense) ]
-                                , td [] [ text (teamLabel model.teams trial.defenseTeam) ]
-                                , td [] [ text ("P:" ++ String.fromInt dSides.prosecution ++ " D:" ++ String.fromInt dSides.defense) ]
-                                , td [] [ text (courtroomLabel model.courtrooms trial.courtroom) ]
-                                , td []
-                                    [ div [ Attr.class "buttons are-small" ]
-                                        [ button [ Attr.class "button is-info is-outlined", Events.onClick (EditTrial trial) ]
-                                            [ text "Edit" ]
-                                        , button
-                                            [ Attr.class
+                                         else
+                                            ""
+                                        )
+                                    ]
+                                    [ td [] [ text (teamLabel model.teams trial.prosecutionTeam) ]
+                                    , td [] [ text ("P:" ++ String.fromInt pSides.prosecution ++ " D:" ++ String.fromInt pSides.defense) ]
+                                    , td [] [ text (teamLabel model.teams trial.defenseTeam) ]
+                                    , td [] [ text ("P:" ++ String.fromInt dSides.prosecution ++ " D:" ++ String.fromInt dSides.defense) ]
+                                    , td [] [ text (courtroomLabel model.courtrooms trial.courtroom) ]
+                                    , td []
+                                        [ div [ Attr.class "flex gap-2" ]
+                                            [ button
+                                                [ Attr.class "btn btn-sm btn-outline btn-info"
+                                                , Events.onClick (EditTrial trial)
+                                                ]
+                                                [ text "Edit" ]
+                                            , button
+                                                [ Attr.class "btn btn-sm btn-outline btn-error"
+                                                , Events.onClick (DeleteTrial trial.id)
+                                                , Attr.disabled (model.deleting == Just trial.id)
+                                                ]
                                                 (if model.deleting == Just trial.id then
-                                                    "button is-danger is-outlined is-loading"
+                                                    [ span [ Attr.class "loading loading-spinner loading-sm" ] [] ]
 
                                                  else
-                                                    "button is-danger is-outlined"
+                                                    [ text "Delete" ]
                                                 )
-                                            , Events.onClick (DeleteTrial trial.id)
                                             ]
-                                            [ text "Delete" ]
                                         ]
                                     ]
-                                ]
+                            )
+                            model.trials
                         )
-                        model.trials
-                    )
+                    ]
                 ]
             ]
 

@@ -70,8 +70,8 @@ view route { toContentMsg, content, model } =
     { title = content.title ++ " | Riverside County Mock Trial"
     , body =
         [ viewNavbar route
-        , div [ Attr.class "section" ]
-            [ div [ Attr.class "container" ]
+        , main_ [ Attr.class "p-6" ]
+            [ div [ Attr.class "max-w-4xl mx-auto" ]
                 content.body
             ]
         ]
@@ -80,38 +80,23 @@ view route { toContentMsg, content, model } =
 
 viewNavbar : Route () -> Html msg
 viewNavbar route =
-    nav [ Attr.class "navbar is-primary", Attr.attribute "role" "navigation" ]
-        [ div [ Attr.class "navbar-brand" ]
-            [ a [ Attr.class "navbar-item", Route.Path.href Route.Path.Home_ ]
-                [ strong [] [ text "Riverside County Mock Trial" ] ]
+    nav [ Attr.class "navbar bg-primary text-primary-content shadow-sm" ]
+        [ div [ Attr.class "navbar-start" ]
+            [ a [ Attr.class "btn btn-ghost text-base font-bold normal-case", Route.Path.href Route.Path.Home_ ]
+                [ text "Riverside County Mock Trial" ]
             ]
-        , div [ Attr.class "navbar-menu" ]
-            [ div [ Attr.class "navbar-start" ]
-                [ a
-                    [ Attr.class "navbar-item"
-                    , Route.Path.href Route.Path.Register
-                    ]
-                    [ text "Register" ]
-                ]
-            , div [ Attr.class "navbar-end" ]
-                [ div [ Attr.class "navbar-item" ]
-                    [ div [ Attr.class "buttons" ]
-                        [ a
-                            [ Attr.class
-                                "button is-info is-small"
-                            , Route.Path.href
-                                Route.Path.Team_Login
-                            ]
-                            [ text "Coach Login" ]
-                        , a
-                            [ Attr.class
-                                "button is-light is-small"
-                            , Route.Path.href
-                                Route.Path.Admin_Login
-                            ]
-                            [ text "Admin" ]
-                        ]
+        , div [ Attr.class "navbar-center hidden lg:flex" ]
+            [ ul [ Attr.class "menu menu-horizontal px-1" ]
+                [ li []
+                    [ a [ Route.Path.href Route.Path.Register ]
+                        [ text "Register" ]
                     ]
                 ]
+            ]
+        , div [ Attr.class "navbar-end" ]
+            [ a [ Attr.class "btn btn-sm btn-info mr-2", Route.Path.href Route.Path.Team_Login ]
+                [ text "Coach Login" ]
+            , a [ Attr.class "btn btn-sm btn-ghost", Route.Path.href Route.Path.Admin_Login ]
+                [ text "Admin" ]
             ]
         ]

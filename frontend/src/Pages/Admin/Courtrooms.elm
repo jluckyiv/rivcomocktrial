@@ -15,6 +15,7 @@ import Pb
 import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Shared
+import UI
 import View exposing (View)
 
 
@@ -85,8 +86,10 @@ init user _ =
 type Msg
     = PbMsg Json.Decode.Value
     | ShowCreateForm
+    | ShowBulkImport
     | EditCourtroom Courtroom
     | CancelForm
+    | CancelBulk
     | FormNameChanged String
     | FormLocationChanged String
     | SaveCourtroom
@@ -183,13 +186,19 @@ update user msg model =
                     ( model, Effect.none )
 
         ShowCreateForm ->
-            ( { model | form = FormOpen Creating { name = "", location = "" } [] }, Effect.none )
+            ( { model | form = FormOpen Creating { name = "", location = "" } [], bulk = BulkIdle }, Effect.none )
+
+        ShowBulkImport ->
+            ( { model | bulk = BulkEditing "", form = FormHidden }, Effect.none )
 
         EditCourtroom c ->
-            ( { model | form = FormOpen (Editing c.id) { name = c.name, location = c.location } [] }, Effect.none )
+            ( { model | form = FormOpen (Editing c.id) { name = c.name, location = c.location } [], bulk = BulkIdle }, Effect.none )
 
         CancelForm ->
             ( { model | form = FormHidden }, Effect.none )
+
+        CancelBulk ->
+            ( { model | bulk = BulkIdle }, Effect.none )
 
         FormNameChanged val ->
             ( { model | form = updateFormField (\f -> { f | name = val }) model.form }, Effect.none )
@@ -352,111 +361,87 @@ view : Model -> View Msg
 view model =
     { title = "Courtrooms"
     , body =
-        [ div [ Attr.class "level" ]
-            [ div [ Attr.class "level-left" ]
-                [ h1 [ Attr.class "title" ] [ text "Courtrooms" ] ]
-            , div [ Attr.class "level-right" ]
-                [ button [ Attr.class "button is-primary", Events.onClick ShowCreateForm ]
-                    [ text "New Courtroom" ]
+        [ UI.titleBar
+            { title = "Courtrooms"
+            , actions =
+                [ { label = "New Courtroom", msg = ShowCreateForm }
+                , { label = "Bulk Import", msg = ShowBulkImport }
                 ]
-            ]
+            }
         , viewForm model.form
         , viewBulkInput model.bulk
-        , viewCourtrooms model.courtrooms model.deleting
+        , viewDataTable model
         ]
     }
 
 
-viewCourtrooms : RemoteData (List Courtroom) -> Maybe String -> Html Msg
-viewCourtrooms courtrooms deleting =
-    case courtrooms of
+viewDataTable : Model -> Html Msg
+viewDataTable model =
+    case model.courtrooms of
         NotAsked ->
-            text ""
+            UI.empty
 
         Loading ->
-            div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
+            UI.loading
 
         Failed err ->
-            div [ Attr.class "notification is-danger" ] [ text err ]
+            UI.error err
 
-        Succeeded list ->
-            viewTable list deleting
+        Succeeded [] ->
+            UI.emptyState "No courtrooms yet. Add one to get started."
+
+        Succeeded courtrooms ->
+            UI.dataTable
+                { columns = [ "Name/Number", "Location", "Actions" ]
+                , rows = courtrooms
+                , rowView = viewRow model.deleting
+                }
 
 
 viewForm : FormState -> Html Msg
 viewForm state =
     case state of
         FormHidden ->
-            text ""
+            UI.empty
 
         FormOpen context formData errors ->
-            viewFormBox context formData errors False
+            viewFormCard context formData errors False
 
         FormSaving context formData ->
-            viewFormBox context formData [] True
+            viewFormCard context formData [] True
 
 
-viewFormBox : FormContext -> CourtroomForm -> List String -> Bool -> Html Msg
-viewFormBox context formData errors saving =
-    div [ Attr.class "box mb-5" ]
-        [ h2 [ Attr.class "subtitle" ]
-            [ text
+viewFormCard : FormContext -> CourtroomForm -> List String -> Bool -> Html Msg
+viewFormCard context formData errors saving =
+    UI.card
+        [ UI.cardBody
+            [ UI.cardTitle
                 (case context of
-                    Editing _ ->
-                        "Edit Courtroom"
-
                     Creating ->
                         "New Courtroom"
-                )
-            ]
-        , viewErrors errors
-        , Html.form [ Events.onSubmit SaveCourtroom ]
-            [ div [ Attr.class "columns" ]
-                [ div [ Attr.class "column" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Name/Number" ]
-                        , div [ Attr.class "control" ]
-                            [ input
-                                [ Attr.class "input"
-                                , Attr.value formData.name
-                                , Events.onInput FormNameChanged
-                                , Attr.required True
-                                ]
-                                []
-                            ]
-                        ]
-                    ]
-                , div [ Attr.class "column" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Location" ]
-                        , div [ Attr.class "control" ]
-                            [ input
-                                [ Attr.class "input"
-                                , Attr.value formData.location
-                                , Events.onInput FormLocationChanged
-                                ]
-                                []
-                            ]
-                        ]
-                    ]
-                ]
-            , div [ Attr.class "field is-grouped" ]
-                [ div [ Attr.class "control" ]
-                    [ button
-                        [ Attr.class
-                            (if saving then
-                                "button is-primary is-loading"
 
-                             else
-                                "button is-primary"
-                            )
-                        , Attr.type_ "submit"
-                        ]
-                        [ text "Save" ]
+                    Editing _ ->
+                        "Edit Courtroom"
+                )
+            , UI.errorList errors
+            , Html.form [ Events.onSubmit SaveCourtroom ]
+                [ UI.formColumns
+                    [ UI.textField
+                        { label = "Name/Number"
+                        , value = formData.name
+                        , onInput = FormNameChanged
+                        , required = True
+                        }
+                    , UI.textField
+                        { label = "Location"
+                        , value = formData.location
+                        , onInput = FormLocationChanged
+                        , required = False
+                        }
                     ]
-                , div [ Attr.class "control" ]
-                    [ button [ Attr.class "button", Attr.type_ "button", Events.onClick CancelForm ]
-                        [ text "Cancel" ]
+                , div [ Attr.class "flex gap-2 mt-4" ]
+                    [ UI.primaryButton { label = "Save", loading = saving }
+                    , UI.cancelButton CancelForm
                     ]
                 ]
             ]
@@ -465,90 +450,65 @@ viewFormBox context formData errors saving =
 
 viewBulkInput : BulkState -> Html Msg
 viewBulkInput state =
-    let
-        ( bulkText, bulkError, saving ) =
-            case state of
-                BulkIdle ->
-                    ( "", Nothing, False )
+    case state of
+        BulkIdle ->
+            UI.empty
 
-                BulkEditing val ->
-                    ( val, Nothing, False )
+        _ ->
+            let
+                ( bulkText, bulkError, saving ) =
+                    case state of
+                        BulkEditing val ->
+                            ( val, Nothing, False )
 
-                BulkSaving val ->
-                    ( val, Nothing, True )
+                        BulkSaving val ->
+                            ( val, Nothing, True )
 
-                BulkFailed val err ->
-                    ( val, Just err, False )
-    in
-    div [ Attr.class "box mb-5" ]
-        [ h2 [ Attr.class "subtitle" ] [ text "Bulk Import" ]
-        , p [ Attr.class "help mb-3" ]
-            [ text "One courtroom per line. Format: "
-            , code [] [ text "Name, Location" ]
-            , text " (location is optional)"
-            ]
-        , div [ Attr.class "field" ]
-            [ div [ Attr.class "control" ]
-                [ textarea
-                    [ Attr.class "textarea"
-                    , Attr.rows 6
-                    , Attr.placeholder "Dept 1, 2nd Floor\nDept 2, 3rd Floor\nDept 3"
-                    , Attr.value bulkText
-                    , Events.onInput BulkTextChanged
-                    ]
-                    []
-                ]
-            ]
-        , case bulkError of
-            Just err ->
-                div [ Attr.class "notification is-danger is-light" ] [ text err ]
+                        BulkFailed val err ->
+                            ( val, Just err, False )
 
-            Nothing ->
-                text ""
-        , div [ Attr.class "field" ]
-            [ button
-                [ Attr.class
-                    (if saving then
-                        "button is-info is-loading"
+                        BulkIdle ->
+                            ( "", Nothing, False )
+            in
+            UI.card
+                [ UI.cardBody
+                    [ UI.cardTitle "Bulk Import"
+                    , p [ Attr.class "text-sm text-base-content/70 mb-3" ]
+                        [ text "One courtroom per line. Format: "
+                        , code [] [ text "Name, Location" ]
+                        , text " (location is optional)"
+                        ]
+                    , UI.textareaField
+                        { label = ""
+                        , value = bulkText
+                        , onInput = BulkTextChanged
+                        , rows = 6
+                        , placeholder = "Dept 1, 2nd Floor\nDept 2, 3rd Floor\nDept 3"
+                        }
+                    , case bulkError of
+                        Just err ->
+                            div [ Attr.class "mt-2" ] [ UI.error err ]
 
-                     else
-                        "button is-info"
-                    )
-                , Events.onClick BulkImport
-                , Attr.disabled (String.trim bulkText == "")
-                ]
-                [ text "Import" ]
-            ]
-        ]
+                        Nothing ->
+                            UI.empty
+                    , div [ Attr.class "flex gap-2 mt-4" ]
+                        [ button
+                            [ Attr.class "btn btn-info"
+                            , Events.onClick BulkImport
+                            , Attr.disabled (saving || String.trim bulkText == "")
+                            ]
+                            (if saving then
+                                [ span [ Attr.class "loading loading-spinner loading-sm" ] []
+                                , text "Importing..."
+                                ]
 
-
-viewErrors : List String -> Html msg
-viewErrors errors =
-    if List.isEmpty errors then
-        text ""
-
-    else
-        div [ Attr.class "notification is-danger is-light" ]
-            [ ul [] (List.map (\e -> li [] [ text e ]) errors) ]
-
-
-viewTable : List Courtroom -> Maybe String -> Html Msg
-viewTable courtrooms deleting =
-    if List.isEmpty courtrooms then
-        div [ Attr.class "has-text-centered has-text-grey" ]
-            [ p [] [ text "No courtrooms yet. Add one to get started." ] ]
-
-    else
-        table [ Attr.class "table is-fullwidth is-striped" ]
-            [ thead []
-                [ tr []
-                    [ th [] [ text "Name/Number" ]
-                    , th [] [ text "Location" ]
-                    , th [] [ text "Actions" ]
+                             else
+                                [ text "Import" ]
+                            )
+                        , UI.cancelButton CancelBulk
+                        ]
                     ]
                 ]
-            , tbody [] (List.map (viewRow deleting) courtrooms)
-            ]
 
 
 viewRow : Maybe String -> Courtroom -> Html Msg
@@ -557,20 +517,23 @@ viewRow deleting c =
         [ td [] [ text c.name ]
         , td [] [ text c.location ]
         , td []
-            [ div [ Attr.class "buttons are-small" ]
-                [ button [ Attr.class "button is-info is-outlined", Events.onClick (EditCourtroom c) ]
+            [ div [ Attr.class "flex gap-2" ]
+                [ button
+                    [ Attr.class "btn btn-sm btn-outline btn-info"
+                    , Events.onClick (EditCourtroom c)
+                    ]
                     [ text "Edit" ]
                 , button
-                    [ Attr.class
-                        (if deleting == Just c.id then
-                            "button is-danger is-outlined is-loading"
-
-                         else
-                            "button is-danger is-outlined"
-                        )
+                    [ Attr.class "btn btn-sm btn-outline btn-error"
                     , Events.onClick (DeleteCourtroom c.id)
+                    , Attr.disabled (deleting == Just c.id)
                     ]
-                    [ text "Delete" ]
+                    (if deleting == Just c.id then
+                        [ span [ Attr.class "loading loading-spinner loading-sm" ] [] ]
+
+                     else
+                        [ text "Delete" ]
+                    )
                 ]
             ]
         ]

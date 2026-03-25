@@ -84,8 +84,8 @@ view route { toContentMsg, content, model } =
     { title = content.title ++ " | Admin"
     , body =
         [ Html.map toContentMsg (viewNavbar model route)
-        , div [ Attr.class "section" ]
-            [ div [ Attr.class "container" ]
+        , main_ [ Attr.class "p-6" ]
+            [ div [ Attr.class "max-w-6xl mx-auto" ]
                 content.body
             ]
         ]
@@ -94,62 +94,98 @@ view route { toContentMsg, content, model } =
 
 viewNavbar : Model -> Route () -> Html Msg
 viewNavbar model route =
-    nav [ Attr.class "navbar is-dark", Attr.attribute "role" "navigation" ]
-        [ div [ Attr.class "navbar-brand" ]
-            [ a [ Attr.class "navbar-item", Route.Path.href Route.Path.Home_ ]
-                [ strong [] [ text "RCMT Admin" ] ]
-            , a
-                [ Attr.class
-                    (if model.burgerOpen then
-                        "navbar-burger is-active"
+    nav [ Attr.class "navbar bg-neutral text-neutral-content shadow-sm" ]
+        [ div [ Attr.class "navbar-start" ]
+            [ -- Mobile burger button
+              div [ Attr.class "dropdown" ]
+                [ button
+                    [ Attr.class "btn btn-ghost btn-square lg:hidden"
+                    , Events.onClick ToggleBurger
+                    , Attr.attribute "aria-label" "menu"
+                    ]
+                    [ Html.node "svg"
+                        [ Attr.class "h-5 w-5"
+                        , Attr.attribute "xmlns" "http://www.w3.org/2000/svg"
+                        , Attr.attribute "fill" "none"
+                        , Attr.attribute "viewBox" "0 0 24 24"
+                        , Attr.attribute "stroke" "currentColor"
+                        ]
+                        [ Html.node "path"
+                            [ Attr.attribute "stroke-linecap" "round"
+                            , Attr.attribute "stroke-linejoin" "round"
+                            , Attr.attribute "stroke-width" "2"
+                            , Attr.attribute "d" "M4 6h16M4 12h16M4 18h16"
+                            ]
+                            []
+                        ]
+                    ]
+                , if model.burgerOpen then
+                    ul [ Attr.class "menu menu-sm dropdown-content bg-neutral text-neutral-content mt-3 z-10 w-52 p-2 shadow-lg rounded-box" ]
+                        [ mobileNavItem route Route.Path.Admin_Tournaments "Tournaments"
+                        , mobileNavItem route Route.Path.Admin_Schools "Schools"
+                        , mobileNavItem route Route.Path.Admin_Teams "Teams"
+                        , mobileNavItem route Route.Path.Admin_Students "Students"
+                        , mobileNavItem route Route.Path.Admin_Courtrooms "Courtrooms"
+                        , mobileNavItem route Route.Path.Admin_Rounds "Rounds"
+                        , mobileNavItem route Route.Path.Admin_Registrations "Registrations"
+                        ]
 
-                     else
-                        "navbar-burger"
-                    )
-                , Events.onClick ToggleBurger
-                , Attr.attribute "role" "button"
-                , Attr.attribute "aria-label" "menu"
+                  else
+                    text ""
                 ]
-                [ span [] [], span [] [], span [] [], span [] [] ]
+            , a [ Attr.class "btn btn-ghost text-base font-bold normal-case", Route.Path.href Route.Path.Home_ ]
+                [ text "RCMT Admin" ]
             ]
-        , div
-            [ Attr.class
-                (if model.burgerOpen then
-                    "navbar-menu is-active"
+        , div [ Attr.class "navbar-center hidden lg:flex" ]
+            [ ul [ Attr.class "menu menu-horizontal px-1" ]
+                [ navItem route Route.Path.Admin_Tournaments "Tournaments"
+                , navItem route Route.Path.Admin_Schools "Schools"
+                , navItem route Route.Path.Admin_Teams "Teams"
+                , navItem route Route.Path.Admin_Students "Students"
+                , navItem route Route.Path.Admin_Courtrooms "Courtrooms"
+                , navItem route Route.Path.Admin_Rounds "Rounds"
+                , navItem route Route.Path.Admin_Registrations "Registrations"
+                ]
+            ]
+        , div [ Attr.class "navbar-end" ]
+            [ button
+                [ Attr.class "btn btn-ghost btn-sm"
+                , Events.onClick Logout
+                ]
+                [ text "Logout" ]
+            ]
+        ]
+
+
+navItem : Route () -> Route.Path.Path -> String -> Html Msg
+navItem route path label =
+    li []
+        [ a
+            [ Route.Path.href path
+            , Attr.class
+                (if route.path == path then
+                    "active"
 
                  else
-                    "navbar-menu"
+                    ""
                 )
             ]
-            [ div [ Attr.class "navbar-start" ]
-                [ navLink route Route.Path.Admin_Tournaments "Tournaments"
-                , navLink route Route.Path.Admin_Schools "Schools"
-                , navLink route Route.Path.Admin_Teams "Teams"
-                , navLink route Route.Path.Admin_Students "Students"
-                , navLink route Route.Path.Admin_Courtrooms "Courtrooms"
-                , navLink route Route.Path.Admin_Rounds "Rounds"
-                , navLink route Route.Path.Admin_Registrations "Registrations"
-                ]
-            , div [ Attr.class "navbar-end" ]
-                [ div [ Attr.class "navbar-item" ]
-                    [ button [ Attr.class "button is-light is-small", Events.onClick Logout ]
-                        [ text "Logout" ]
-                    ]
-                ]
+            [ text label ]
+        ]
+
+
+mobileNavItem : Route () -> Route.Path.Path -> String -> Html Msg
+mobileNavItem route path label =
+    li []
+        [ a
+            [ Route.Path.href path
+            , Attr.class
+                (if route.path == path then
+                    "active"
+
+                 else
+                    ""
+                )
             ]
+            [ text label ]
         ]
-
-
-navLink : Route () -> Route.Path.Path -> String -> Html Msg
-navLink route path label =
-    a
-        [ Attr.class
-            (if route.path == path then
-                "navbar-item is-active"
-
-             else
-                "navbar-item"
-            )
-        , Route.Path.href path
-        ]
-        [ text label ]

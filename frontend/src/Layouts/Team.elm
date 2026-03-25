@@ -94,8 +94,8 @@ view shared route { toContentMsg, content, model } =
     , body =
         [ Html.map toContentMsg
             (viewNavbar shared model route)
-        , div [ Attr.class "section" ]
-            [ div [ Attr.class "container" ]
+        , main_ [ Attr.class "p-6" ]
+            [ div [ Attr.class "max-w-4xl mx-auto" ]
                 content.body
             ]
         ]
@@ -117,76 +117,68 @@ viewNavbar shared model route =
                 _ ->
                     "Coach"
     in
-    nav
-        [ Attr.class "navbar is-info"
-        , Attr.attribute "role" "navigation"
-        ]
-        [ div [ Attr.class "navbar-brand" ]
-            [ a
-                [ Attr.class "navbar-item"
-                , Route.Path.href Route.Path.Home_
-                ]
-                [ strong [] [ text displayName ] ]
-            , a
-                [ Attr.class
-                    (if model.burgerOpen then
-                        "navbar-burger is-active"
+    nav [ Attr.class "navbar bg-info text-info-content shadow-sm" ]
+        [ div [ Attr.class "navbar-start" ]
+            [ div [ Attr.class "dropdown" ]
+                [ button
+                    [ Attr.class "btn btn-ghost btn-square lg:hidden"
+                    , Events.onClick ToggleBurger
+                    , Attr.attribute "aria-label" "menu"
+                    ]
+                    [ Html.node "svg"
+                        [ Attr.class "h-5 w-5"
+                        , Attr.attribute "xmlns" "http://www.w3.org/2000/svg"
+                        , Attr.attribute "fill" "none"
+                        , Attr.attribute "viewBox" "0 0 24 24"
+                        , Attr.attribute "stroke" "currentColor"
+                        ]
+                        [ Html.node "path"
+                            [ Attr.attribute "stroke-linecap" "round"
+                            , Attr.attribute "stroke-linejoin" "round"
+                            , Attr.attribute "stroke-width" "2"
+                            , Attr.attribute "d" "M4 6h16M4 12h16M4 18h16"
+                            ]
+                            []
+                        ]
+                    ]
+                , if model.burgerOpen then
+                    ul [ Attr.class "menu menu-sm dropdown-content bg-info text-info-content mt-3 z-10 w-52 p-2 shadow-lg rounded-box" ]
+                        [ navItem route Route.Path.Team_EligibleStudents "Eligible Students"
+                        ]
 
-                     else
-                        "navbar-burger"
-                    )
-                , Events.onClick ToggleBurger
-                , Attr.attribute "role" "button"
-                , Attr.attribute "aria-label" "menu"
+                  else
+                    text ""
                 ]
-                [ span [] []
-                , span [] []
-                , span [] []
-                , span [] []
+            , a [ Attr.class "btn btn-ghost text-base font-bold normal-case", Route.Path.href Route.Path.Home_ ]
+                [ text displayName ]
+            ]
+        , div [ Attr.class "navbar-center hidden lg:flex" ]
+            [ ul [ Attr.class "menu menu-horizontal px-1" ]
+                [ navItem route Route.Path.Team_EligibleStudents "Eligible Students"
                 ]
             ]
-        , div
-            [ Attr.class
-                (if model.burgerOpen then
-                    "navbar-menu is-active"
+        , div [ Attr.class "navbar-end" ]
+            [ button
+                [ Attr.class "btn btn-ghost btn-sm"
+                , Events.onClick Logout
+                ]
+                [ text "Logout" ]
+            ]
+        ]
+
+
+navItem : Route () -> Route.Path.Path -> String -> Html Msg
+navItem route path label =
+    li []
+        [ a
+            [ Route.Path.href path
+            , Attr.class
+                (if route.path == path then
+                    "active"
 
                  else
-                    "navbar-menu"
+                    ""
                 )
             ]
-            [ div [ Attr.class "navbar-start" ]
-                [ navLink route
-                    Route.Path.Team_EligibleStudents
-                    "Eligible Students"
-                ]
-            , div [ Attr.class "navbar-end" ]
-                [ div [ Attr.class "navbar-item" ]
-                    [ button
-                        [ Attr.class
-                            "button is-light is-small"
-                        , Events.onClick Logout
-                        ]
-                        [ text "Logout" ]
-                    ]
-                ]
-            ]
+            [ text label ]
         ]
-
-
-navLink :
-    Route ()
-    -> Route.Path.Path
-    -> String
-    -> Html Msg
-navLink route path label =
-    a
-        [ Attr.class
-            (if route.path == path then
-                "navbar-item is-active"
-
-             else
-                "navbar-item"
-            )
-        , Route.Path.href path
-        ]
-        [ text label ]

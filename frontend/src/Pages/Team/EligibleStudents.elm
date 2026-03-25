@@ -14,6 +14,7 @@ import Route exposing (Route)
 import Shared
 import Student
 import Team
+import UI
 import View exposing (View)
 
 
@@ -236,15 +237,17 @@ view model =
     in
     { title = "Eligible Students"
     , body =
-        [ h1 [ Attr.class "title" ]
-            [ text ("Eligible Students — " ++ teamNameStr) ]
-        , p [ Attr.class "subtitle" ]
+        [ UI.titleBar
+            { title = "Eligible Students — " ++ teamNameStr
+            , actions = []
+            }
+        , p [ Attr.class "text-base-content/60 mb-4" ]
             [ text ("Status: " ++ EligibleStudents.statusToString currentStatus) ]
         , if isDraft then
             viewAddStudentForm model
 
           else
-            text ""
+            UI.empty
         , viewStudentList isDraft cfg studentList
         , viewSubmitSection model isDraft cfg studentList
         ]
@@ -253,68 +256,63 @@ view model =
 
 viewAddStudentForm : Model -> Html Msg
 viewAddStudentForm model =
-    div [ Attr.class "box" ]
-        [ h2 [ Attr.class "title is-5" ] [ text "Add Student" ]
-        , viewFormErrors model.formErrors
-        , div [ Attr.class "field" ]
-            [ label [ Attr.class "label" ] [ text "First Name" ]
-            , div [ Attr.class "control" ]
-                [ input
-                    [ Attr.class "input"
-                    , Attr.type_ "text"
-                    , Attr.value model.firstName
-                    , Events.onInput SetFirstName
-                    ]
-                    []
-                ]
-            ]
-        , div [ Attr.class "field" ]
-            [ label [ Attr.class "label" ] [ text "Last Name" ]
-            , div [ Attr.class "control" ]
-                [ input
-                    [ Attr.class "input"
-                    , Attr.type_ "text"
-                    , Attr.value model.lastName
-                    , Events.onInput SetLastName
-                    ]
-                    []
-                ]
-            ]
-        , div [ Attr.class "field" ]
-            [ label [ Attr.class "label" ] [ text "Preferred Name" ]
-            , div [ Attr.class "control" ]
-                [ input
-                    [ Attr.class "input"
-                    , Attr.type_ "text"
-                    , Attr.value model.preferredName
-                    , Attr.placeholder "Optional"
-                    , Events.onInput SetPreferredName
-                    ]
-                    []
-                ]
-            ]
-        , div [ Attr.class "field" ]
-            [ label [ Attr.class "label" ] [ text "Pronouns" ]
-            , div [ Attr.class "control" ]
-                [ div [ Attr.class "select" ]
-                    [ select
-                        [ Events.onInput SetPronouns
-                        , Attr.value model.pronouns
+    UI.card
+        [ UI.cardBody
+            [ UI.cardTitle "Add Student"
+            , UI.errorList model.formErrors
+            , div [ Attr.class "grid grid-cols-1 md:grid-cols-2 gap-4" ]
+                [ label [ Attr.class "form-control w-full" ]
+                    [ div [ Attr.class "label" ]
+                        [ span [ Attr.class "label-text" ] [ text "First Name" ] ]
+                    , input
+                        [ Attr.class "input input-bordered w-full"
+                        , Attr.type_ "text"
+                        , Attr.value model.firstName
+                        , Events.onInput SetFirstName
                         ]
-                        [ option [ Attr.value "" ] [ text "-- select --" ]
-                        , option [ Attr.value "he/him" ] [ text "He/Him" ]
-                        , option [ Attr.value "she/her" ] [ text "She/Her" ]
-                        , option [ Attr.value "they/them" ]
-                            [ text "They/Them" ]
-                        , option [ Attr.value "other" ] [ text "Other" ]
+                        []
+                    ]
+                , label [ Attr.class "form-control w-full" ]
+                    [ div [ Attr.class "label" ]
+                        [ span [ Attr.class "label-text" ] [ text "Last Name" ] ]
+                    , input
+                        [ Attr.class "input input-bordered w-full"
+                        , Attr.type_ "text"
+                        , Attr.value model.lastName
+                        , Events.onInput SetLastName
+                        ]
+                        []
+                    ]
+                , label [ Attr.class "form-control w-full" ]
+                    [ div [ Attr.class "label" ]
+                        [ span [ Attr.class "label-text" ] [ text "Preferred Name" ] ]
+                    , input
+                        [ Attr.class "input input-bordered w-full"
+                        , Attr.type_ "text"
+                        , Attr.value model.preferredName
+                        , Attr.placeholder "Optional"
+                        , Events.onInput SetPreferredName
+                        ]
+                        []
+                    ]
+                , label [ Attr.class "form-control w-full" ]
+                    [ div [ Attr.class "label" ]
+                        [ span [ Attr.class "label-text" ] [ text "Pronouns" ] ]
+                    , select
+                        [ Attr.class "select select-bordered w-full"
+                        , Events.onInput SetPronouns
+                        ]
+                        [ option [ Attr.value "", Attr.selected (model.pronouns == "") ] [ text "-- select --" ]
+                        , option [ Attr.value "he/him", Attr.selected (model.pronouns == "he/him") ] [ text "He/Him" ]
+                        , option [ Attr.value "she/her", Attr.selected (model.pronouns == "she/her") ] [ text "She/Her" ]
+                        , option [ Attr.value "they/them", Attr.selected (model.pronouns == "they/them") ] [ text "They/Them" ]
+                        , option [ Attr.value "other", Attr.selected (model.pronouns == "other") ] [ text "Other" ]
                         ]
                     ]
                 ]
-            ]
-        , div [ Attr.class "field" ]
-            [ div [ Attr.class "control" ]
+            , div [ Attr.class "mt-4" ]
                 [ button
-                    [ Attr.class "button is-info"
+                    [ Attr.class "btn btn-info"
                     , Events.onClick AddStudent
                     ]
                     [ text "Add Student" ]
@@ -323,56 +321,47 @@ viewAddStudentForm model =
         ]
 
 
-viewFormErrors : List String -> Html msg
-viewFormErrors errors =
-    if List.isEmpty errors then
-        text ""
-
-    else
-        div [ Attr.class "notification is-danger is-light" ]
-            (List.map (\e -> p [] [ text e ]) errors)
-
-
 viewStudentList : Bool -> EligibleStudents.Config -> List Student.Student -> Html Msg
 viewStudentList isDraft cfg studentList =
     let
         count =
             List.length studentList
     in
-    div [ Attr.class "box" ]
-        [ h2 [ Attr.class "title is-5" ]
-            [ text
+    UI.card
+        [ UI.cardBody
+            [ UI.cardTitle
                 ("Students ("
                     ++ String.fromInt count
                     ++ " of "
                     ++ String.fromInt cfg.minStudents
                     ++ " minimum)"
                 )
-            ]
-        , if List.isEmpty studentList then
-            p [ Attr.class "has-text-grey" ]
-                [ text "No students added yet." ]
+            , if List.isEmpty studentList then
+                UI.emptyState "No students added yet."
 
-          else
-            table [ Attr.class "table is-fullwidth is-striped" ]
-                [ thead []
-                    [ tr []
-                        [ th [] [ text "#" ]
-                        , th [] [ text "Name" ]
-                        , th [] [ text "Pronouns" ]
-                        , if isDraft then
-                            th [] [ text "" ]
+              else
+                div [ Attr.class "overflow-x-auto" ]
+                    [ table [ Attr.class "table table-zebra w-full" ]
+                        [ thead []
+                            [ tr []
+                                [ th [] [ text "#" ]
+                                , th [] [ text "Name" ]
+                                , th [] [ text "Pronouns" ]
+                                , if isDraft then
+                                    th [] []
 
-                          else
-                            text ""
+                                  else
+                                    text ""
+                                ]
+                            ]
+                        , tbody []
+                            (List.indexedMap
+                                (viewStudentRow isDraft)
+                                studentList
+                            )
                         ]
                     ]
-                , tbody []
-                    (List.indexedMap
-                        (viewStudentRow isDraft)
-                        studentList
-                    )
-                ]
+            ]
         ]
 
 
@@ -395,10 +384,11 @@ viewStudentRow isDraft idx s =
         , if isDraft then
             td []
                 [ button
-                    [ Attr.class "delete"
+                    [ Attr.class "btn btn-sm btn-ghost btn-circle"
                     , Events.onClick (RemoveStudent idx)
+                    , Attr.attribute "aria-label" "Remove"
                     ]
-                    []
+                    [ text "✕" ]
                 ]
 
           else
@@ -415,47 +405,46 @@ viewSubmitSection model isDraft cfg studentList =
         minReq =
             cfg.minStudents
     in
-    div [ Attr.class "box" ]
-        ([ if isDraft then
-            button
-                [ Attr.class "button is-primary"
-                , Attr.disabled (count < minReq)
-                , Events.onClick SubmitList
-                ]
-                [ text "Submit Student List" ]
-
-           else
-            p [ Attr.class "has-text-success" ]
-                [ text "Student list has been submitted." ]
-         ]
-            ++ (case model.submitResult of
-                    Just (Err errors) ->
-                        [ div
-                            [ Attr.class
-                                "notification is-danger is-light mt-3"
-                            ]
-                            (List.map (\e -> p [] [ text e ]) errors)
-                        ]
-
-                    _ ->
-                        []
-               )
-            ++ (if isDraft && count < minReq then
-                    [ p [ Attr.class "help is-danger mt-2" ]
-                        [ text
-                            ("Need at least "
-                                ++ String.fromInt minReq
-                                ++ " students ("
-                                ++ String.fromInt (minReq - count)
-                                ++ " more)"
-                            )
-                        ]
+    UI.card
+        [ UI.cardBody
+            ([ if isDraft then
+                button
+                    [ Attr.class "btn btn-primary"
+                    , Attr.disabled (count < minReq)
+                    , Events.onClick SubmitList
                     ]
+                    [ text "Submit Student List" ]
 
-                else
-                    []
-               )
-        )
+               else
+                p [ Attr.class "text-success font-semibold" ]
+                    [ text "Student list has been submitted." ]
+             ]
+                ++ (case model.submitResult of
+                        Just (Err errors) ->
+                            [ div [ Attr.class "mt-3" ]
+                                [ UI.errorList errors ]
+                            ]
+
+                        _ ->
+                            []
+                   )
+                ++ (if isDraft && count < minReq then
+                        [ p [ Attr.class "text-sm text-error mt-2" ]
+                            [ text
+                                ("Need at least "
+                                    ++ String.fromInt minReq
+                                    ++ " students ("
+                                    ++ String.fromInt (minReq - count)
+                                    ++ " more)"
+                                )
+                            ]
+                        ]
+
+                    else
+                        []
+                   )
+            )
+        ]
 
 
 
