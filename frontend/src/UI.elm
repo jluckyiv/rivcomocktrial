@@ -1,5 +1,6 @@
 module UI exposing
-    ( cancelButton
+    ( badge
+    , cancelButton
     , card
     , cardBody
     , cardTitle
@@ -8,9 +9,12 @@ module UI exposing
     , emptyState
     , error
     , errorList
+    , filterSelect
     , formColumns
     , loading
+    , numberField
     , primaryButton
+    , selectField
     , textareaField
     , textField
     , titleBar
@@ -24,7 +28,7 @@ need does not exist here, add it before using it in a page.
 `btn-primary`; subsequent = `btn-outline`.
 -}
 
-import Html exposing (Html, button, div, h1, h2, input, label, li, p, span, table, tbody, td, text, textarea, th, thead, tr, ul)
+import Html exposing (Html, button, div, h1, h2, input, label, li, option, p, select, span, table, tbody, td, text, textarea, th, thead, tr, ul)
 import Html.Attributes as Attr
 import Html.Events as Events
 
@@ -301,3 +305,141 @@ emptyState msg =
 empty : Html msg
 empty =
     text ""
+
+
+
+-- SELECT FIELDS
+
+
+{-| Labeled select dropdown for use in forms.
+
+Pass the placeholder as the first option with an empty value:
+
+    UI.selectField
+        { label = "Tournament"
+        , value = formData.tournament
+        , onInput = FormTournamentChanged
+        , options =
+            { value = "", label = "Select tournament..." }
+                :: List.map (\t -> { value = t.id, label = t.name }) tournaments
+        }
+
+-}
+selectField :
+    { label : String
+    , value : String
+    , onInput : String -> msg
+    , options : List { value : String, label : String }
+    }
+    -> Html msg
+selectField config =
+    label [ Attr.class "form-control w-full" ]
+        [ div [ Attr.class "label" ]
+            [ span [ Attr.class "label-text" ] [ text config.label ] ]
+        , select
+            [ Attr.class "select select-bordered w-full"
+            , Events.onInput config.onInput
+            ]
+            (List.map
+                (\opt ->
+                    option
+                        [ Attr.value opt.value
+                        , Attr.selected (config.value == opt.value)
+                        ]
+                        [ text opt.label ]
+                )
+                config.options
+            )
+        ]
+
+
+{-| Number input field. Use for year, round number, team number, etc.
+
+    UI.numberField
+        { label = "Year"
+        , value = formData.year
+        , onInput = FormYearChanged
+        , required = True
+        }
+
+-}
+numberField :
+    { label : String
+    , value : String
+    , onInput : String -> msg
+    , required : Bool
+    }
+    -> Html msg
+numberField config =
+    label [ Attr.class "form-control w-full" ]
+        [ div [ Attr.class "label" ]
+            [ span [ Attr.class "label-text" ] [ text config.label ] ]
+        , input
+            [ Attr.class "input input-bordered w-full"
+            , Attr.type_ "number"
+            , Attr.value config.value
+            , Events.onInput config.onInput
+            , Attr.required config.required
+            ]
+            []
+        ]
+
+
+{-| Compact filter select for placement above a data table.
+
+    UI.filterSelect
+        { label = "Tournament:"
+        , value = model.filterTournament
+        , onInput = FilterTournamentChanged
+        , options =
+            { value = "", label = "All Tournaments" }
+                :: List.map (\t -> { value = t.id, label = t.name }) model.tournaments
+        }
+
+-}
+filterSelect :
+    { label : String
+    , value : String
+    , onInput : String -> msg
+    , options : List { value : String, label : String }
+    }
+    -> Html msg
+filterSelect config =
+    div [ Attr.class "flex items-center gap-2 mb-4" ]
+        ([ if config.label /= "" then
+            span [ Attr.class "text-sm text-base-content/70" ] [ text config.label ]
+
+           else
+            text ""
+         , select
+            [ Attr.class "select select-bordered select-sm"
+            , Events.onInput config.onInput
+            ]
+            (List.map
+                (\opt ->
+                    option
+                        [ Attr.value opt.value
+                        , Attr.selected (config.value == opt.value)
+                        ]
+                        [ text opt.label ]
+                )
+                config.options
+            )
+         ]
+        )
+
+
+
+-- BADGE
+
+
+{-| Colored status badge. Variant maps to DaisyUI badge variants:
+`"neutral"`, `"info"`, `"success"`, `"warning"`, `"error"`, `"ghost"`.
+
+    UI.badge { label = "Pending", variant = "warning" }
+    UI.badge { label = "Active", variant = "success" }
+
+-}
+badge : { label : String, variant : String } -> Html msg
+badge config =
+    span [ Attr.class ("badge badge-" ++ config.variant) ] [ text config.label ]
