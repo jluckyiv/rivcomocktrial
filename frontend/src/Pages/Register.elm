@@ -2,7 +2,6 @@ module Pages.Register exposing (page)
 
 import Html exposing (..)
 import Html.Attributes as Attr
-import Layouts
 import Route.Path
 import View exposing (View)
 
@@ -11,7 +10,8 @@ page : View msg
 page =
     { title = "Register"
     , body =
-        [ div [ Attr.class "columns is-multiline is-centered" ]
+        [ h1 [ Attr.class "text-2xl font-bold mb-6" ] [ text "Register" ]
+        , div [ Attr.class "grid grid-cols-1 md:grid-cols-3 gap-4" ]
             [ roleCard
                 { title = "Teacher Coach"
                 , description =
@@ -45,28 +45,21 @@ roleCard :
     }
     -> Html msg
 roleCard config =
-    div [ Attr.class "column is-4" ]
-        [ div [ Attr.class "card" ]
-            [ div [ Attr.class "card-content" ]
-                [ p [ Attr.class "title is-4" ]
-                    [ text config.title ]
-                , p [ Attr.class "content" ]
-                    [ text config.description ]
-                ]
-            , div [ Attr.class "card-footer" ]
+    div [ Attr.class "card bg-base-100 shadow-sm" ]
+        [ div [ Attr.class "card-body" ]
+            [ h2 [ Attr.class "card-title" ] [ text config.title ]
+            , p [] [ text config.description ]
+            , div [ Attr.class "card-actions justify-end mt-2" ]
                 [ case config.path of
                     Just path ->
                         a
-                            [ Attr.class "card-footer-item"
+                            [ Attr.class "btn btn-primary btn-sm"
                             , Route.Path.href path
                             ]
                             [ text "Register" ]
 
                     Nothing ->
-                        span
-                            [ Attr.class
-                                "card-footer-item has-text-grey"
-                            ]
+                        span [ Attr.class "text-sm text-base-content/50" ]
                             [ text "Coming soon" ]
                 ]
             ]
