@@ -16,6 +16,7 @@ import Route exposing (Route)
 import Route.Path
 import Shared
 import Tournament
+import UI
 import View exposing (View)
 
 
@@ -300,7 +301,12 @@ validateForm formData =
             Tournament.statusFromString formData.status |> Result.mapError toStrings
 
         allErrors =
-            collectErrors [ nameValidation |> Result.map (\_ -> ()), yearValidation |> Result.map (\_ -> ()), configValidation |> Result.map (\_ -> ()), statusValidation |> Result.map (\_ -> ()) ]
+            collectErrors
+                [ nameValidation |> Result.map (\_ -> ())
+                , yearValidation |> Result.map (\_ -> ())
+                , configValidation |> Result.map (\_ -> ())
+                , statusValidation |> Result.map (\_ -> ())
+                ]
     in
     if List.isEmpty allErrors then
         case ( yearResult, prelimResult, elimResult ) of
@@ -347,192 +353,112 @@ view : Model -> View Msg
 view model =
     { title = "Tournaments"
     , body =
-        [ div [ Attr.class "level" ]
-            [ div [ Attr.class "level-left" ]
-                [ h1 [ Attr.class "title" ] [ text "Tournaments" ] ]
-            , div [ Attr.class "level-right" ]
-                [ button [ Attr.class "button is-primary", Events.onClick ShowCreateForm ]
-                    [ text "New Tournament" ]
-                ]
-            ]
+        [ UI.titleBar
+            { title = "Tournaments"
+            , actions = [ { label = "New Tournament", msg = ShowCreateForm } ]
+            }
         , viewForm model.form
-        , viewTournaments model.tournaments model.deleting
+        , viewDataTable model
         ]
     }
 
 
-viewTournaments : RemoteData (List Tournament) -> Maybe String -> Html Msg
-viewTournaments tournaments deleting =
-    case tournaments of
+viewDataTable : Model -> Html Msg
+viewDataTable model =
+    case model.tournaments of
         NotAsked ->
-            text ""
+            UI.empty
 
         Loading ->
-            div [ Attr.class "has-text-centered" ] [ text "Loading..." ]
+            UI.loading
 
         Failed err ->
-            div [ Attr.class "notification is-danger" ] [ text err ]
+            UI.error err
 
-        Succeeded list ->
-            viewTable list deleting
+        Succeeded [] ->
+            UI.emptyState "No tournaments yet. Create one to get started."
+
+        Succeeded tournaments ->
+            UI.dataTable
+                { columns = [ "Name", "Year", "Rounds", "Status", "Actions" ]
+                , rows = tournaments
+                , rowView = viewRow model.deleting
+                }
 
 
 viewForm : FormState -> Html Msg
 viewForm state =
     case state of
         FormHidden ->
-            text ""
+            UI.empty
 
         FormOpen context formData errors ->
-            viewFormBox context formData errors False
+            viewFormCard context formData errors False
 
         FormSaving context formData ->
-            viewFormBox context formData [] True
+            viewFormCard context formData [] True
 
 
-viewFormBox : FormContext -> TournamentForm -> List String -> Bool -> Html Msg
-viewFormBox context formData errors saving =
-    div [ Attr.class "box mb-5" ]
-        [ h2 [ Attr.class "subtitle" ]
-            [ text
+viewFormCard : FormContext -> TournamentForm -> List String -> Bool -> Html Msg
+viewFormCard context formData errors saving =
+    UI.card
+        [ UI.cardBody
+            [ UI.cardTitle
                 (case context of
-                    Editing _ ->
-                        "Edit Tournament"
-
                     Creating ->
                         "New Tournament"
-                )
-            ]
-        , viewErrors errors
-        , Html.form [ Events.onSubmit SaveTournament ]
-            [ div [ Attr.class "columns" ]
-                [ div [ Attr.class "column" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Name" ]
-                        , div [ Attr.class "control" ]
-                            [ input
-                                [ Attr.class "input"
-                                , Attr.value formData.name
-                                , Events.onInput FormNameChanged
-                                , Attr.required True
-                                ]
-                                []
-                            ]
-                        ]
-                    ]
-                , div [ Attr.class "column is-2" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Year" ]
-                        , div [ Attr.class "control" ]
-                            [ input
-                                [ Attr.class "input"
-                                , Attr.type_ "number"
-                                , Attr.value formData.year
-                                , Events.onInput FormYearChanged
-                                , Attr.required True
-                                ]
-                                []
-                            ]
-                        ]
-                    ]
-                ]
-            , div [ Attr.class "columns" ]
-                [ div [ Attr.class "column is-3" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Preliminary Rounds" ]
-                        , div [ Attr.class "control" ]
-                            [ input
-                                [ Attr.class "input"
-                                , Attr.type_ "number"
-                                , Attr.value formData.prelimRounds
-                                , Events.onInput FormPrelimRoundsChanged
-                                ]
-                                []
-                            ]
-                        ]
-                    ]
-                , div [ Attr.class "column is-3" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Elimination Rounds" ]
-                        , div [ Attr.class "control" ]
-                            [ input
-                                [ Attr.class "input"
-                                , Attr.type_ "number"
-                                , Attr.value formData.elimRounds
-                                , Events.onInput FormElimRoundsChanged
-                                ]
-                                []
-                            ]
-                        ]
-                    ]
-                , div [ Attr.class "column is-3" ]
-                    [ div [ Attr.class "field" ]
-                        [ label [ Attr.class "label" ] [ text "Status" ]
-                        , div [ Attr.class "control" ]
-                            [ div [ Attr.class "select is-fullwidth" ]
-                                [ select [ Events.onInput FormStatusChanged ]
-                                    [ option [ Attr.value "draft", Attr.selected (formData.status == "draft") ] [ text "Draft" ]
-                                    , option [ Attr.value "registration", Attr.selected (formData.status == "registration") ] [ text "Registration" ]
-                                    , option [ Attr.value "active", Attr.selected (formData.status == "active") ] [ text "Active" ]
-                                    , option [ Attr.value "completed", Attr.selected (formData.status == "completed") ] [ text "Completed" ]
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            , div [ Attr.class "field is-grouped" ]
-                [ div [ Attr.class "control" ]
-                    [ button
-                        [ Attr.class
-                            (if saving then
-                                "button is-primary is-loading"
 
-                             else
-                                "button is-primary"
-                            )
-                        , Attr.type_ "submit"
-                        ]
-                        [ text "Save" ]
+                    Editing _ ->
+                        "Edit Tournament"
+                )
+            , UI.errorList errors
+            , Html.form [ Events.onSubmit SaveTournament ]
+                [ UI.formColumns
+                    [ UI.textField
+                        { label = "Name"
+                        , value = formData.name
+                        , onInput = FormNameChanged
+                        , required = True
+                        }
+                    , UI.numberField
+                        { label = "Year"
+                        , value = formData.year
+                        , onInput = FormYearChanged
+                        , required = True
+                        }
                     ]
-                , div [ Attr.class "control" ]
-                    [ button [ Attr.class "button", Attr.type_ "button", Events.onClick CancelForm ]
-                        [ text "Cancel" ]
+                , UI.formColumns
+                    [ UI.numberField
+                        { label = "Preliminary Rounds"
+                        , value = formData.prelimRounds
+                        , onInput = FormPrelimRoundsChanged
+                        , required = False
+                        }
+                    , UI.numberField
+                        { label = "Elimination Rounds"
+                        , value = formData.elimRounds
+                        , onInput = FormElimRoundsChanged
+                        , required = False
+                        }
+                    , UI.selectField
+                        { label = "Status"
+                        , value = formData.status
+                        , onInput = FormStatusChanged
+                        , options =
+                            [ { value = "draft", label = "Draft" }
+                            , { value = "registration", label = "Registration" }
+                            , { value = "active", label = "Active" }
+                            , { value = "completed", label = "Completed" }
+                            ]
+                        }
+                    ]
+                , div [ Attr.class "flex gap-2 mt-4" ]
+                    [ UI.primaryButton { label = "Save", loading = saving }
+                    , UI.cancelButton CancelForm
                     ]
                 ]
             ]
         ]
-
-
-viewErrors : List String -> Html msg
-viewErrors errors =
-    if List.isEmpty errors then
-        text ""
-
-    else
-        div [ Attr.class "notification is-danger is-light" ]
-            [ ul [] (List.map (\e -> li [] [ text e ]) errors) ]
-
-
-viewTable : List Tournament -> Maybe String -> Html Msg
-viewTable tournaments deleting =
-    if List.isEmpty tournaments then
-        div [ Attr.class "has-text-centered has-text-grey" ]
-            [ p [] [ text "No tournaments yet. Create one to get started." ] ]
-
-    else
-        table [ Attr.class "table is-fullwidth is-striped" ]
-            [ thead []
-                [ tr []
-                    [ th [] [ text "Name" ]
-                    , th [] [ text "Year" ]
-                    , th [] [ text "Rounds" ]
-                    , th [] [ text "Status" ]
-                    , th [] [ text "Actions" ]
-                    ]
-                ]
-            , tbody [] (List.map (viewRow deleting) tournaments)
-            ]
 
 
 viewRow : Maybe String -> Tournament -> Html Msg
@@ -541,45 +467,44 @@ viewRow deleting t =
         [ td [] [ text t.name ]
         , td [] [ text (String.fromInt t.year) ]
         , td [] [ text (String.fromInt t.numPreliminaryRounds ++ "P + " ++ String.fromInt t.numEliminationRounds ++ "E") ]
-        , td [] [ viewStatusTag t.status ]
+        , td [] [ viewStatusBadge t.status ]
         , td []
-            [ div [ Attr.class "buttons are-small" ]
-                [ button [ Attr.class "button is-info is-outlined", Events.onClick (EditTournament t) ]
+            [ div [ Attr.class "flex gap-2" ]
+                [ button
+                    [ Attr.class "btn btn-sm btn-outline btn-info"
+                    , Events.onClick (EditTournament t)
+                    ]
                     [ text "Edit" ]
                 , button
-                    [ Attr.class
-                        (if deleting == Just t.id then
-                            "button is-danger is-outlined is-loading"
-
-                         else
-                            "button is-danger is-outlined"
-                        )
+                    [ Attr.class "btn btn-sm btn-outline btn-error"
                     , Events.onClick (DeleteTournament t.id)
+                    , Attr.disabled (deleting == Just t.id)
                     ]
-                    [ text "Delete" ]
+                    (if deleting == Just t.id then
+                        [ span [ Attr.class "loading loading-spinner loading-sm" ] [] ]
+
+                     else
+                        [ text "Delete" ]
+                    )
                 ]
             ]
         ]
 
 
-viewStatusTag : String -> Html msg
-viewStatusTag status =
-    let
-        tagClass =
-            case status of
-                "draft" ->
-                    "tag is-light"
+viewStatusBadge : String -> Html msg
+viewStatusBadge status =
+    case status of
+        "draft" ->
+            UI.badge { label = "Draft", variant = "ghost" }
 
-                "registration" ->
-                    "tag is-info"
+        "registration" ->
+            UI.badge { label = "Registration", variant = "info" }
 
-                "active" ->
-                    "tag is-success"
+        "active" ->
+            UI.badge { label = "Active", variant = "success" }
 
-                "completed" ->
-                    "tag is-dark"
+        "completed" ->
+            UI.badge { label = "Completed", variant = "neutral" }
 
-                _ ->
-                    "tag"
-    in
-    span [ Attr.class tagClass ] [ text status ]
+        _ ->
+            UI.badge { label = status, variant = "ghost" }
