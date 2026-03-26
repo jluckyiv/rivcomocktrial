@@ -381,6 +381,35 @@ PocketBase JS SDK as the sole PB client (ADR-010).
 
 ---
 
+## DaisyUI Migration ✅
+
+**Status:** Done (issues #67, #68, PR #66, v0.3.0)
+
+Replaced Bulma CSS with DaisyUI 5 + Tailwind CSS 4
+across the entire frontend.
+
+### Changes
+
+- **Build**: `@tailwindcss/postcss` + `postcss.config.mjs`
+  + `app.css` with `@import "tailwindcss"` +
+  `@plugin "daisyui"`. Elm Land auto-detects PostCSS.
+- **`UI.elm`**: Central DaisyUI view helper module.
+  All page modules use these helpers — no raw class
+  strings in pages. Exports: `titleBar`, `card`,
+  `dataTable`, form fields, buttons, `badge`, `loading`,
+  `error`, `emptyState`.
+- **All admin pages**: Tournaments, Schools, Teams,
+  Students, Courtrooms, Rounds, Pairings, Registrations.
+- **Layouts**: Admin, Public, Team — all use DaisyUI
+  `navbar` with responsive burger.
+- **Public/team pages**: Home, Register, Register/Pending,
+  Register/TeacherCoach, Team/EligibleStudents.
+- **Bulk import fix**: Panels are hidden by default
+  (`BulkIdle → UI.empty`), mutually exclusive with
+  the edit form.
+
+---
+
 ## Open Questions
 
 These are deferred to the relevant milestones:
