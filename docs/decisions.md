@@ -5,6 +5,51 @@ rationale. Newest first.
 
 ---
 
+## ADR-011: Dual auth store isolation
+
+**Date:** 2026-04-15
+
+**Context:** ADR-010 introduced two PocketBase SDK
+instances (`pb` for coaches, `pbAdmin` for superusers).
+The default PocketBase SDK auth store is `LocalAuthStore`,
+which persists the auth token to `localStorage` under the
+key `pocketbase_auth`. Both instances shared that key —
+a coach login would write the coach token to
+`pocketbase_auth`, and on the next navigation `pbAdmin`
+would load the coach token instead of the admin token,
+causing all admin list/update/delete calls to fail with
+401 or permission errors.
+
+**Decision:** Both `pb` and `pbAdmin` use
+`new BaseAuthStore()` (in-memory only). Auth tokens are
+persisted manually to distinct `localStorage` keys and
+restored in `interop.js` on page load:
+
+- `adminToken` — superuser JWT
+- `coachToken` — coach user JWT
+- `coachUser` — serialized coach user record
+
+The `flags` function reads all three from `localStorage`
+at startup and passes them to Elm, so both admin and coach
+sessions survive page refresh.
+
+**Rationale:**
+- In-memory auth stores can never collide, regardless of
+  how many SDK instances exist
+- Manual persistence gives full control over what is
+  stored and under which key
+- The `flags` restore path is explicit and testable —
+  no SDK magic loading tokens from unexpected places
+
+**Trade-offs:**
+- More code in `interop.js` to save/restore tokens vs
+  SDK auto-persistence
+- Must remember to clear the right key on logout (handled
+  by `SaveAdminToken null` and `SaveCoachToken null`
+  port messages)
+
+---
+
 ## ADR-010: PocketBase JS SDK as sole PB client
 
 **Date:** 2026-03-07
@@ -257,70 +302,73 @@ for application state.
 
 ---
 
-## ADR-007: Auth UX — role self-identification and OAuth labels
+## ADR-007: Auth UX — role self-identification
 
-**Date:** 2026-03-01
+**Date:** 2026-03-01 (updated 2026-04-15)
 
 **Context:** The app has multiple user roles (teacher
 coach, attorney coach, scorer/judge, admin) with
-different auth mechanisms. Need to decide how users
-identify themselves at registration and what the OAuth
-buttons should say.
+different auth needs. This ADR was originally written
+when OAuth2 was the planned auth mechanism. OAuth2 was
+subsequently dropped (issue #60 closed) in favor of a
+simpler username/password workflow matched to RCOE's
+existing manual approval process.
 
-**Decision:**
+**Decision (current):**
 
-1. **Role selection first.** The login/register screen
-   opens with "How are you participating?" and presents
-   role cards:
-   - "Teacher Coach" → OAuth2 → applicant flow (admin
-     approval required)
-   - "Attorney Coach" → OAuth2 → simpler registration
-   - "Scorer / Judge" → magic link (email) or QR code
-     scan on tournament day
-   - Admin and SuperUser are never self-registered —
-     created by existing admins
+1. **Role selection first.** The `/register` screen
+   presents role cards ("How are you participating?").
+   Currently only "Teacher Coach" leads to a working
+   flow. Other roles are placeholders.
 
-2. **OAuth button labels use education-specific names:**
-   - "Sign in with Microsoft 365 Education"
-   - "Sign in with Google Workspace for Education"
+2. **Teacher coaches use email/password registration.**
+   The `/register/teacher-coach` form collects name,
+   email, password, school, and team name. On submit,
+   PocketBase creates a `users` record (status:
+   `pending`) and a `teams` record (status: `pending`)
+   atomically via a server-side hook.
 
-   This signals that teachers should use their
-   school-issued account, not a personal one. The school
-   domain in the OAuth response aids admin verification.
+3. **RCOE approves coaches manually.** The admin reviews
+   registrations at `/admin/registrations` and approves
+   or rejects. An auth guard hook blocks login until the
+   coach is approved.
 
-3. **Scorer/judge auth is lightweight.** Scorers
-   authenticate via magic link (emailed) or by scanning
-   a single tournament-wide QR code on the day of
-   competition. No password, no OAuth. This
-   accommodates last-minute volunteers and reduces
-   friction on tournament day.
+4. **Attorney coaches are excluded from direct
+   registration.** RCOE has no direct communication
+   channel with attorney coaches — outreach goes through
+   the Bar Association. System access for attorney
+   coaches is deferred and may not happen. If it does,
+   the access level is TBD (likely read-only).
+
+5. **Scorer/judge auth is deferred.** The planned
+   approach — magic link or tournament-day QR — is still
+   the right direction, but implementation is deferred to
+   milestone 4. See issue #77 for the future magic link
+   consideration.
+
+6. **Admin and SuperUser are never self-registered.**
+   Created by existing admins via PocketBase admin UI or
+   the `superuser upsert` CLI command.
 
 **Rationale:**
-- Role selection up front maps directly to `UserRole`
-  domain type and determines the auth flow
-- Education-branded OAuth buttons set correct
-  expectations — teachers know to pick their school
-  account, reducing mismatched-identity issues
-- RCOE distinguishes teacher coaches from attorney
-  coaches at registration (different privileges, only
-  teachers receive scores and admin their team) — the
-  UI should reflect this distinction early
-- Magic link / QR for scorers matches the reality:
-  volunteers sign up days before or show up the morning
-  of, and must be scoring within minutes
+- Username/password matches RCOE's existing workflow:
+  coaches email RCOE, RCOE sends a registration URL, coach
+  fills the form, RCOE approves in the admin UI
+- OAuth adds configuration complexity (two providers,
+  domain verification) for a marginal benefit when RCOE
+  already reviews every registration manually
+- Excluding attorney coaches avoids building a feature
+  for an audience RCOE cannot directly reach or support
+- Magic link / QR for scorers remains the right approach
+  for tournament day — deferred until ballot entry is built
 
 **Consequences:**
-- Login screen has a pre-auth step (role selection)
-  before showing auth options — slightly more clicks
-  but clearer flow
-- OAuth provider configuration needs two providers
-  (Google + Microsoft) in PocketBase
-- Magic link requires PocketBase email sending config
-- Single tournament-wide QR code means any scanner gets
-  the auth flow — courtroom assignment happens after
-  auth, not encoded in the QR
-- Admin/SuperUser creation is an admin-only action,
-  keeping the public-facing auth screen simple
+- Coach passwords are stored in PocketBase's `users` auth
+  collection — PocketBase handles bcrypt hashing
+- Coaches must remember their password (no OAuth SSO)
+- Attorney coaches have no system access for MVP; RCOE
+  shares results with them through existing channels
+- Scorer auth is undefined until milestone 4
 
 ---
 
