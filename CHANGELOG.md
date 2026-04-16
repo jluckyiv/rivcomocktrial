@@ -8,6 +8,18 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 - Issue #61: Rosters UI (coach round roster management)
 
+### Added (PR #86)
+- 6 PocketBase migrations: pronouns on students,
+  roster_deadline_hours on tournaments, and new
+  collections case_characters, roster_submissions,
+  roster_entries, attorney_tasks (#85)
+- Full roster type system in Api.elm: Pronoun,
+  RosterSide, EntryType, RosterRole, TaskType,
+  CaseCharacter, RosterSubmission, RosterEntry,
+  AttorneyTask — with decoders and encoders (#85)
+- Pronouns field on Admin/Students create/edit form
+  (#85)
+
 ## v0.3.0 — DaisyUI + Auth + Team Management
 
 ### Added
