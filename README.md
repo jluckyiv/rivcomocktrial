@@ -141,7 +141,7 @@ fly ssh console --config fly.staging.toml -C \
 - [Competition Workflow](docs/competition-workflow.md)
   — end-to-end competition sequence and rules
 - [Architecture Decisions](docs/decisions.md) — key
-  technical choices and rationale (ADR-001–007)
+  technical choices and rationale (ADR-001–011)
 
 ## Development Workflow
 

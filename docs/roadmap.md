@@ -22,7 +22,9 @@ the entire spreadsheet/email workflow.
 - Schools have districts (tracked by RCOE)
 - Two kinds of coaches: teacher coaches (submit rosters)
   and attorney coaches (currently view-only)
-- Registration in December, random drawing in January,
+- Registration opens in summer/August; teams commit their
+  eligibility list (all students eligible to compete this
+  season) in December; random drawing in January;
   competition January–March
 - Pairings for round 1 are drawn live (manual input);
   rounds 2+ are power-matched
@@ -76,16 +78,18 @@ in and manage tournaments.
 
 ### Auth Model
 
-| Role           | Access                         | Auth method                           |
-| -------------- | ------------------------------ | ------------------------------------- |
-| Admin          | Full access                    | PocketBase superuser (email/password) |
-| Teacher coach  | Submit rosters, view published | Email/password, linked to school      |
-| Attorney coach | View published                 | View-only                             |
-| Scorer         | Enter ballots                  | No auth — anonymous via link          |
-| Public         | View published                 | No auth                               |
+| Role           | Access                         | Auth method                              |
+| -------------- | ------------------------------ | ---------------------------------------- |
+| Admin          | Full access                    | PocketBase superuser (email/password)    |
+| Teacher coach  | Submit rosters, view published | Email/password, linked to school         |
+| Attorney coach | Deferred — access level TBD,   | Not planned for MVP                      |
+|                | not planned for MVP            |                                          |
+| Scorer         | Enter ballots                  | Deferred — anonymous link auth planned   |
+|                |                                | for milestone 4                          |
+| Public         | View published                 | No auth                                  |
 
 **Note:** Milestone 1 implements admin auth only. Coach
-auth added in the Registration & Auth section below.
+auth added in the Registration & Coach Auth section below.
 
 ---
 
@@ -333,7 +337,7 @@ different error pattern (model-level, not FormState).
 
 ## Registration & Coach Auth ✅
 
-**Status:** Done (issue #54 step 3, issue #64, PR #65)
+**Status:** Done (issues #64, #70; PRs #65, #75)
 
 Coach registration and login workflow using the
 PocketBase JS SDK as the sole PB client (ADR-010).
@@ -341,43 +345,62 @@ PocketBase JS SDK as the sole PB client (ADR-010).
 ### Architecture
 
 - **PB JS SDK** (`pocketbase` v0.25.x) replaces all
-  Elm HTTP calls to PocketBase
+  Elm HTTP calls to PocketBase (ADR-010)
+- **Dual SDK instances**: `pbAdmin` (superuser) and
+  `pb` (coach/public), both using `BaseAuthStore`
+  (in-memory) to prevent `localStorage` key collision
+  (ADR-011)
 - **Elm ports**: `outgoing` sends commands, `incoming`
   receives responses, tag-based routing
-- **Dual SDK instances**: `pbAdmin` (superuser) and
-  `pb` (coach/public) in `interop.js`
 - **Pb.elm module**: typed Elm interface over the port
   layer (`adminList`, `coachLogin`, etc.)
-- All 11 pages converted from `Api.*` HTTP to `Pb.*`
-  port calls
 
 ### Registration Flow
 
 1. Coach visits `/register/teacher-coach`, fills form
    (name, email, password, school, team name)
-2. `Pb.publicCreate` creates user record with status
-   `pending`
-3. Redirect to `/register/pending` confirmation page
-4. Admin reviews at `/admin/registrations`, approves
-   or rejects
-5. Server-side hook (`auth_guard.pb.js`) blocks login
+2. Tournament must be in `registration` status — form
+   shows "Registration is not currently open" otherwise
+3. `Pb.publicCreate` creates `users` record
+   (status: `pending`, role: `coach`)
+4. PocketBase hook (`registration.pb.js`) creates a
+   linked `teams` record (status: `pending`) atomically
+5. Redirect to `/register/pending` confirmation page
+6. Admin reviews at `/admin/registrations`, approves
+   or rejects; hook syncs team status automatically
+7. Server-side hook (`auth_guard.pb.js`) blocks login
    for non-approved coaches
-6. Approved coach logs in at `/team/login` with
+8. Approved coach logs in at `/team/login` with
    email/password
+
+### Terminology
+
+- **Eligibility list**: all students eligible to compete
+  for a team this season (committed in December, locked
+  before competition)
+- **Round roster**: students competing in a specific
+  round with role assignments (per-round submission,
+  handled in milestone 3)
 
 ### Collections
 
-| Collection | Changes                            |
-| ---------- | ---------------------------------- |
-| users      | Auth collection with role, school, |
-|            | team_name, status fields           |
-| schools    | Made publicly readable (list/view) |
+| Collection | Changes                                    |
+| ---------- | ------------------------------------------ |
+| users      | Auth collection: role, school, team_name,  |
+|            | status fields                              |
+| teams      | Added status, coach fields; public create  |
+|            | rule for self-registration                 |
+| schools    | Made publicly readable (list/view)         |
+| tournaments | Made publicly readable so registration    |
+|            | form can check status without auth         |
 
-### Remaining (separate issues)
+### Issues
 
-- Issue #61: Round rosters & eligible students API
-- Issue #62: Tournament day workflow
-- Issue #63: Results & standings
+- Issue #69: auth guard hook
+- Issue #70: atomic registration (user + team)
+- Issue #71: team management page
+- Issue #72: eligible students API
+- Issue #73: coach profile / account page
 
 ---
 
@@ -418,7 +441,12 @@ These are deferred to the relevant milestones:
   (Milestone 5)
 - Score sheet format for coaches (pending PDF,
   Milestone 5)
-- Whether attorney coaches need any write access
+- **Attorney coach system access**: RCOE has no direct
+  communication channel with attorney coaches —
+  outreach goes through the Bar Association. Whether
+  attorney coaches will ever have read-only system
+  access is unresolved. Not planned for MVP; RCOE
+  shares results through existing channels for now.
 - Whether teacher coach must be different per team from
   same school (rule clarification)
 - Ballot visibility policy: will coaches ever see full
