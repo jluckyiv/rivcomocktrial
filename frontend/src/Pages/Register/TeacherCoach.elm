@@ -35,6 +35,19 @@ page shared route =
 -- MODEL
 
 
+type RegistrationStep
+    = NotStarted
+    | Submitting
+    | Done
+
+
+type RegistrationAvailability
+    = CheckingAvailability
+    | RegistrationOpen Api.Tournament
+    | RegistrationClosed
+    | LoadFailed String
+
+
 type alias Model =
     { firstName : String
     , lastName : String
@@ -45,8 +58,8 @@ type alias Model =
     , teamName : String
     , errors : List String
     , schools : List Api.School
-    , loadingSchools : Bool
-    , submitting : Bool
+    , availability : RegistrationAvailability
+    , step : RegistrationStep
     }
 
 
@@ -61,15 +74,23 @@ init _ =
       , teamName = ""
       , errors = []
       , schools = []
-      , loadingSchools = True
-      , submitting = False
+      , availability = CheckingAvailability
+      , step = NotStarted
       }
-    , Pb.publicList
-        { collection = "schools"
-        , tag = "schools"
-        , filter = ""
-        , sort = "name"
-        }
+    , Effect.batch
+        [ Pb.publicList
+            { collection = "schools"
+            , tag = "schools"
+            , filter = ""
+            , sort = "name"
+            }
+        , Pb.publicList
+            { collection = "tournaments"
+            , tag = "active-tournament"
+            , filter = "status='registration'"
+            , sort = "-created"
+            }
+        ]
     )
 
 
@@ -93,32 +114,19 @@ update : Msg -> Model -> ( Model, Effect Msg )
 update msg model =
     case msg of
         UpdateFirstName val ->
-            ( { model | firstName = val, errors = [] }
-            , Effect.none
-            )
+            ( { model | firstName = val, errors = [] }, Effect.none )
 
         UpdateLastName val ->
-            ( { model | lastName = val, errors = [] }
-            , Effect.none
-            )
+            ( { model | lastName = val, errors = [] }, Effect.none )
 
         UpdateEmail val ->
-            ( { model | email = val, errors = [] }
-            , Effect.none
-            )
+            ( { model | email = val, errors = [] }, Effect.none )
 
         UpdatePassword val ->
-            ( { model | password = val, errors = [] }
-            , Effect.none
-            )
+            ( { model | password = val, errors = [] }, Effect.none )
 
         UpdatePasswordConfirm val ->
-            ( { model
-                | passwordConfirm = val
-                , errors = []
-              }
-            , Effect.none
-            )
+            ( { model | passwordConfirm = val, errors = [] }, Effect.none )
 
         SelectSchool val ->
             let
@@ -133,12 +141,10 @@ update msg model =
                     case schoolId of
                         Just id ->
                             model.schools
-                                |> List.filter
-                                    (\s -> s.id == id)
+                                |> List.filter (\s -> s.id == id)
                                 |> List.head
                                 |> Maybe.map .name
-                                |> Maybe.withDefault
-                                    model.teamName
+                                |> Maybe.withDefault model.teamName
 
                         Nothing ->
                             model.teamName
@@ -152,28 +158,19 @@ update msg model =
             )
 
         UpdateTeamName val ->
-            ( { model | teamName = val, errors = [] }
-            , Effect.none
-            )
+            ( { model | teamName = val, errors = [] }, Effect.none )
 
         Submit ->
             case validateForm model of
                 Err errors ->
-                    ( { model | errors = errors }
-                    , Effect.none
-                    )
+                    ( { model | errors = errors }, Effect.none )
 
                 Ok data ->
-                    ( { model
-                        | submitting = True
-                        , errors = []
-                      }
+                    ( { model | step = Submitting, errors = [] }
                     , Pb.publicCreate
                         { collection = "users"
-                        , tag = "register"
-                        , body =
-                            Api.encodeCoachRegistration
-                                data
+                        , tag = "register-user"
+                        , body = Api.encodeCoachRegistration data
                         }
                     )
 
@@ -182,17 +179,11 @@ update msg model =
                 Just "schools" ->
                     case Pb.decodeList Api.schoolDecoder value of
                         Ok schools ->
-                            ( { model
-                                | schools = schools
-                                , loadingSchools = False
-                              }
-                            , Effect.none
-                            )
+                            ( { model | schools = schools }, Effect.none )
 
                         Err _ ->
                             ( { model
-                                | loadingSchools = False
-                                , errors =
+                                | errors =
                                     [ "Failed to load schools. "
                                         ++ "Please refresh the page."
                                     ]
@@ -200,21 +191,64 @@ update msg model =
                             , Effect.none
                             )
 
-                Just "register" ->
-                    case Pb.decodeRecord Api.coachUserDecoder value of
-                        Ok _ ->
-                            ( model
-                            , Effect.pushRoutePath
-                                Route.Path.Register_Pending
+                Just "active-tournament" ->
+                    case Pb.decodeList Api.tournamentDecoder value of
+                        Ok (tournament :: _) ->
+                            ( { model
+                                | availability = RegistrationOpen tournament
+                              }
+                            , Effect.none
+                            )
+
+                        Ok [] ->
+                            ( { model | availability = RegistrationClosed }
+                            , Effect.none
                             )
 
                         Err _ ->
                             ( { model
-                                | submitting = False
-                                , errors =
-                                    [ "Registration failed. The email "
-                                        ++ "may already be in use."
-                                    ]
+                                | availability =
+                                    LoadFailed
+                                        "Could not check registration status."
+                              }
+                            , Effect.none
+                            )
+
+                Just "register-user" ->
+                    case Pb.decodeRecord Api.coachUserDecoder value of
+                        Ok _ ->
+                            ( { model | step = Done }
+                            , Effect.pushRoutePath Route.Path.Register_Pending
+                            )
+
+                        Err _ ->
+                            let
+                                emailTaken =
+                                    Json.Decode.decodeValue
+                                        (Json.Decode.at
+                                            [ "errorData"
+                                            , "email"
+                                            , "code"
+                                            ]
+                                            Json.Decode.string
+                                        )
+                                        value
+                                        == Ok "validation_not_unique"
+
+                                errorMsg =
+                                    if emailTaken then
+                                        "We already have a registration "
+                                            ++ "for that email address. "
+                                            ++ "It is pending review."
+
+                                    else
+                                        "Registration failed. Please "
+                                            ++ "try again or contact "
+                                            ++ "the organizer."
+                            in
+                            ( { model
+                                | step = NotStarted
+                                , errors = [ errorMsg ]
                               }
                             , Effect.none
                             )
@@ -245,8 +279,7 @@ validateForm model =
             List.map (\(Error m) -> m)
 
         nameValidation =
-            Coach.nameFromStrings model.firstName
-                model.lastName
+            Coach.nameFromStrings model.firstName model.lastName
                 |> Result.mapError toStrings
 
         emailValidation =
@@ -255,10 +288,7 @@ validateForm model =
 
         passwordValidation =
             if String.length model.password < 8 then
-                Err
-                    [ "Password must be at least "
-                        ++ "8 characters."
-                    ]
+                Err [ "Password must be at least 8 characters." ]
 
             else if model.password /= model.passwordConfirm then
                 Err [ "Passwords do not match." ]
@@ -269,7 +299,7 @@ validateForm model =
         schoolValidation =
             case model.selectedSchoolId of
                 Nothing ->
-                    Err [ "Please select a school" ]
+                    Err [ "Please select a school." ]
 
                 Just _ ->
                     Ok ()
@@ -292,14 +322,11 @@ validateForm model =
 
         allErrors =
             collectErrors
-                [ nameValidation
-                    |> Result.map (\_ -> ())
-                , emailValidation
-                    |> Result.map (\_ -> ())
+                [ nameValidation |> Result.map (\_ -> ())
+                , emailValidation |> Result.map (\_ -> ())
                 , passwordValidation
                 , schoolValidation
-                , teamNameValidation
-                    |> Result.map (\_ -> ())
+                , teamNameValidation |> Result.map (\_ -> ())
                 ]
     in
     if List.isEmpty allErrors then
@@ -308,18 +335,14 @@ validateForm model =
                 Ok
                     { email = model.email
                     , password = model.password
-                    , passwordConfirm =
-                        model.passwordConfirm
-                    , name =
-                        model.firstName
-                            ++ " "
-                            ++ model.lastName
+                    , passwordConfirm = model.passwordConfirm
+                    , name = model.firstName ++ " " ++ model.lastName
                     , school = schoolId
                     , teamName = model.teamName
                     }
 
             Nothing ->
-                Err [ "Please select a school" ]
+                Err [ "Please select a school." ]
 
     else
         Err allErrors
@@ -345,19 +368,52 @@ view model =
         [ div [ Attr.class "max-w-lg mx-auto" ]
             [ h1 [ Attr.class "text-2xl font-bold mb-4" ]
                 [ text "Teacher Coach Registration" ]
-            , UI.errorList model.errors
-            , if model.loadingSchools then
-                UI.loading
-
-              else
-                viewForm model
+            , viewAvailability model
             ]
         ]
     }
 
 
+viewAvailability : Model -> Html Msg
+viewAvailability model =
+    case model.availability of
+        CheckingAvailability ->
+            UI.loading
+
+        RegistrationClosed ->
+            div [ Attr.class "alert alert-info" ]
+                [ p [] [ text "Registration is not currently open." ]
+                , p [ Attr.class "text-sm" ]
+                    [ text "Contact the organizer if you believe this is an error." ]
+                ]
+
+        LoadFailed err ->
+            UI.error err
+
+        RegistrationOpen tournament ->
+            div []
+                [ div [ Attr.class "alert alert-success mb-4" ]
+                    [ text
+                        ("Registration is open for "
+                            ++ tournament.name
+                            ++ "."
+                        )
+                    ]
+                , UI.errorList model.errors
+                , if List.isEmpty model.schools then
+                    UI.loading
+
+                  else
+                    viewForm model
+                ]
+
+
 viewForm : Model -> Html Msg
 viewForm model =
+    let
+        submitting =
+            model.step == Submitting
+    in
     Html.form [ Events.onSubmit Submit, Attr.class "flex flex-col gap-4" ]
         [ div [ Attr.class "grid grid-cols-1 md:grid-cols-2 gap-4" ]
             [ formField "First Name"
@@ -367,7 +423,7 @@ viewForm model =
                     , Attr.placeholder "First name"
                     , Attr.value model.firstName
                     , Events.onInput UpdateFirstName
-                    , Attr.disabled model.submitting
+                    , Attr.disabled submitting
                     ]
                     []
                 ]
@@ -378,7 +434,7 @@ viewForm model =
                     , Attr.placeholder "Last name"
                     , Attr.value model.lastName
                     , Events.onInput UpdateLastName
-                    , Attr.disabled model.submitting
+                    , Attr.disabled submitting
                     ]
                     []
                 ]
@@ -390,7 +446,7 @@ viewForm model =
                 , Attr.placeholder "you@school.edu"
                 , Attr.value model.email
                 , Events.onInput UpdateEmail
-                , Attr.disabled model.submitting
+                , Attr.disabled submitting
                 ]
                 []
             ]
@@ -402,7 +458,7 @@ viewForm model =
                     , Attr.placeholder "At least 8 characters"
                     , Attr.value model.password
                     , Events.onInput UpdatePassword
-                    , Attr.disabled model.submitting
+                    , Attr.disabled submitting
                     ]
                     []
                 ]
@@ -413,7 +469,7 @@ viewForm model =
                     , Attr.placeholder "Confirm password"
                     , Attr.value model.passwordConfirm
                     , Events.onInput UpdatePasswordConfirm
-                    , Attr.disabled model.submitting
+                    , Attr.disabled submitting
                     ]
                     []
                 ]
@@ -422,7 +478,7 @@ viewForm model =
             [ select
                 [ Attr.class "select select-bordered w-full"
                 , Events.onInput SelectSchool
-                , Attr.disabled model.submitting
+                , Attr.disabled submitting
                 ]
                 (option
                     [ Attr.value ""
@@ -430,7 +486,9 @@ viewForm model =
                     ]
                     [ text "-- Select a school --" ]
                     :: List.map
-                        (\sch -> option [ Attr.value sch.id ] [ text sch.name ])
+                        (\sch ->
+                            option [ Attr.value sch.id ] [ text sch.name ]
+                        )
                         model.schools
                 )
             ]
@@ -441,7 +499,7 @@ viewForm model =
                 , Attr.placeholder "Team name"
                 , Attr.value model.teamName
                 , Events.onInput UpdateTeamName
-                , Attr.disabled model.submitting
+                , Attr.disabled submitting
                 ]
                 []
             , p [ Attr.class "text-sm text-base-content/60 mt-1" ]
@@ -450,9 +508,9 @@ viewForm model =
         , button
             [ Attr.class "btn btn-primary w-full"
             , Attr.type_ "submit"
-            , Attr.disabled model.submitting
+            , Attr.disabled submitting
             ]
-            (if model.submitting then
+            (if submitting then
                 [ span [ Attr.class "loading loading-spinner loading-sm" ] []
                 , text "Submitting..."
                 ]
