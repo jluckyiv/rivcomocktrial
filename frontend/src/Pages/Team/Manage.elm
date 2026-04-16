@@ -925,7 +925,15 @@ viewTeam data =
 
 isLocked : Api.Tournament -> Bool
 isLocked t =
-    t.eligibilityLockedAt /= Nothing
+    case t.eligibilityLockedAt of
+        Nothing ->
+            False
+
+        Just "" ->
+            False
+
+        Just _ ->
+            True
 
 
 viewEligibilitySection : Bool -> TeamData -> Html Msg
