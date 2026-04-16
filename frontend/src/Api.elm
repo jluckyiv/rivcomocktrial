@@ -3,6 +3,7 @@ module Api exposing
     , Courtroom, Round, Trial, CoachUser
     , EligibilityEntry, ChangeRequest, CoCoach, AttorneyCoach
     , ChangeType(..), RequestStatus(..), EligibilityStatus(..)
+    , TournamentStatus(..), TeamStatus(..), CoachUserStatus(..), RoundType(..)
     , tournamentDecoder, schoolDecoder, teamDecoder
     , studentDecoder, courtroomDecoder, roundDecoder
     , trialDecoder, coachUserDecoder
@@ -15,6 +16,8 @@ module Api exposing
     , encodeEligibilityEntry, encodeChangeRequest
     , encodeChangeType, encodeRequestStatus
     , encodeCoCoach, encodeAttorneyCoach
+    , encodeTournamentStatus, encodeTeamStatus, encodeCoachUserStatus, encodeRoundType
+    , roundTypeToString, tournamentStatusFromString
     )
 
 {-| PocketBase record types, decoders, and encoders.
@@ -32,13 +35,38 @@ import Json.Encode as Encode
 -- TYPES
 
 
+type TournamentStatus
+    = TournamentDraft
+    | TournamentRegistration
+    | TournamentActive
+    | TournamentCompleted
+
+
+type TeamStatus
+    = TeamPending
+    | TeamActive
+    | TeamWithdrawn
+    | TeamRejected
+
+
+type CoachUserStatus
+    = CoachPending
+    | CoachApproved
+    | CoachRejected
+
+
+type RoundType
+    = Preliminary
+    | Elimination
+
+
 type alias Tournament =
     { id : String
     , name : String
     , year : Int
     , numPreliminaryRounds : Int
     , numEliminationRounds : Int
-    , status : String
+    , status : TournamentStatus
     , eligibilityLockedAt : Maybe String
     , created : String
     , updated : String
@@ -60,7 +88,7 @@ type alias Team =
     , school : String
     , teamNumber : Int
     , name : String
-    , status : String
+    , status : TeamStatus
     , coach : String
     , created : String
     , updated : String
@@ -89,7 +117,7 @@ type alias Round =
     { id : String
     , number : Int
     , date : String
-    , roundType : String
+    , roundType : RoundType
     , published : Bool
     , tournament : String
     , created : String
@@ -114,7 +142,7 @@ type alias CoachUser =
     , name : String
     , school : String
     , teamName : String
-    , status : String
+    , status : CoachUserStatus
     , role : String
     , created : String
     , updated : String
@@ -180,6 +208,89 @@ type alias AttorneyCoach =
 -- DECODERS
 
 
+tournamentStatusDecoder : Decoder TournamentStatus
+tournamentStatusDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "draft" ->
+                        Decode.succeed TournamentDraft
+
+                    "registration" ->
+                        Decode.succeed TournamentRegistration
+
+                    "active" ->
+                        Decode.succeed TournamentActive
+
+                    "completed" ->
+                        Decode.succeed TournamentCompleted
+
+                    _ ->
+                        Decode.fail ("Unknown tournament status: " ++ s)
+            )
+
+
+teamStatusDecoder : Decoder TeamStatus
+teamStatusDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "pending" ->
+                        Decode.succeed TeamPending
+
+                    "active" ->
+                        Decode.succeed TeamActive
+
+                    "withdrawn" ->
+                        Decode.succeed TeamWithdrawn
+
+                    "rejected" ->
+                        Decode.succeed TeamRejected
+
+                    _ ->
+                        Decode.fail ("Unknown team status: " ++ s)
+            )
+
+
+coachUserStatusDecoder : Decoder CoachUserStatus
+coachUserStatusDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "pending" ->
+                        Decode.succeed CoachPending
+
+                    "approved" ->
+                        Decode.succeed CoachApproved
+
+                    "rejected" ->
+                        Decode.succeed CoachRejected
+
+                    _ ->
+                        Decode.fail ("Unknown coach user status: " ++ s)
+            )
+
+
+roundTypeDecoder : Decoder RoundType
+roundTypeDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "preliminary" ->
+                        Decode.succeed Preliminary
+
+                    "elimination" ->
+                        Decode.succeed Elimination
+
+                    _ ->
+                        Decode.fail ("Unknown round type: " ++ s)
+            )
+
+
 tournamentDecoder : Decoder Tournament
 tournamentDecoder =
     Decode.succeed Tournament
@@ -194,7 +305,7 @@ tournamentDecoder =
             (Decode.field "num_elimination_rounds"
                 Decode.int
             )
-        |> andMap (Decode.field "status" Decode.string)
+        |> andMap (Decode.field "status" tournamentStatusDecoder)
         |> andMap
             (fieldWithDefault "eligibility_locked_at"
                 (Decode.nullable Decode.string)
@@ -229,7 +340,7 @@ teamDecoder =
         |> andMap
             (fieldWithDefault "name" Decode.string "")
         |> andMap
-            (fieldWithDefault "status" Decode.string "")
+            (fieldWithDefault "status" teamStatusDecoder TeamPending)
         |> andMap
             (fieldWithDefault "coach" Decode.string "")
         |> andMap (Decode.field "created" Decode.string)
@@ -262,8 +373,8 @@ roundDecoder =
         (Decode.field "id" Decode.string)
         (fieldWithDefault "number" Decode.int 0)
         (fieldWithDefault "date" Decode.string "")
-        (fieldWithDefault "type" Decode.string
-            "preliminary"
+        (fieldWithDefault "type" roundTypeDecoder
+            Preliminary
         )
         (fieldWithDefault "published" Decode.bool False)
         (Decode.field "tournament" Decode.string)
@@ -306,8 +417,8 @@ coachUserDecoder =
             )
         |> andMap
             (fieldWithDefault "status"
-                Decode.string
-                "pending"
+                coachUserStatusDecoder
+                CoachPending
             )
         |> andMap
             (fieldWithDefault "role"
@@ -435,12 +546,67 @@ attorneyCoachDecoder =
 -- ENCODERS
 
 
+encodeTournamentStatus : TournamentStatus -> Encode.Value
+encodeTournamentStatus s =
+    case s of
+        TournamentDraft ->
+            Encode.string "draft"
+
+        TournamentRegistration ->
+            Encode.string "registration"
+
+        TournamentActive ->
+            Encode.string "active"
+
+        TournamentCompleted ->
+            Encode.string "completed"
+
+
+encodeTeamStatus : TeamStatus -> Encode.Value
+encodeTeamStatus s =
+    case s of
+        TeamPending ->
+            Encode.string "pending"
+
+        TeamActive ->
+            Encode.string "active"
+
+        TeamWithdrawn ->
+            Encode.string "withdrawn"
+
+        TeamRejected ->
+            Encode.string "rejected"
+
+
+encodeCoachUserStatus : CoachUserStatus -> Encode.Value
+encodeCoachUserStatus s =
+    case s of
+        CoachPending ->
+            Encode.string "pending"
+
+        CoachApproved ->
+            Encode.string "approved"
+
+        CoachRejected ->
+            Encode.string "rejected"
+
+
+encodeRoundType : RoundType -> Encode.Value
+encodeRoundType rt =
+    case rt of
+        Preliminary ->
+            Encode.string "preliminary"
+
+        Elimination ->
+            Encode.string "elimination"
+
+
 encodeTournament :
     { name : String
     , year : Int
     , numPreliminaryRounds : Int
     , numEliminationRounds : Int
-    , status : String
+    , status : TournamentStatus
     }
     -> Encode.Value
 encodeTournament t =
@@ -453,7 +619,7 @@ encodeTournament t =
         , ( "num_elimination_rounds"
           , Encode.int t.numEliminationRounds
           )
-        , ( "status", Encode.string t.status )
+        , ( "status", encodeTournamentStatus t.status )
         ]
 
 
@@ -506,7 +672,7 @@ encodeCourtroom c =
 encodeRound :
     { number : Int
     , date : String
-    , roundType : String
+    , roundType : RoundType
     , published : Bool
     , tournament : String
     }
@@ -515,7 +681,7 @@ encodeRound r =
     Encode.object
         [ ( "number", Encode.int r.number )
         , ( "date", Encode.string r.date )
-        , ( "type", Encode.string r.roundType )
+        , ( "type", encodeRoundType r.roundType )
         , ( "published", Encode.bool r.published )
         , ( "tournament", Encode.string r.tournament )
         ]
@@ -653,6 +819,35 @@ encodeAttorneyCoach c =
 
 
 -- HELPERS
+
+
+roundTypeToString : RoundType -> String
+roundTypeToString rt =
+    case rt of
+        Preliminary ->
+            "preliminary"
+
+        Elimination ->
+            "elimination"
+
+
+tournamentStatusFromString : String -> Maybe TournamentStatus
+tournamentStatusFromString s =
+    case s of
+        "draft" ->
+            Just TournamentDraft
+
+        "registration" ->
+            Just TournamentRegistration
+
+        "active" ->
+            Just TournamentActive
+
+        "completed" ->
+            Just TournamentCompleted
+
+        _ ->
+            Nothing
 
 
 fieldWithDefault :

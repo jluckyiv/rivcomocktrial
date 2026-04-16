@@ -206,7 +206,7 @@ update user msg model =
                     FormOpen (Editing r.id)
                         { number = String.fromInt r.number
                         , date = r.date
-                        , roundType = r.roundType
+                        , roundType = Api.roundTypeToString r.roundType
                         , tournament = r.tournament
                         }
                         []
@@ -278,7 +278,7 @@ update user msg model =
 type alias ValidatedRound =
     { number : Int
     , date : String
-    , roundType : String
+    , roundType : Api.RoundType
     , published : Bool
     , tournament : String
     }
@@ -287,6 +287,17 @@ type alias ValidatedRound =
 validateForm : RoundForm -> Result (List String) ValidatedRound
 validateForm formData =
     let
+        roundTypeResult =
+            case formData.roundType of
+                "preliminary" ->
+                    Ok Api.Preliminary
+
+                "elimination" ->
+                    Ok Api.Elimination
+
+                _ ->
+                    Err "Round type must be preliminary or elimination"
+
         errors =
             []
                 |> addErrorIf (String.trim formData.tournament == "") "Tournament is required"
@@ -300,20 +311,26 @@ validateForm formData =
                     )
                     "Round number must be a positive integer"
                 |> addErrorIf (String.trim formData.date == "") "Date is required"
-                |> addErrorIf (not (List.member formData.roundType [ "preliminary", "elimination" ])) "Round type must be preliminary or elimination"
+                |> (case roundTypeResult of
+                        Ok _ ->
+                            identity
+
+                        Err e ->
+                            (::) e
+                   )
     in
     if List.isEmpty errors then
-        case String.toInt formData.number of
-            Just n ->
+        case ( String.toInt formData.number, roundTypeResult ) of
+            ( Just n, Ok rt ) ->
                 Ok
                     { number = n
                     , date = formData.date
-                    , roundType = formData.roundType
+                    , roundType = rt
                     , published = False
                     , tournament = formData.tournament
                     }
 
-            Nothing ->
+            _ ->
                 Err errors
 
     else
@@ -496,7 +513,7 @@ viewRow : Maybe String -> (String -> String) -> Round -> Html Msg
 viewRow deleting findTournamentName r =
     tr []
         [ td [] [ text (String.fromInt r.number) ]
-        , td [] [ text (capitalize r.roundType) ]
+        , td [] [ text (capitalize (Api.roundTypeToString r.roundType)) ]
         , td [] [ text r.date ]
         , td [] [ text (findTournamentName r.tournament) ]
         , td []
