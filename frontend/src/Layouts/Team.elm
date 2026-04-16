@@ -143,7 +143,7 @@ viewNavbar shared model route =
                     ]
                 , if model.burgerOpen then
                     ul [ Attr.class "menu menu-sm dropdown-content bg-info text-info-content mt-3 z-10 w-52 p-2 shadow-lg rounded-box" ]
-                        [ navItem route Route.Path.Team_EligibleStudents "Eligible Students"
+                        [ navItem route Route.Path.Team_Manage "Eligible Students"
                         ]
 
                   else
@@ -154,7 +154,7 @@ viewNavbar shared model route =
             ]
         , div [ Attr.class "navbar-center hidden lg:flex" ]
             [ ul [ Attr.class "menu menu-horizontal px-1" ]
-                [ navItem route Route.Path.Team_EligibleStudents "Eligible Students"
+                [ navItem route Route.Path.Team_Manage "Eligible Students"
                 ]
             ]
         , div [ Attr.class "navbar-end" ]

@@ -54,7 +54,7 @@ init shared _ =
               , state = Ready
               }
             , Effect.pushRoutePath
-                Route.Path.Team_EligibleStudents
+                Route.Path.Team_Manage
             )
 
         NotLoggedIn ->

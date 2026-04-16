@@ -1,6 +1,6 @@
 module Pb exposing
     ( adminList, adminCreate, adminUpdate, adminDelete
-    , publicList, publicCreate
+    , publicList, publicCreate, publicUpdate, publicDelete
     , adminLogin, coachLogin
     , subscribe
     , responseTag
@@ -135,6 +135,42 @@ publicCreate config =
         , ( "tag", Encode.string config.tag )
         , ( "admin", Encode.bool False )
         , ( "body", config.body )
+        ]
+
+
+publicUpdate :
+    { collection : String
+    , id : String
+    , tag : String
+    , body : Encode.Value
+    }
+    -> Effect msg
+publicUpdate config =
+    pbSend "update"
+        [ ( "collection"
+          , Encode.string config.collection
+          )
+        , ( "tag", Encode.string config.tag )
+        , ( "admin", Encode.bool False )
+        , ( "id", Encode.string config.id )
+        , ( "body", config.body )
+        ]
+
+
+publicDelete :
+    { collection : String
+    , id : String
+    , tag : String
+    }
+    -> Effect msg
+publicDelete config =
+    pbSend "delete"
+        [ ( "collection"
+          , Encode.string config.collection
+          )
+        , ( "tag", Encode.string config.tag )
+        , ( "admin", Encode.bool False )
+        , ( "id", Encode.string config.id )
         ]
 
 
