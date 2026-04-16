@@ -2,13 +2,17 @@ module Api exposing
     ( Tournament, School, Team, Student
     , Courtroom, Round, Trial, CoachUser
     , EligibilityEntry, ChangeRequest, CoCoach, AttorneyCoach
+    , CaseCharacter, RosterSubmission, RosterEntry, AttorneyTask
     , ChangeType(..), RequestStatus(..), EligibilityStatus(..)
     , TournamentStatus(..), TeamStatus(..), CoachUserStatus(..), RoundType(..)
+    , Pronoun(..), RosterSide(..), EntryType(..), RosterRole(..), TaskType(..)
     , tournamentDecoder, schoolDecoder, teamDecoder
     , studentDecoder, courtroomDecoder, roundDecoder
     , trialDecoder, coachUserDecoder
     , eligibilityEntryDecoder, changeRequestDecoder
     , coCoachDecoder, attorneyCoachDecoder
+    , caseCharacterDecoder, rosterSubmissionDecoder
+    , rosterEntryDecoder, attorneyTaskDecoder
     , encodeTournament, encodeSchool, encodeTeam
     , encodeStudent, encodeCourtroom, encodeRound
     , encodeTrial, encodeCoachRegistration
@@ -17,7 +21,10 @@ module Api exposing
     , encodeChangeType, encodeRequestStatus
     , encodeCoCoach, encodeAttorneyCoach
     , encodeTournamentStatus, encodeTeamStatus, encodeCoachUserStatus, encodeRoundType
+    , encodeCaseCharacter, encodeRosterSubmission
+    , encodeRosterEntry, encodeAttorneyTask
     , roundTypeToString, tournamentStatusFromString
+    , pronounToString, rosterSideToString
     )
 
 {-| PocketBase record types, decoders, and encoders.
@@ -60,6 +67,41 @@ type RoundType
     | Elimination
 
 
+type Pronoun
+    = HeHim
+    | SheHer
+    | TheyThem
+    | OtherPronoun String
+
+
+type RosterSide
+    = Prosecution
+    | Defense
+
+
+type EntryType
+    = ActiveEntry
+    | SubstituteEntry
+    | NonActiveEntry
+
+
+type RosterRole
+    = PretrialAttorneyRole
+    | TrialAttorneyRole
+    | WitnessRole
+    | ClerkRole
+    | BailiffRole
+    | ArtistRole
+    | JournalistRole
+
+
+type TaskType
+    = OpeningTask
+    | DirectTask
+    | CrossTask
+    | ClosingTask
+
+
 type alias Tournament =
     { id : String
     , name : String
@@ -68,6 +110,7 @@ type alias Tournament =
     , numEliminationRounds : Int
     , status : TournamentStatus
     , eligibilityLockedAt : Maybe String
+    , rosterDeadlineHours : Maybe Int
     , created : String
     , updated : String
     }
@@ -99,6 +142,7 @@ type alias Student =
     { id : String
     , name : String
     , school : String
+    , pronouns : Maybe String
     , created : String
     , updated : String
     }
@@ -204,6 +248,55 @@ type alias AttorneyCoach =
     }
 
 
+type alias CaseCharacter =
+    { id : String
+    , tournament : String
+    , side : RosterSide
+    , characterName : String
+    , description : String
+    , sortOrder : Int
+    , created : String
+    , updated : String
+    }
+
+
+type alias RosterSubmission =
+    { id : String
+    , team : String
+    , round : String
+    , side : RosterSide
+    , submittedAt : Maybe String
+    , created : String
+    , updated : String
+    }
+
+
+type alias RosterEntry =
+    { id : String
+    , team : String
+    , round : String
+    , side : RosterSide
+    , student : Maybe String
+    , entryType : EntryType
+    , role : Maybe RosterRole
+    , character : Maybe String
+    , sortOrder : Maybe Int
+    , created : String
+    , updated : String
+    }
+
+
+type alias AttorneyTask =
+    { id : String
+    , rosterEntry : String
+    , taskType : TaskType
+    , character : Maybe String
+    , sortOrder : Int
+    , created : String
+    , updated : String
+    }
+
+
 
 -- DECODERS
 
@@ -291,24 +384,115 @@ roundTypeDecoder =
             )
 
 
+rosterSideDecoder : Decoder RosterSide
+rosterSideDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "prosecution" ->
+                        Decode.succeed Prosecution
+
+                    "defense" ->
+                        Decode.succeed Defense
+
+                    _ ->
+                        Decode.fail ("Unknown roster side: " ++ s)
+            )
+
+
+entryTypeDecoder : Decoder EntryType
+entryTypeDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "active" ->
+                        Decode.succeed ActiveEntry
+
+                    "substitute" ->
+                        Decode.succeed SubstituteEntry
+
+                    "non_active" ->
+                        Decode.succeed NonActiveEntry
+
+                    _ ->
+                        Decode.fail ("Unknown entry type: " ++ s)
+            )
+
+
+rosterRoleDecoder : Decoder RosterRole
+rosterRoleDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "pretrial_attorney" ->
+                        Decode.succeed PretrialAttorneyRole
+
+                    "trial_attorney" ->
+                        Decode.succeed TrialAttorneyRole
+
+                    "witness" ->
+                        Decode.succeed WitnessRole
+
+                    "clerk" ->
+                        Decode.succeed ClerkRole
+
+                    "bailiff" ->
+                        Decode.succeed BailiffRole
+
+                    "artist" ->
+                        Decode.succeed ArtistRole
+
+                    "journalist" ->
+                        Decode.succeed JournalistRole
+
+                    _ ->
+                        Decode.fail ("Unknown roster role: " ++ s)
+            )
+
+
+taskTypeDecoder : Decoder TaskType
+taskTypeDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "opening" ->
+                        Decode.succeed OpeningTask
+
+                    "direct" ->
+                        Decode.succeed DirectTask
+
+                    "cross" ->
+                        Decode.succeed CrossTask
+
+                    "closing" ->
+                        Decode.succeed ClosingTask
+
+                    _ ->
+                        Decode.fail ("Unknown task type: " ++ s)
+            )
+
+
 tournamentDecoder : Decoder Tournament
 tournamentDecoder =
     Decode.succeed Tournament
         |> andMap (Decode.field "id" Decode.string)
         |> andMap (Decode.field "name" Decode.string)
         |> andMap (Decode.field "year" Decode.int)
-        |> andMap
-            (Decode.field "num_preliminary_rounds"
-                Decode.int
-            )
-        |> andMap
-            (Decode.field "num_elimination_rounds"
-                Decode.int
-            )
+        |> andMap (Decode.field "num_preliminary_rounds" Decode.int)
+        |> andMap (Decode.field "num_elimination_rounds" Decode.int)
         |> andMap (Decode.field "status" tournamentStatusDecoder)
         |> andMap
             (fieldWithDefault "eligibility_locked_at"
                 (Decode.nullable Decode.string)
+                Nothing
+            )
+        |> andMap
+            (fieldWithDefault "roster_deadline_hours"
+                (Decode.nullable Decode.int)
                 Nothing
             )
         |> andMap (Decode.field "created" Decode.string)
@@ -329,32 +513,29 @@ teamDecoder : Decoder Team
 teamDecoder =
     Decode.succeed Team
         |> andMap (Decode.field "id" Decode.string)
-        |> andMap
-            (fieldWithDefault "tournament"
-                Decode.string
-                ""
-            )
+        |> andMap (fieldWithDefault "tournament" Decode.string "")
         |> andMap (Decode.field "school" Decode.string)
-        |> andMap
-            (fieldWithDefault "team_number" Decode.int 0)
-        |> andMap
-            (fieldWithDefault "name" Decode.string "")
-        |> andMap
-            (fieldWithDefault "status" teamStatusDecoder TeamPending)
-        |> andMap
-            (fieldWithDefault "coach" Decode.string "")
+        |> andMap (fieldWithDefault "team_number" Decode.int 0)
+        |> andMap (fieldWithDefault "name" Decode.string "")
+        |> andMap (fieldWithDefault "status" teamStatusDecoder TeamPending)
+        |> andMap (fieldWithDefault "coach" Decode.string "")
         |> andMap (Decode.field "created" Decode.string)
         |> andMap (Decode.field "updated" Decode.string)
 
 
 studentDecoder : Decoder Student
 studentDecoder =
-    Decode.map5 Student
-        (Decode.field "id" Decode.string)
-        (Decode.field "name" Decode.string)
-        (Decode.field "school" Decode.string)
-        (Decode.field "created" Decode.string)
-        (Decode.field "updated" Decode.string)
+    Decode.succeed Student
+        |> andMap (Decode.field "id" Decode.string)
+        |> andMap (Decode.field "name" Decode.string)
+        |> andMap (Decode.field "school" Decode.string)
+        |> andMap
+            (fieldWithDefault "pronouns"
+                (Decode.nullable Decode.string)
+                Nothing
+            )
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
 
 
 courtroomDecoder : Decoder Courtroom
@@ -373,9 +554,7 @@ roundDecoder =
         (Decode.field "id" Decode.string)
         (fieldWithDefault "number" Decode.int 0)
         (fieldWithDefault "date" Decode.string "")
-        (fieldWithDefault "type" roundTypeDecoder
-            Preliminary
-        )
+        (fieldWithDefault "type" roundTypeDecoder Preliminary)
         (fieldWithDefault "published" Decode.bool False)
         (Decode.field "tournament" Decode.string)
         (Decode.field "created" Decode.string)
@@ -398,38 +577,14 @@ coachUserDecoder : Decoder CoachUser
 coachUserDecoder =
     Decode.succeed CoachUser
         |> andMap (Decode.field "id" Decode.string)
-        |> andMap
-            (fieldWithDefault "email" Decode.string "")
-        |> andMap
-            (fieldWithDefault "name"
-                Decode.string
-                ""
-            )
-        |> andMap
-            (fieldWithDefault "school"
-                Decode.string
-                ""
-            )
-        |> andMap
-            (fieldWithDefault "team_name"
-                Decode.string
-                ""
-            )
-        |> andMap
-            (fieldWithDefault "status"
-                coachUserStatusDecoder
-                CoachPending
-            )
-        |> andMap
-            (fieldWithDefault "role"
-                Decode.string
-                ""
-            )
-        |> andMap
-            (Decode.field "created" Decode.string)
-        |> andMap
-            (Decode.field "updated" Decode.string)
-
+        |> andMap (fieldWithDefault "email" Decode.string "")
+        |> andMap (fieldWithDefault "name" Decode.string "")
+        |> andMap (fieldWithDefault "school" Decode.string "")
+        |> andMap (fieldWithDefault "team_name" Decode.string "")
+        |> andMap (fieldWithDefault "status" coachUserStatusDecoder CoachPending)
+        |> andMap (fieldWithDefault "role" Decode.string "")
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
 
 
 changeTypeDecoder : Decoder ChangeType
@@ -503,23 +658,10 @@ changeRequestDecoder =
     Decode.succeed ChangeRequest
         |> andMap (Decode.field "id" Decode.string)
         |> andMap (Decode.field "team" Decode.string)
-        |> andMap
-            (fieldWithDefault "student_name"
-                Decode.string
-                ""
-            )
-        |> andMap
-            (fieldWithDefault "change_type"
-                changeTypeDecoder
-                AddStudent
-            )
-        |> andMap
-            (fieldWithDefault "notes" Decode.string "")
-        |> andMap
-            (fieldWithDefault "status"
-                requestStatusDecoder
-                Pending
-            )
+        |> andMap (fieldWithDefault "student_name" Decode.string "")
+        |> andMap (fieldWithDefault "change_type" changeTypeDecoder AddStudent)
+        |> andMap (fieldWithDefault "notes" Decode.string "")
+        |> andMap (fieldWithDefault "status" requestStatusDecoder Pending)
         |> andMap (Decode.field "created" Decode.string)
         |> andMap (Decode.field "updated" Decode.string)
 
@@ -540,6 +682,83 @@ attorneyCoachDecoder =
         (Decode.field "team" Decode.string)
         (Decode.field "name" Decode.string)
         (fieldWithDefault "contact" Decode.string "")
+
+
+caseCharacterDecoder : Decoder CaseCharacter
+caseCharacterDecoder =
+    Decode.succeed CaseCharacter
+        |> andMap (Decode.field "id" Decode.string)
+        |> andMap (Decode.field "tournament" Decode.string)
+        |> andMap (fieldWithDefault "side" rosterSideDecoder Prosecution)
+        |> andMap (Decode.field "character_name" Decode.string)
+        |> andMap (fieldWithDefault "description" Decode.string "")
+        |> andMap (fieldWithDefault "sort_order" Decode.int 0)
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
+
+
+rosterSubmissionDecoder : Decoder RosterSubmission
+rosterSubmissionDecoder =
+    Decode.succeed RosterSubmission
+        |> andMap (Decode.field "id" Decode.string)
+        |> andMap (Decode.field "team" Decode.string)
+        |> andMap (Decode.field "round" Decode.string)
+        |> andMap (fieldWithDefault "side" rosterSideDecoder Prosecution)
+        |> andMap
+            (fieldWithDefault "submitted_at"
+                (Decode.nullable Decode.string)
+                Nothing
+            )
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
+
+
+rosterEntryDecoder : Decoder RosterEntry
+rosterEntryDecoder =
+    Decode.succeed RosterEntry
+        |> andMap (Decode.field "id" Decode.string)
+        |> andMap (Decode.field "team" Decode.string)
+        |> andMap (Decode.field "round" Decode.string)
+        |> andMap (fieldWithDefault "side" rosterSideDecoder Prosecution)
+        |> andMap
+            (fieldWithDefault "student"
+                (Decode.nullable Decode.string)
+                Nothing
+            )
+        |> andMap (fieldWithDefault "entry_type" entryTypeDecoder ActiveEntry)
+        |> andMap
+            (fieldWithDefault "role"
+                (Decode.nullable rosterRoleDecoder)
+                Nothing
+            )
+        |> andMap
+            (fieldWithDefault "character"
+                (Decode.nullable Decode.string)
+                Nothing
+            )
+        |> andMap
+            (fieldWithDefault "sort_order"
+                (Decode.nullable Decode.int)
+                Nothing
+            )
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
+
+
+attorneyTaskDecoder : Decoder AttorneyTask
+attorneyTaskDecoder =
+    Decode.succeed AttorneyTask
+        |> andMap (Decode.field "id" Decode.string)
+        |> andMap (Decode.field "roster_entry" Decode.string)
+        |> andMap (fieldWithDefault "task_type" taskTypeDecoder OpeningTask)
+        |> andMap
+            (fieldWithDefault "character"
+                (Decode.nullable Decode.string)
+                Nothing
+            )
+        |> andMap (fieldWithDefault "sort_order" Decode.int 0)
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
 
 
 
@@ -601,6 +820,70 @@ encodeRoundType rt =
             Encode.string "elimination"
 
 
+encodeRosterSide : RosterSide -> Encode.Value
+encodeRosterSide s =
+    case s of
+        Prosecution ->
+            Encode.string "prosecution"
+
+        Defense ->
+            Encode.string "defense"
+
+
+encodeEntryType : EntryType -> Encode.Value
+encodeEntryType et =
+    case et of
+        ActiveEntry ->
+            Encode.string "active"
+
+        SubstituteEntry ->
+            Encode.string "substitute"
+
+        NonActiveEntry ->
+            Encode.string "non_active"
+
+
+encodeRosterRole : RosterRole -> Encode.Value
+encodeRosterRole rr =
+    case rr of
+        PretrialAttorneyRole ->
+            Encode.string "pretrial_attorney"
+
+        TrialAttorneyRole ->
+            Encode.string "trial_attorney"
+
+        WitnessRole ->
+            Encode.string "witness"
+
+        ClerkRole ->
+            Encode.string "clerk"
+
+        BailiffRole ->
+            Encode.string "bailiff"
+
+        ArtistRole ->
+            Encode.string "artist"
+
+        JournalistRole ->
+            Encode.string "journalist"
+
+
+encodeTaskType : TaskType -> Encode.Value
+encodeTaskType tt =
+    case tt of
+        OpeningTask ->
+            Encode.string "opening"
+
+        DirectTask ->
+            Encode.string "direct"
+
+        CrossTask ->
+            Encode.string "cross"
+
+        ClosingTask ->
+            Encode.string "closing"
+
+
 encodeTournament :
     { name : String
     , year : Int
@@ -613,12 +896,8 @@ encodeTournament t =
     Encode.object
         [ ( "name", Encode.string t.name )
         , ( "year", Encode.int t.year )
-        , ( "num_preliminary_rounds"
-          , Encode.int t.numPreliminaryRounds
-          )
-        , ( "num_elimination_rounds"
-          , Encode.int t.numEliminationRounds
-          )
+        , ( "num_preliminary_rounds", Encode.int t.numPreliminaryRounds )
+        , ( "num_elimination_rounds", Encode.int t.numEliminationRounds )
         , ( "status", encodeTournamentStatus t.status )
         ]
 
@@ -634,11 +913,7 @@ encodeSchool s =
 
 
 encodeTeam :
-    { tournament : String
-    , school : String
-    , teamNumber : Int
-    , name : String
-    }
+    { tournament : String, school : String, teamNumber : Int, name : String }
     -> Encode.Value
 encodeTeam t =
     Encode.object
@@ -650,12 +925,16 @@ encodeTeam t =
 
 
 encodeStudent :
-    { name : String, school : String }
+    { name : String, school : String, pronouns : Maybe String }
     -> Encode.Value
 encodeStudent s =
     Encode.object
         [ ( "name", Encode.string s.name )
         , ( "school", Encode.string s.school )
+        , ( "pronouns"
+          , Maybe.map Encode.string s.pronouns
+                |> Maybe.withDefault Encode.null
+          )
         ]
 
 
@@ -697,12 +976,8 @@ encodeTrial :
 encodeTrial t =
     Encode.object
         [ ( "round", Encode.string t.round )
-        , ( "prosecution_team"
-          , Encode.string t.prosecutionTeam
-          )
-        , ( "defense_team"
-          , Encode.string t.defenseTeam
-          )
+        , ( "prosecution_team", Encode.string t.prosecutionTeam )
+        , ( "defense_team", Encode.string t.defenseTeam )
         , ( "courtroom", Encode.string t.courtroom )
         ]
 
@@ -720,9 +995,7 @@ encodeCoachRegistration r =
     Encode.object
         [ ( "email", Encode.string r.email )
         , ( "password", Encode.string r.password )
-        , ( "passwordConfirm"
-          , Encode.string r.passwordConfirm
-          )
+        , ( "passwordConfirm", Encode.string r.passwordConfirm )
         , ( "name", Encode.string r.name )
         , ( "school", Encode.string r.school )
         , ( "team_name", Encode.string r.teamName )
@@ -817,6 +1090,98 @@ encodeAttorneyCoach c =
         ]
 
 
+encodeCaseCharacter :
+    { tournament : String
+    , side : RosterSide
+    , characterName : String
+    , description : String
+    , sortOrder : Int
+    }
+    -> Encode.Value
+encodeCaseCharacter c =
+    Encode.object
+        [ ( "tournament", Encode.string c.tournament )
+        , ( "side", encodeRosterSide c.side )
+        , ( "character_name", Encode.string c.characterName )
+        , ( "description", Encode.string c.description )
+        , ( "sort_order", Encode.int c.sortOrder )
+        ]
+
+
+encodeRosterSubmission :
+    { team : String
+    , round : String
+    , side : RosterSide
+    , submittedAt : Maybe String
+    }
+    -> Encode.Value
+encodeRosterSubmission s =
+    Encode.object
+        [ ( "team", Encode.string s.team )
+        , ( "round", Encode.string s.round )
+        , ( "side", encodeRosterSide s.side )
+        , ( "submitted_at"
+          , Maybe.map Encode.string s.submittedAt
+                |> Maybe.withDefault Encode.null
+          )
+        ]
+
+
+encodeRosterEntry :
+    { team : String
+    , round : String
+    , side : RosterSide
+    , student : Maybe String
+    , entryType : EntryType
+    , role : Maybe RosterRole
+    , character : Maybe String
+    , sortOrder : Maybe Int
+    }
+    -> Encode.Value
+encodeRosterEntry e =
+    Encode.object
+        [ ( "team", Encode.string e.team )
+        , ( "round", Encode.string e.round )
+        , ( "side", encodeRosterSide e.side )
+        , ( "student"
+          , Maybe.map Encode.string e.student
+                |> Maybe.withDefault Encode.null
+          )
+        , ( "entry_type", encodeEntryType e.entryType )
+        , ( "role"
+          , Maybe.map encodeRosterRole e.role
+                |> Maybe.withDefault Encode.null
+          )
+        , ( "character"
+          , Maybe.map Encode.string e.character
+                |> Maybe.withDefault Encode.null
+          )
+        , ( "sort_order"
+          , Maybe.map Encode.int e.sortOrder
+                |> Maybe.withDefault Encode.null
+          )
+        ]
+
+
+encodeAttorneyTask :
+    { rosterEntry : String
+    , taskType : TaskType
+    , character : Maybe String
+    , sortOrder : Int
+    }
+    -> Encode.Value
+encodeAttorneyTask t =
+    Encode.object
+        [ ( "roster_entry", Encode.string t.rosterEntry )
+        , ( "task_type", encodeTaskType t.taskType )
+        , ( "character"
+          , Maybe.map Encode.string t.character
+                |> Maybe.withDefault Encode.null
+          )
+        , ( "sort_order", Encode.int t.sortOrder )
+        ]
+
+
 
 -- HELPERS
 
@@ -848,6 +1213,32 @@ tournamentStatusFromString s =
 
         _ ->
             Nothing
+
+
+pronounToString : Pronoun -> String
+pronounToString p =
+    case p of
+        HeHim ->
+            "he/him"
+
+        SheHer ->
+            "she/her"
+
+        TheyThem ->
+            "they/them"
+
+        OtherPronoun s ->
+            s
+
+
+rosterSideToString : RosterSide -> String
+rosterSideToString s =
+    case s of
+        Prosecution ->
+            "prosecution"
+
+        Defense ->
+            "defense"
 
 
 fieldWithDefault :
