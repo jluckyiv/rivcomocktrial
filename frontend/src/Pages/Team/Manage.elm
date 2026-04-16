@@ -74,13 +74,13 @@ type ChangeRequestFormState
     = ChangeRequestFormHidden
     | ChangeRequestFormOpen
         { studentName : String
-        , changeType : String
+        , changeType : Api.ChangeType
         , notes : String
         }
         (List String)
     | ChangeRequestFormSaving
         { studentName : String
-        , changeType : String
+        , changeType : Api.ChangeType
         , notes : String
         }
 
@@ -143,10 +143,10 @@ type Msg
     | SaveStudent
     | CancelStudentForm
     | RemoveEntry String
-    | ShowChangeRequestForm String String
+    | ShowChangeRequestForm String Api.ChangeType
     | ShowAddChangeRequestForm
     | UpdateChangeRequestStudentName String
-    | UpdateChangeRequestType String
+    | UpdateChangeRequestType Api.ChangeType
     | UpdateChangeRequestNotes String
     | SaveChangeRequest
     | CancelChangeRequestForm
@@ -344,7 +344,7 @@ updateTeamData msg data =
                 | changeRequestForm =
                     ChangeRequestFormOpen
                         { studentName = ""
-                        , changeType = "add"
+                        , changeType = Api.AddStudent
                         , notes = ""
                         }
                         []
@@ -405,18 +405,11 @@ updateTeamData msg data =
                             String.trim fields.studentName
 
                         errors =
-                            (if String.isEmpty trimmedName then
+                            if String.isEmpty trimmedName then
                                 [ "Student name is required." ]
 
-                             else
+                            else
                                 []
-                            )
-                                ++ (if String.isEmpty fields.changeType then
-                                        [ "Change type is required." ]
-
-                                    else
-                                        []
-                                   )
                     in
                     if not (List.isEmpty errors) then
                         ( { data
@@ -936,6 +929,16 @@ isLocked t =
             True
 
 
+changeTypeFromString : String -> Api.ChangeType
+changeTypeFromString s =
+    case s of
+        "add" ->
+            Api.AddStudent
+
+        _ ->
+            Api.RemoveStudent
+
+
 viewEligibilitySection : Bool -> TeamData -> Html Msg
 viewEligibilitySection locked data =
     div []
@@ -1124,7 +1127,7 @@ viewLockedEntryRow entry =
             [ button
                 [ Attr.class "btn btn-sm btn-ghost"
                 , Events.onClick
-                    (ShowChangeRequestForm entry.name "remove")
+                    (ShowChangeRequestForm entry.name Api.RemoveStudent)
                 ]
                 [ text "Request Remove" ]
             ]
@@ -1165,16 +1168,21 @@ viewChangeRequestForm formState =
                             ]
                         , select
                             [ Attr.class "select select-bordered w-full"
-                            , Events.onInput UpdateChangeRequestType
+                            , Events.onInput
+                                (changeTypeFromString
+                                    >> UpdateChangeRequestType
+                                )
                             ]
                             [ option
                                 [ Attr.value "add"
-                                , Attr.selected (fields.changeType == "add")
+                                , Attr.selected
+                                    (fields.changeType == Api.AddStudent)
                                 ]
                                 [ text "Add student" ]
                             , option
                                 [ Attr.value "remove"
-                                , Attr.selected (fields.changeType == "remove")
+                                , Attr.selected
+                                    (fields.changeType == Api.RemoveStudent)
                                 ]
                                 [ text "Remove student" ]
                             ]
@@ -1255,11 +1263,12 @@ viewChangeRequestRow req =
         [ td [] [ text req.studentName ]
         , td []
             [ text
-                (if req.changeType == "add" then
-                    "Add"
+                (case req.changeType of
+                    Api.AddStudent ->
+                        "Add"
 
-                 else
-                    "Remove"
+                    Api.RemoveStudent ->
+                        "Remove"
                 )
             ]
         , td [] [ text req.notes ]
@@ -1267,20 +1276,17 @@ viewChangeRequestRow req =
         ]
 
 
-viewChangeRequestBadge : String -> Html msg
+viewChangeRequestBadge : Api.RequestStatus -> Html msg
 viewChangeRequestBadge status =
     case status of
-        "pending" ->
+        Api.Pending ->
             UI.badge { label = "Pending", variant = "warning" }
 
-        "approved" ->
+        Api.Approved ->
             UI.badge { label = "Approved", variant = "success" }
 
-        "rejected" ->
+        Api.Rejected ->
             UI.badge { label = "Rejected", variant = "error" }
-
-        _ ->
-            UI.badge { label = status, variant = "ghost" }
 
 
 viewCoachesSection : TeamData -> Html Msg

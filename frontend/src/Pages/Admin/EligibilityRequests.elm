@@ -89,7 +89,7 @@ update _ msg model =
                 , tag = "update-request"
                 , body =
                     Json.Encode.object
-                        [ ( "status", Json.Encode.string "approved" ) ]
+                        [ ( "status", Api.encodeRequestStatus Api.Approved ) ]
                 }
             )
 
@@ -101,7 +101,7 @@ update _ msg model =
                 , tag = "update-request"
                 , body =
                     Json.Encode.object
-                        [ ( "status", Json.Encode.string "rejected" ) ]
+                        [ ( "status", Api.encodeRequestStatus Api.Rejected ) ]
                 }
             )
 
@@ -253,11 +253,12 @@ viewRequestRow teams req =
         , td [] [ text req.studentName ]
         , td []
             [ text
-                (if req.changeType == "add" then
-                    "Add"
+                (case req.changeType of
+                    Api.AddStudent ->
+                        "Add"
 
-                 else
-                    "Remove"
+                    Api.RemoveStudent ->
+                        "Remove"
                 )
             ]
         , td [] [ text req.notes ]
@@ -266,26 +267,23 @@ viewRequestRow teams req =
         ]
 
 
-viewStatusBadge : String -> Html msg
+viewStatusBadge : Api.RequestStatus -> Html msg
 viewStatusBadge status =
     case status of
-        "pending" ->
+        Api.Pending ->
             UI.badge { label = "Pending", variant = "warning" }
 
-        "approved" ->
+        Api.Approved ->
             UI.badge { label = "Approved", variant = "success" }
 
-        "rejected" ->
+        Api.Rejected ->
             UI.badge { label = "Rejected", variant = "error" }
 
-        _ ->
-            UI.badge { label = status, variant = "ghost" }
 
-
-viewActions : String -> String -> Html Msg
+viewActions : String -> Api.RequestStatus -> Html Msg
 viewActions requestId status =
     case status of
-        "pending" ->
+        Api.Pending ->
             div [ Attr.class "flex gap-2" ]
                 [ button
                     [ Attr.class "btn btn-sm btn-success"
