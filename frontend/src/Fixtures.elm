@@ -1,13 +1,6 @@
 module Fixtures exposing
-    ( districts
-    , palmDesertEligibleStudents
-    , palmDesertStudents
-    , registrations
-    , santiagoEligibleStudents
-    , santiagoStudents
-    , schools
+    ( palmDesertEligibleStudents
     , teams
-    , tournament
     )
 
 {-| Hardcoded 2026 fixture data for incremental UI development.
@@ -23,11 +16,9 @@ import District exposing (District)
 import EligibleStudents exposing (EligibleStudents)
 import Email exposing (Email)
 import Error exposing (Error(..))
-import Registration exposing (Registration)
 import School exposing (School)
 import Student exposing (Student)
 import Team exposing (Team)
-import Tournament exposing (Tournament)
 
 
 
@@ -93,24 +84,6 @@ coach first last emailAddr =
     Coach.verify (Coach.apply (coachName first last) (email emailAddr))
 
 
-tournamentName : String -> Tournament.Name
-tournamentName raw =
-    crashOnError ("tournament name: " ++ raw)
-        (Tournament.nameFromString raw)
-
-
-tournamentYear : Int -> Tournament.Year
-tournamentYear n =
-    crashOnError ("tournament year: " ++ String.fromInt n)
-        (Tournament.yearFromInt n)
-
-
-tournamentConfig : Int -> Int -> Tournament.Config
-tournamentConfig prelim elim =
-    crashOnError "tournament config"
-        (Tournament.configFromInts prelim elim)
-
-
 studentName : String -> String -> Student.Name
 studentName first last =
     crashOnError ("student name: " ++ first ++ " " ++ last)
@@ -141,33 +114,12 @@ palmDesertStudents =
     ]
 
 
-santiagoStudents : List Student
-santiagoStudents =
-    [ student "Jamie" "Rodriguez" Student.TheyThem
-    , student "Sofia" "Martinez" Student.SheHer
-    , student "Ethan" "Lee" Student.HeHim
-    , student "Mia" "Anderson" Student.SheHer
-    , student "Noah" "Thomas" Student.HeHim
-    , student "Zoe" "Jackson" Student.SheHer
-    , student "Liam" "White" Student.HeHim
-    , student "Ava" "Harris" Student.SheHer
-    , student "Dylan" "Clark" Student.TheyThem
-    , student "Harper" "Lewis" Student.SheHer
-    ]
-
-
-
 -- ELIGIBLE STUDENTS
 
 
 palmDesertEligibleStudents : EligibleStudents
 palmDesertEligibleStudents =
     buildEligibleStudents "Palm Desert" palmDesertTeam palmDesertStudents
-
-
-santiagoEligibleStudents : EligibleStudents
-santiagoEligibleStudents =
-    buildEligibleStudents "Santiago" santiagoTeam santiagoStudents
 
 
 buildEligibleStudents : String -> Team -> List Student -> EligibleStudents
@@ -259,24 +211,6 @@ sanJacinto : District
 sanJacinto =
     District.create
         (districtName "San Jacinto Unified School District")
-
-
-districts : List District
-districts =
-    [ desertSands
-    , coronaNorco
-    , morenoValley
-    , murrietaValley
-    , jurupa
-    , dioceseSanBernardino
-    , temeculaValley
-    , riverside
-    , perrisUnion
-    , hemet
-    , paloVerdeDistrict
-    , sanJacinto
-    ]
-
 
 
 -- SCHOOLS
@@ -414,38 +348,6 @@ mlkSchool =
 sanJacintoSchool : School
 sanJacintoSchool =
     School.create (schoolName "San Jacinto High School") sanJacinto
-
-
-schools : List School
-schools =
-    [ palmDesertSchool
-    , santiagoSchool
-    , vistaDelLagoSchool
-    , murrietaValleySchool
-    , patriotSchool
-    , laQuintaSchool
-    , norcoSchool
-    , notreDameSchool
-    , valleyViewSchool
-    , canyonSpringsSchool
-    , temeculaValleySchool
-    , polySchool
-    , heritageSchool
-    , indioSchool
-    , ramonaSchool
-    , libertySchool
-    , johnWNorthSchool
-    , hemetSchool
-    , greatOakSchool
-    , chaparralSchool
-    , palomaValleySchool
-    , paloVerdeSchool
-    , stJeanneSchool
-    , centennialSchool
-    , mlkSchool
-    , sanJacintoSchool
-    ]
-
 
 
 -- TEAMS
@@ -632,50 +534,3 @@ teams =
 
 
 
--- TOURNAMENT
-
-
-tournament : Tournament
-tournament =
-    let
-        draft =
-            Tournament.create
-                (tournamentName
-                    "2026 Riverside County Mock Trial Competition"
-                )
-                (tournamentYear 2026)
-                (tournamentConfig 4 3)
-    in
-    crashOnError "tournament registration transition"
-        (Tournament.openRegistration draft)
-
-
-
--- REGISTRATIONS
-
-
-applicant : String -> String -> String -> Coach.TeacherCoachApplicant
-applicant first last emailAddr =
-    Coach.apply (coachName first last) (email emailAddr)
-
-
-registrations : List Registration
-registrations =
-    [ Registration.create
-        (Registration.idFromString "reg-001")
-        (applicant "Maria" "Santos" "msantos@palmdesert.edu")
-        palmDesertSchool
-        (teamName "Palm Desert")
-    , Registration.create
-        (Registration.idFromString "reg-002")
-        (applicant "James" "Chen" "jchen@santiago.edu")
-        santiagoSchool
-        (teamName "Santiago")
-    , Registration.approve
-        (Registration.create
-            (Registration.idFromString "reg-003")
-            (applicant "Lisa" "Thompson" "lthompson@norco.edu")
-            norcoSchool
-            (teamName "Norco")
-        )
-    ]
