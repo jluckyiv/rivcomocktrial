@@ -1,13 +1,18 @@
 module Api exposing
     ( Tournament, School, Team, Student
     , Courtroom, Round, Trial, CoachUser
+    , EligibilityEntry, ChangeRequest, CoCoach, AttorneyCoach
     , tournamentDecoder, schoolDecoder, teamDecoder
     , studentDecoder, courtroomDecoder, roundDecoder
     , trialDecoder, coachUserDecoder
+    , eligibilityEntryDecoder, changeRequestDecoder
+    , coCoachDecoder, attorneyCoachDecoder
     , encodeTournament, encodeSchool, encodeTeam
     , encodeStudent, encodeCourtroom, encodeRound
     , encodeTrial, encodeCoachRegistration
     , encodePendingTeamRegistration
+    , encodeEligibilityEntry, encodeChangeRequest
+    , encodeCoCoach, encodeAttorneyCoach
     )
 
 {-| PocketBase record types, decoders, and encoders.
@@ -32,6 +37,7 @@ type alias Tournament =
     , numPreliminaryRounds : Int
     , numEliminationRounds : Int
     , status : String
+    , eligibilityLockedAt : Maybe String
     , created : String
     , updated : String
     }
@@ -113,25 +119,71 @@ type alias CoachUser =
     }
 
 
+type alias EligibilityEntry =
+    { id : String
+    , team : String
+    , tournament : String
+    , name : String
+    , status : String
+    , created : String
+    , updated : String
+    }
+
+
+type alias ChangeRequest =
+    { id : String
+    , team : String
+    , studentName : String
+    , changeType : String
+    , notes : String
+    , status : String
+    , created : String
+    , updated : String
+    }
+
+
+type alias CoCoach =
+    { id : String
+    , team : String
+    , name : String
+    , email : String
+    }
+
+
+type alias AttorneyCoach =
+    { id : String
+    , team : String
+    , name : String
+    , contact : String
+    }
+
+
 
 -- DECODERS
 
 
 tournamentDecoder : Decoder Tournament
 tournamentDecoder =
-    Decode.map8 Tournament
-        (Decode.field "id" Decode.string)
-        (Decode.field "name" Decode.string)
-        (Decode.field "year" Decode.int)
-        (Decode.field "num_preliminary_rounds"
-            Decode.int
-        )
-        (Decode.field "num_elimination_rounds"
-            Decode.int
-        )
-        (Decode.field "status" Decode.string)
-        (Decode.field "created" Decode.string)
-        (Decode.field "updated" Decode.string)
+    Decode.succeed Tournament
+        |> andMap (Decode.field "id" Decode.string)
+        |> andMap (Decode.field "name" Decode.string)
+        |> andMap (Decode.field "year" Decode.int)
+        |> andMap
+            (Decode.field "num_preliminary_rounds"
+                Decode.int
+            )
+        |> andMap
+            (Decode.field "num_elimination_rounds"
+                Decode.int
+            )
+        |> andMap (Decode.field "status" Decode.string)
+        |> andMap
+            (fieldWithDefault "eligibility_locked_at"
+                (Decode.nullable Decode.string)
+                Nothing
+            )
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
 
 
 schoolDecoder : Decoder School
@@ -248,6 +300,63 @@ coachUserDecoder =
             (Decode.field "created" Decode.string)
         |> andMap
             (Decode.field "updated" Decode.string)
+
+
+
+eligibilityEntryDecoder : Decoder EligibilityEntry
+eligibilityEntryDecoder =
+    Decode.map7 EligibilityEntry
+        (Decode.field "id" Decode.string)
+        (Decode.field "team" Decode.string)
+        (fieldWithDefault "tournament" Decode.string "")
+        (Decode.field "name" Decode.string)
+        (fieldWithDefault "status" Decode.string "active")
+        (Decode.field "created" Decode.string)
+        (Decode.field "updated" Decode.string)
+
+
+changeRequestDecoder : Decoder ChangeRequest
+changeRequestDecoder =
+    Decode.succeed ChangeRequest
+        |> andMap (Decode.field "id" Decode.string)
+        |> andMap (Decode.field "team" Decode.string)
+        |> andMap
+            (fieldWithDefault "student_name"
+                Decode.string
+                ""
+            )
+        |> andMap
+            (fieldWithDefault "change_type"
+                Decode.string
+                ""
+            )
+        |> andMap
+            (fieldWithDefault "notes" Decode.string "")
+        |> andMap
+            (fieldWithDefault "status"
+                Decode.string
+                "pending"
+            )
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
+
+
+coCoachDecoder : Decoder CoCoach
+coCoachDecoder =
+    Decode.map4 CoCoach
+        (Decode.field "id" Decode.string)
+        (Decode.field "team" Decode.string)
+        (Decode.field "name" Decode.string)
+        (fieldWithDefault "email" Decode.string "")
+
+
+attorneyCoachDecoder : Decoder AttorneyCoach
+attorneyCoachDecoder =
+    Decode.map4 AttorneyCoach
+        (Decode.field "id" Decode.string)
+        (Decode.field "team" Decode.string)
+        (Decode.field "name" Decode.string)
+        (fieldWithDefault "contact" Decode.string "")
 
 
 
@@ -393,6 +502,57 @@ encodePendingTeamRegistration t =
         , ( "name", Encode.string t.name )
         , ( "coach", Encode.string t.coach )
         , ( "status", Encode.string "pending" )
+        ]
+
+
+encodeEligibilityEntry :
+    { team : String, tournament : String, name : String }
+    -> Encode.Value
+encodeEligibilityEntry e =
+    Encode.object
+        [ ( "team", Encode.string e.team )
+        , ( "tournament", Encode.string e.tournament )
+        , ( "name", Encode.string e.name )
+        , ( "status", Encode.string "active" )
+        ]
+
+
+encodeChangeRequest :
+    { team : String
+    , studentName : String
+    , changeType : String
+    , notes : String
+    }
+    -> Encode.Value
+encodeChangeRequest r =
+    Encode.object
+        [ ( "team", Encode.string r.team )
+        , ( "student_name", Encode.string r.studentName )
+        , ( "change_type", Encode.string r.changeType )
+        , ( "notes", Encode.string r.notes )
+        , ( "status", Encode.string "pending" )
+        ]
+
+
+encodeCoCoach :
+    { team : String, name : String, email : String }
+    -> Encode.Value
+encodeCoCoach c =
+    Encode.object
+        [ ( "team", Encode.string c.team )
+        , ( "name", Encode.string c.name )
+        , ( "email", Encode.string c.email )
+        ]
+
+
+encodeAttorneyCoach :
+    { team : String, name : String, contact : String }
+    -> Encode.Value
+encodeAttorneyCoach c =
+    Encode.object
+        [ ( "team", Encode.string c.team )
+        , ( "name", Encode.string c.name )
+        , ( "contact", Encode.string c.contact )
         ]
 
 

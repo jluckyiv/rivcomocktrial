@@ -59,7 +59,7 @@ onPageLoad shared route =
 isTeamRoute : Route.Path.Path -> Bool
 isTeamRoute path =
     case path of
-        Route.Path.Team_EligibleStudents ->
+        Route.Path.Team_Manage ->
             True
 
         _ ->

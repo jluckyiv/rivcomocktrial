@@ -122,7 +122,7 @@ update route msg model =
                 , Effect.saveCoachUser
                     (Just credentials.user)
                 , Effect.pushRoutePath
-                    Route.Path.Team_EligibleStudents
+                    Route.Path.Team_Manage
                 ]
             )
 
