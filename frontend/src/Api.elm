@@ -2,6 +2,7 @@ module Api exposing
     ( Tournament, School, Team, Student
     , Courtroom, Round, Trial, CoachUser
     , EligibilityEntry, ChangeRequest, CoCoach, AttorneyCoach
+    , ChangeType(..), RequestStatus(..), EligibilityStatus(..)
     , tournamentDecoder, schoolDecoder, teamDecoder
     , studentDecoder, courtroomDecoder, roundDecoder
     , trialDecoder, coachUserDecoder
@@ -12,6 +13,7 @@ module Api exposing
     , encodeTrial, encodeCoachRegistration
     , encodePendingTeamRegistration
     , encodeEligibilityEntry, encodeChangeRequest
+    , encodeChangeType, encodeRequestStatus
     , encodeCoCoach, encodeAttorneyCoach
     )
 
@@ -119,12 +121,28 @@ type alias CoachUser =
     }
 
 
+type ChangeType
+    = AddStudent
+    | RemoveStudent
+
+
+type RequestStatus
+    = Pending
+    | Approved
+    | Rejected
+
+
+type EligibilityStatus
+    = Active
+    | Removed
+
+
 type alias EligibilityEntry =
     { id : String
     , team : String
     , tournament : String
     , name : String
-    , status : String
+    , status : EligibilityStatus
     , created : String
     , updated : String
     }
@@ -134,9 +152,9 @@ type alias ChangeRequest =
     { id : String
     , team : String
     , studentName : String
-    , changeType : String
+    , changeType : ChangeType
     , notes : String
-    , status : String
+    , status : RequestStatus
     , created : String
     , updated : String
     }
@@ -303,6 +321,60 @@ coachUserDecoder =
 
 
 
+changeTypeDecoder : Decoder ChangeType
+changeTypeDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "add" ->
+                        Decode.succeed AddStudent
+
+                    "remove" ->
+                        Decode.succeed RemoveStudent
+
+                    _ ->
+                        Decode.fail ("Unknown change type: " ++ s)
+            )
+
+
+requestStatusDecoder : Decoder RequestStatus
+requestStatusDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "pending" ->
+                        Decode.succeed Pending
+
+                    "approved" ->
+                        Decode.succeed Approved
+
+                    "rejected" ->
+                        Decode.succeed Rejected
+
+                    _ ->
+                        Decode.fail ("Unknown request status: " ++ s)
+            )
+
+
+eligibilityStatusDecoder : Decoder EligibilityStatus
+eligibilityStatusDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "active" ->
+                        Decode.succeed Active
+
+                    "removed" ->
+                        Decode.succeed Removed
+
+                    _ ->
+                        Decode.fail ("Unknown eligibility status: " ++ s)
+            )
+
+
 eligibilityEntryDecoder : Decoder EligibilityEntry
 eligibilityEntryDecoder =
     Decode.map7 EligibilityEntry
@@ -310,7 +382,7 @@ eligibilityEntryDecoder =
         (Decode.field "team" Decode.string)
         (fieldWithDefault "tournament" Decode.string "")
         (Decode.field "name" Decode.string)
-        (fieldWithDefault "status" Decode.string "active")
+        (fieldWithDefault "status" eligibilityStatusDecoder Active)
         (Decode.field "created" Decode.string)
         (Decode.field "updated" Decode.string)
 
@@ -327,15 +399,15 @@ changeRequestDecoder =
             )
         |> andMap
             (fieldWithDefault "change_type"
-                Decode.string
-                ""
+                changeTypeDecoder
+                AddStudent
             )
         |> andMap
             (fieldWithDefault "notes" Decode.string "")
         |> andMap
             (fieldWithDefault "status"
-                Decode.string
-                "pending"
+                requestStatusDecoder
+                Pending
             )
         |> andMap (Decode.field "created" Decode.string)
         |> andMap (Decode.field "updated" Decode.string)
@@ -517,10 +589,33 @@ encodeEligibilityEntry e =
         ]
 
 
+encodeChangeType : ChangeType -> Encode.Value
+encodeChangeType ct =
+    case ct of
+        AddStudent ->
+            Encode.string "add"
+
+        RemoveStudent ->
+            Encode.string "remove"
+
+
+encodeRequestStatus : RequestStatus -> Encode.Value
+encodeRequestStatus rs =
+    case rs of
+        Pending ->
+            Encode.string "pending"
+
+        Approved ->
+            Encode.string "approved"
+
+        Rejected ->
+            Encode.string "rejected"
+
+
 encodeChangeRequest :
     { team : String
     , studentName : String
-    , changeType : String
+    , changeType : ChangeType
     , notes : String
     }
     -> Encode.Value
@@ -528,9 +623,9 @@ encodeChangeRequest r =
     Encode.object
         [ ( "team", Encode.string r.team )
         , ( "student_name", Encode.string r.studentName )
-        , ( "change_type", Encode.string r.changeType )
+        , ( "change_type", encodeChangeType r.changeType )
         , ( "notes", Encode.string r.notes )
-        , ( "status", Encode.string "pending" )
+        , ( "status", encodeRequestStatus Pending )
         ]
 
 
