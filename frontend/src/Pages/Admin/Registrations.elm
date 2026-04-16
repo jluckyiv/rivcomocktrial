@@ -94,7 +94,7 @@ update user msg model =
                 , tag = "user-status-update"
                 , body =
                     Json.Encode.object
-                        [ ( "status", Json.Encode.string "approved" ) ]
+                        [ ( "status", Api.encodeCoachUserStatus Api.CoachApproved ) ]
                 }
             )
 
@@ -106,7 +106,7 @@ update user msg model =
                 , tag = "user-status-update"
                 , body =
                     Json.Encode.object
-                        [ ( "status", Json.Encode.string "rejected" ) ]
+                        [ ( "status", Api.encodeCoachUserStatus Api.CoachRejected ) ]
                 }
             )
 
@@ -178,36 +178,37 @@ update user msg model =
 
                                 expectedTeamStatus =
                                     case updated.status of
-                                        "approved" ->
-                                            "active"
+                                        Api.CoachApproved ->
+                                            Just Api.TeamActive
 
-                                        "rejected" ->
-                                            "rejected"
+                                        Api.CoachRejected ->
+                                            Just Api.TeamRejected
 
-                                        _ ->
-                                            ""
+                                        Api.CoachPending ->
+                                            Nothing
 
                                 newTeams =
-                                    if String.isEmpty expectedTeamStatus then
-                                        model.teams
+                                    case expectedTeamStatus of
+                                        Nothing ->
+                                            model.teams
 
-                                    else
-                                        case model.teams of
-                                            Succeeded teams ->
-                                                Succeeded
-                                                    (List.map
-                                                        (\t ->
-                                                            if t.coach == updated.id then
-                                                                { t | status = expectedTeamStatus }
+                                        Just newStatus ->
+                                            case model.teams of
+                                                Succeeded teams ->
+                                                    Succeeded
+                                                        (List.map
+                                                            (\t ->
+                                                                if t.coach == updated.id then
+                                                                    { t | status = newStatus }
 
-                                                            else
-                                                                t
+                                                                else
+                                                                    t
+                                                            )
+                                                            teams
                                                         )
-                                                        teams
-                                                    )
 
-                                            other ->
-                                                other
+                                                other ->
+                                                    other
                             in
                             ( { model
                                 | coaches = newCoaches
@@ -347,7 +348,6 @@ viewCoachRow teams coach =
         teamStatus =
             maybeTeam
                 |> Maybe.map .status
-                |> Maybe.withDefault ""
     in
     tr []
         [ td [] [ text coach.name ]
@@ -359,45 +359,39 @@ viewCoachRow teams coach =
         ]
 
 
-viewUserStatusBadge : String -> Html msg
+viewUserStatusBadge : Api.CoachUserStatus -> Html msg
 viewUserStatusBadge s =
     case s of
-        "pending" ->
+        Api.CoachPending ->
             UI.badge { label = "Pending", variant = "warning" }
 
-        "approved" ->
+        Api.CoachApproved ->
             UI.badge { label = "Approved", variant = "success" }
 
-        "rejected" ->
+        Api.CoachRejected ->
             UI.badge { label = "Rejected", variant = "error" }
 
-        _ ->
-            UI.badge { label = s, variant = "ghost" }
 
-
-viewTeamStatusBadge : String -> Html msg
-viewTeamStatusBadge s =
-    case s of
-        "pending" ->
-            UI.badge { label = "Pending", variant = "warning" }
-
-        "active" ->
-            UI.badge { label = "Active", variant = "success" }
-
-        "withdrawn" ->
-            UI.badge { label = "Withdrawn", variant = "ghost" }
-
-        "rejected" ->
-            UI.badge { label = "Rejected", variant = "error" }
-
-        "" ->
+viewTeamStatusBadge : Maybe Api.TeamStatus -> Html msg
+viewTeamStatusBadge maybeStatus =
+    case maybeStatus of
+        Nothing ->
             UI.empty
 
-        _ ->
-            UI.badge { label = s, variant = "ghost" }
+        Just Api.TeamPending ->
+            UI.badge { label = "Pending", variant = "warning" }
+
+        Just Api.TeamActive ->
+            UI.badge { label = "Active", variant = "success" }
+
+        Just Api.TeamWithdrawn ->
+            UI.badge { label = "Withdrawn", variant = "ghost" }
+
+        Just Api.TeamRejected ->
+            UI.badge { label = "Rejected", variant = "error" }
 
 
-viewActions : String -> String -> Html Msg
+viewActions : String -> Api.CoachUserStatus -> Html Msg
 viewActions coachId status =
     let
         deleteButton =
@@ -408,7 +402,7 @@ viewActions coachId status =
                 [ text "Delete" ]
     in
     case status of
-        "pending" ->
+        Api.CoachPending ->
             div [ Attr.class "flex gap-2" ]
                 [ button
                     [ Attr.class "btn btn-sm btn-success"

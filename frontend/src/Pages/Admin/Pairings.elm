@@ -805,7 +805,7 @@ viewHeader model =
         roundLabel =
             case model.round of
                 Just r ->
-                    "Round " ++ String.fromInt r.number ++ " (" ++ capitalize r.roundType ++ ")"
+                    "Round " ++ String.fromInt r.number ++ " (" ++ capitalize (Api.roundTypeToString r.roundType) ++ ")"
 
                 Nothing ->
                     "Pairings"

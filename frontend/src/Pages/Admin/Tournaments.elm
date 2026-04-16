@@ -186,7 +186,7 @@ update user msg model =
                         , year = String.fromInt t.year
                         , prelimRounds = String.fromInt t.numPreliminaryRounds
                         , elimRounds = String.fromInt t.numEliminationRounds
-                        , status = t.status
+                        , status = tournamentStatusToFormString t.status
                         }
                         []
               }
@@ -248,7 +248,7 @@ type alias ValidatedTournament =
     , year : Int
     , numPreliminaryRounds : Int
     , numEliminationRounds : Int
-    , status : String
+    , status : Api.TournamentStatus
     }
 
 
@@ -311,19 +311,56 @@ validateForm formData =
     if List.isEmpty allErrors then
         case ( yearResult, prelimResult, elimResult ) of
             ( Ok y, Ok p, Ok e ) ->
-                Ok
-                    { name = String.trim formData.name
-                    , year = y
-                    , numPreliminaryRounds = p
-                    , numEliminationRounds = e
-                    , status = formData.status
-                    }
+                case statusValidation of
+                    Ok s ->
+                        Ok
+                            { name = String.trim formData.name
+                            , year = y
+                            , numPreliminaryRounds = p
+                            , numEliminationRounds = e
+                            , status = tournamentStatusFromDomain s
+                            }
+
+                    Err _ ->
+                        Err allErrors
 
             _ ->
                 Err allErrors
 
     else
         Err allErrors
+
+
+tournamentStatusFromDomain : Tournament.Status -> Api.TournamentStatus
+tournamentStatusFromDomain s =
+    case String.toLower (Tournament.statusToString s) of
+        "registration" ->
+            Api.TournamentRegistration
+
+        "active" ->
+            Api.TournamentActive
+
+        "completed" ->
+            Api.TournamentCompleted
+
+        _ ->
+            Api.TournamentDraft
+
+
+tournamentStatusToFormString : Api.TournamentStatus -> String
+tournamentStatusToFormString s =
+    case s of
+        Api.TournamentDraft ->
+            "draft"
+
+        Api.TournamentRegistration ->
+            "registration"
+
+        Api.TournamentActive ->
+            "active"
+
+        Api.TournamentCompleted ->
+            "completed"
 
 
 updateFormField : (TournamentForm -> TournamentForm) -> FormState -> FormState
@@ -491,20 +528,17 @@ viewRow deleting t =
         ]
 
 
-viewStatusBadge : String -> Html msg
+viewStatusBadge : Api.TournamentStatus -> Html msg
 viewStatusBadge status =
     case status of
-        "draft" ->
+        Api.TournamentDraft ->
             UI.badge { label = "Draft", variant = "ghost" }
 
-        "registration" ->
+        Api.TournamentRegistration ->
             UI.badge { label = "Registration", variant = "info" }
 
-        "active" ->
+        Api.TournamentActive ->
             UI.badge { label = "Active", variant = "success" }
 
-        "completed" ->
+        Api.TournamentCompleted ->
             UI.badge { label = "Completed", variant = "neutral" }
-
-        _ ->
-            UI.badge { label = status, variant = "ghost" }
