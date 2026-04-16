@@ -7,6 +7,7 @@ module Api exposing
     , encodeTournament, encodeSchool, encodeTeam
     , encodeStudent, encodeCourtroom, encodeRound
     , encodeTrial, encodeCoachRegistration
+    , encodePendingTeamRegistration
     )
 
 {-| PocketBase record types, decoders, and encoders.
@@ -51,6 +52,8 @@ type alias Team =
     , school : String
     , teamNumber : Int
     , name : String
+    , status : String
+    , coach : String
     , created : String
     , updated : String
     }
@@ -143,14 +146,24 @@ schoolDecoder =
 
 teamDecoder : Decoder Team
 teamDecoder =
-    Decode.map7 Team
-        (Decode.field "id" Decode.string)
-        (Decode.field "tournament" Decode.string)
-        (Decode.field "school" Decode.string)
-        (fieldWithDefault "team_number" Decode.int 0)
-        (fieldWithDefault "name" Decode.string "")
-        (Decode.field "created" Decode.string)
-        (Decode.field "updated" Decode.string)
+    Decode.succeed Team
+        |> andMap (Decode.field "id" Decode.string)
+        |> andMap
+            (fieldWithDefault "tournament"
+                Decode.string
+                ""
+            )
+        |> andMap (Decode.field "school" Decode.string)
+        |> andMap
+            (fieldWithDefault "team_number" Decode.int 0)
+        |> andMap
+            (fieldWithDefault "name" Decode.string "")
+        |> andMap
+            (fieldWithDefault "status" Decode.string "")
+        |> andMap
+            (fieldWithDefault "coach" Decode.string "")
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
 
 
 studentDecoder : Decoder Student
@@ -205,7 +218,7 @@ coachUserDecoder =
     Decode.succeed CoachUser
         |> andMap (Decode.field "id" Decode.string)
         |> andMap
-            (Decode.field "email" Decode.string)
+            (fieldWithDefault "email" Decode.string "")
         |> andMap
             (fieldWithDefault "name"
                 Decode.string
@@ -368,6 +381,18 @@ encodeCoachRegistration r =
         , ( "team_name", Encode.string r.teamName )
         , ( "status", Encode.string "pending" )
         , ( "role", Encode.string "coach" )
+        ]
+
+
+encodePendingTeamRegistration :
+    { school : String, name : String, coach : String }
+    -> Encode.Value
+encodePendingTeamRegistration t =
+    Encode.object
+        [ ( "school", Encode.string t.school )
+        , ( "name", Encode.string t.name )
+        , ( "coach", Encode.string t.coach )
+        , ( "status", Encode.string "pending" )
         ]
 
 

@@ -6,12 +6,14 @@
 // stores are in-memory only to avoid key conflicts.
 
 import "./app.css"
-import PocketBase from "pocketbase"
+import PocketBase, { BaseAuthStore } from "pocketbase"
 
-const pb = new PocketBase(window.location.origin)
-const pbAdmin = new PocketBase(window.location.origin)
+// Use BaseAuthStore (in-memory, no localStorage persistence) for both
+// instances so they never collide on the same storage key. We manage
+// auth persistence ourselves via localStorage["adminToken"] etc.
+const pb = new PocketBase(window.location.origin, new BaseAuthStore())
+const pbAdmin = new PocketBase(window.location.origin, new BaseAuthStore())
 
-// Disable SDK auto-persistence (we manage localStorage ourselves)
 pb.autoCancellation(false)
 pbAdmin.autoCancellation(false)
 
@@ -60,8 +62,9 @@ export const onReady = ({ app, env }) => {
 
     const sendError = (tag, err) => {
         const message = err?.message || String(err)
+        const errorData = err?.data || null
         if (app.ports.incoming) {
-            app.ports.incoming.send({ tag, error: message })
+            app.ports.incoming.send({ tag, error: message, errorData })
         }
     }
 

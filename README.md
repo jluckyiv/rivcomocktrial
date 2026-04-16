@@ -9,10 +9,14 @@ workflow.
 
 - **Frontend:** [Elm Land](https://elm.land) v0.20.1 —
   file-based routing SPA with
-  [Bulma](https://bulma.io) v1.0.4 CSS
+  [DaisyUI](https://daisyui.com) 5 +
+  [Tailwind CSS](https://tailwindcss.com) 4
 - **Backend:** [PocketBase](https://pocketbase.io)
   v0.36.3 — SQLite-based backend-as-a-service (JS
-  migrations and hooks, no custom Go)
+  migrations and hooks, no custom Go). PocketBase
+  exposes a server-side JSVM (Goja) for hooks and
+  migrations; these are *not* browser JavaScript and
+  have nothing to do with the PocketBase JS SDK.
 - **Deployment:** [fly.io](https://fly.io) via Docker —
   single container serves both frontend and backend
 - **CI/CD:** GitHub Actions deploys to fly.io staging on
@@ -25,12 +29,20 @@ workflow.
 │   ├── src/
 │   │   ├── Pages/     File-based routing
 │   │   ├── Layouts/   Shared layouts
-│   │   ├── Api.elm    PocketBase HTTP client
+│   │   ├── Api.elm    PocketBase record types and codecs
+│   │   ├── Pb.elm     Port-based PocketBase SDK client
+│   │   ├── interop.js Single JS boundary (actor-model
+│   │   │              port pair: outgoing/incoming).
+│   │   │              Uses the PocketBase JS SDK.
 │   │   └── Shared/    App-wide state (auth)
-│   └── elm-land.json  Proxy config, Bulma CDN
+│   └── elm-land.json  Proxy config
 ├── backend/           PocketBase
-│   ├── pb_migrations/ JS migrations (VCS)
-│   ├── pb_hooks/      JS hooks (VCS)
+│   ├── pb_migrations/ JS migrations (VCS) — run inside
+│   │                  PocketBase's server-side JSVM,
+│   │                  not the browser
+│   ├── pb_hooks/      JS hooks (VCS) — same JSVM; these
+│   │                  are server middleware, unrelated to
+│   │                  interop.js or the PocketBase JS SDK
 │   ├── pb_data/       SQLite (gitignored)
 │   ├── Dockerfile     Production build
 │   └── Dockerfile.dev Local dev container
