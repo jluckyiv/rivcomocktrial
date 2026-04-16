@@ -38,7 +38,7 @@ type FormContext
 
 
 type alias StudentForm =
-    { name : String, school : String }
+    { name : String, school : String, pronouns : String }
 
 
 type FormState
@@ -98,6 +98,7 @@ type Msg
     | CancelBulk
     | FormNameChanged String
     | FormSchoolChanged String
+    | FormPronounsChanged String
     | SaveStudent
     | DeleteStudent String
     | BulkTextChanged String
@@ -204,7 +205,7 @@ update user msg model =
 
         ShowCreateForm ->
             ( { model
-                | form = FormOpen Creating { name = "", school = model.filterSchool } []
+                | form = FormOpen Creating { name = "", school = model.filterSchool, pronouns = "" } []
                 , bulk = BulkIdle
               }
             , Effect.none
@@ -214,7 +215,7 @@ update user msg model =
             ( { model | bulk = BulkEditing "", form = FormHidden }, Effect.none )
 
         EditStudent s ->
-            ( { model | form = FormOpen (Editing s.id) { name = s.name, school = s.school } [], bulk = BulkIdle }, Effect.none )
+            ( { model | form = FormOpen (Editing s.id) { name = s.name, school = s.school, pronouns = Maybe.withDefault "" s.pronouns } [], bulk = BulkIdle }, Effect.none )
 
         CancelForm ->
             ( { model | form = FormHidden }, Effect.none )
@@ -227,6 +228,9 @@ update user msg model =
 
         FormSchoolChanged val ->
             ( { model | form = updateFormField (\f -> { f | school = val }) model.form }, Effect.none )
+
+        FormPronounsChanged val ->
+            ( { model | form = updateFormField (\f -> { f | pronouns = val }) model.form }, Effect.none )
 
         SaveStudent ->
             case model.form of
@@ -275,16 +279,23 @@ update user msg model =
 -- HELPERS
 
 
-validateForm : StudentForm -> Result (List String) { name : String, school : String }
+validateForm : StudentForm -> Result (List String) { name : String, school : String, pronouns : Maybe String }
 validateForm formData =
     let
         errors =
             []
                 |> addErrorIf (String.trim formData.name == "") "Name is required"
                 |> addErrorIf (String.trim formData.school == "") "School is required"
+
+        pronouns =
+            if String.trim formData.pronouns == "" then
+                Nothing
+
+            else
+                Just (String.trim formData.pronouns)
     in
     if List.isEmpty errors then
-        Ok { name = formData.name, school = formData.school }
+        Ok { name = formData.name, school = formData.school, pronouns = pronouns }
 
     else
         Err errors
@@ -360,7 +371,7 @@ handleBulkImport user model =
 -- BULK PARSING
 
 
-parseBulkLine : List School -> String -> Maybe { name : String, school : String }
+parseBulkLine : List School -> String -> Maybe { name : String, school : String, pronouns : Maybe String }
 parseBulkLine schools line =
     case String.split "," line |> List.map String.trim of
         [ name, schoolName ] ->
@@ -374,7 +385,7 @@ parseBulkLine schools line =
                             |> Maybe.withDefault ""
                 in
                 if schoolId /= "" then
-                    Just { name = name, school = schoolId }
+                    Just { name = name, school = schoolId, pronouns = Nothing }
 
                 else
                     Nothing
@@ -504,6 +515,12 @@ viewFormCard context formData errors saving schools =
                         , options =
                             { value = "", label = "Select school..." }
                                 :: List.map (\s -> { value = s.id, label = s.name }) schools
+                        }
+                    , UI.textField
+                        { label = "Pronouns"
+                        , value = formData.pronouns
+                        , onInput = FormPronounsChanged
+                        , required = False
                         }
                     ]
                 , div [ Attr.class "flex gap-2 mt-4" ]
