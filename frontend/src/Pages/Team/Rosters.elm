@@ -7,6 +7,7 @@ import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
 import Json.Decode
+import Json.Encode
 import Layouts
 import Page exposing (Page)
 import Pb
@@ -53,6 +54,9 @@ type alias TeamData =
     , submissions : List Api.RosterSubmission
     , tasks : List Api.AttorneyTask
     , expandedRound : Maybe String
+    , form : FormState
+    , savesPending : Int
+    , deletesPending : Int
     }
 
 
@@ -60,6 +64,29 @@ type RemoteData a
     = Loading
     | Succeeded a
     | Failed String
+
+
+type FormState
+    = FormHidden
+    | FormEditing FormData (List String)
+    | FormSaving FormData
+
+
+type alias FormData =
+    { roundId : String
+    , side : Api.RosterSide
+    , rows : List FormRow
+    , submitting : Bool
+    }
+
+
+type alias FormRow =
+    { id : Maybe String
+    , student : String
+    , entryType : String
+    , role : String
+    , character : String
+    }
 
 
 emptyTeamData : Api.Team -> TeamData
@@ -73,6 +100,19 @@ emptyTeamData team =
     , submissions = []
     , tasks = []
     , expandedRound = Nothing
+    , form = FormHidden
+    , savesPending = 0
+    , deletesPending = 0
+    }
+
+
+emptyRow : FormRow
+emptyRow =
+    { id = Nothing
+    , student = ""
+    , entryType = "active"
+    , role = ""
+    , character = ""
     }
 
 
@@ -104,6 +144,16 @@ init shared _ =
 type Msg
     = PbMsg Json.Decode.Value
     | ToggleRound String
+    | EditRoster String Api.RosterSide
+    | CancelRosterForm
+    | AddRow
+    | RemoveRow Int
+    | UpdateRowStudent Int String
+    | UpdateRowEntryType Int String
+    | UpdateRowRole Int String
+    | UpdateRowCharacter Int String
+    | SaveDraft
+    | SubmitRoster
 
 
 update : Msg -> Model -> ( Model, Effect Msg )
@@ -217,6 +267,238 @@ updateTeamData msg data =
             in
             ( { data | expandedRound = newExpanded }, Effect.none )
 
+        EditRoster roundId side ->
+            let
+                existingEntries =
+                    entriesForRound roundId side data.entries
+
+                rows =
+                    if List.isEmpty existingEntries then
+                        [ emptyRow ]
+
+                    else
+                        List.map entryToFormRow existingEntries
+            in
+            ( { data
+                | form =
+                    FormEditing
+                        { roundId = roundId
+                        , side = side
+                        , rows = rows
+                        , submitting = False
+                        }
+                        []
+                , expandedRound = Just roundId
+              }
+            , Effect.none
+            )
+
+        CancelRosterForm ->
+            ( { data | form = FormHidden }, Effect.none )
+
+        AddRow ->
+            ( { data | form = updateFormRows (\rows -> rows ++ [ emptyRow ]) data.form }
+            , Effect.none
+            )
+
+        RemoveRow idx ->
+            ( { data
+                | form =
+                    updateFormRows
+                        (\rows ->
+                            List.indexedMap Tuple.pair rows
+                                |> List.filterMap
+                                    (\( i, r ) ->
+                                        if i == idx then
+                                            Nothing
+
+                                        else
+                                            Just r
+                                    )
+                        )
+                        data.form
+              }
+            , Effect.none
+            )
+
+        UpdateRowStudent idx val ->
+            ( { data | form = updateRow idx (\r -> { r | student = val }) data.form }, Effect.none )
+
+        UpdateRowEntryType idx val ->
+            ( { data | form = updateRow idx (\r -> { r | entryType = val, role = "", character = "" }) data.form }, Effect.none )
+
+        UpdateRowRole idx val ->
+            let
+                clearCharacter r =
+                    if val /= "witness" then
+                        { r | role = val, character = "" }
+
+                    else
+                        { r | role = val }
+            in
+            ( { data | form = updateRow idx clearCharacter data.form }, Effect.none )
+
+        UpdateRowCharacter idx val ->
+            ( { data | form = updateRow idx (\r -> { r | character = val }) data.form }, Effect.none )
+
+        SaveDraft ->
+            handleSave False data
+
+        SubmitRoster ->
+            handleSave True data
+
+
+handleSave : Bool -> TeamData -> ( TeamData, Effect Msg )
+handleSave submitting data =
+    case data.form of
+        FormEditing formData _ ->
+            case validateForm formData of
+                Err errors ->
+                    ( { data | form = FormEditing formData errors }, Effect.none )
+
+                Ok validRows ->
+                    let
+                        teamId =
+                            data.team.id
+
+                        roundId =
+                            formData.roundId
+
+                        side =
+                            formData.side
+
+                        existingEntries =
+                            entriesForRound roundId side data.entries
+
+                        existingIds =
+                            List.filterMap .id validRows
+
+                        toDelete =
+                            List.filter
+                                (\e -> not (List.member e.id existingIds))
+                                existingEntries
+
+                        toCreate =
+                            List.filter (\r -> r.id == Nothing) validRows
+
+                        toUpdate =
+                            List.filter (\r -> r.id /= Nothing) validRows
+
+                        encodeRow row =
+                            Api.encodeRosterEntry
+                                { team = teamId
+                                , round = roundId
+                                , side = side
+                                , student =
+                                    if row.student == "" then
+                                        Nothing
+
+                                    else
+                                        Just row.student
+                                , entryType = parseEntryType row.entryType
+                                , role = parseRole row.role
+                                , character =
+                                    if row.character == "" then
+                                        Nothing
+
+                                    else
+                                        Just row.character
+                                , sortOrder = Nothing
+                                }
+
+                        createEffects =
+                            List.map
+                                (\row ->
+                                    Pb.publicCreate
+                                        { collection = "roster_entries"
+                                        , tag = "save-entry"
+                                        , body = encodeRow row
+                                        }
+                                )
+                                toCreate
+
+                        updateEffects =
+                            List.filterMap
+                                (\row ->
+                                    row.id
+                                        |> Maybe.map
+                                            (\id ->
+                                                Pb.publicUpdate
+                                                    { collection = "roster_entries"
+                                                    , id = id
+                                                    , tag = "save-entry"
+                                                    , body = encodeRow row
+                                                    }
+                                            )
+                                )
+                                toUpdate
+
+                        deleteEffects =
+                            List.map
+                                (\entry ->
+                                    Pb.publicDelete
+                                        { collection = "roster_entries"
+                                        , id = entry.id
+                                        , tag = "delete-entry"
+                                        }
+                                )
+                                toDelete
+
+                        submissionEffect =
+                            let
+                                existingSub =
+                                    submissionForRound roundId side data.submissions
+
+                                submittedAt =
+                                    if submitting then
+                                        Just "now"
+
+                                    else
+                                        Nothing
+
+                                body =
+                                    Api.encodeRosterSubmission
+                                        { team = teamId
+                                        , round = roundId
+                                        , side = side
+                                        , submittedAt = submittedAt
+                                        }
+                            in
+                            case existingSub of
+                                Just sub ->
+                                    [ Pb.publicUpdate
+                                        { collection = "roster_submissions"
+                                        , id = sub.id
+                                        , tag = "save-submission"
+                                        , body = body
+                                        }
+                                    ]
+
+                                Nothing ->
+                                    [ Pb.publicCreate
+                                        { collection = "roster_submissions"
+                                        , tag = "save-submission"
+                                        , body = body
+                                        }
+                                    ]
+
+                        allEffects =
+                            createEffects ++ updateEffects ++ deleteEffects ++ submissionEffect
+
+                        savingFormData =
+                            { formData | submitting = submitting }
+                    in
+                    ( { data
+                        | form = FormSaving savingFormData
+                        , savesPending = List.length createEffects + List.length updateEffects + List.length submissionEffect
+                        , deletesPending = List.length deleteEffects
+                      }
+                    , Effect.batch allEffects
+                    )
+
+        _ ->
+            ( data, Effect.none )
+
 
 handleTeamPbMsg : Json.Decode.Value -> TeamData -> ( TeamData, Effect Msg )
 handleTeamPbMsg value data =
@@ -277,12 +559,307 @@ handleTeamPbMsg value data =
                 Err _ ->
                     ( data, Effect.none )
 
+        Just "save-entry" ->
+            case Pb.decodeRecord Api.rosterEntryDecoder value of
+                Ok entry ->
+                    let
+                        updatedEntries =
+                            if List.any (\e -> e.id == entry.id) data.entries then
+                                List.map
+                                    (\e ->
+                                        if e.id == entry.id then
+                                            entry
+
+                                        else
+                                            e
+                                    )
+                                    data.entries
+
+                            else
+                                data.entries ++ [ entry ]
+
+                        newPending =
+                            data.savesPending - 1
+                    in
+                    checkSaveComplete
+                        { data
+                            | entries = updatedEntries
+                            , savesPending = newPending
+                        }
+
+                Err _ ->
+                    handleSaveError "Failed to save roster entry." data
+
+        Just "delete-entry" ->
+            case Pb.decodeDelete value of
+                Ok id ->
+                    let
+                        newPending =
+                            data.deletesPending - 1
+                    in
+                    checkSaveComplete
+                        { data
+                            | entries = List.filter (\e -> e.id /= id) data.entries
+                            , deletesPending = newPending
+                        }
+
+                Err _ ->
+                    handleSaveError "Failed to delete roster entry." data
+
+        Just "save-submission" ->
+            case Pb.decodeRecord Api.rosterSubmissionDecoder value of
+                Ok sub ->
+                    let
+                        updatedSubs =
+                            if List.any (\s -> s.id == sub.id) data.submissions then
+                                List.map
+                                    (\s ->
+                                        if s.id == sub.id then
+                                            sub
+
+                                        else
+                                            s
+                                    )
+                                    data.submissions
+
+                            else
+                                data.submissions ++ [ sub ]
+
+                        newPending =
+                            data.savesPending - 1
+                    in
+                    checkSaveComplete
+                        { data
+                            | submissions = updatedSubs
+                            , savesPending = newPending
+                        }
+
+                Err _ ->
+                    handleSaveError "Failed to save submission." data
+
+        _ ->
+            ( data, Effect.none )
+
+
+checkSaveComplete : TeamData -> ( TeamData, Effect Msg )
+checkSaveComplete data =
+    if data.savesPending <= 0 && data.deletesPending <= 0 then
+        ( { data | form = FormHidden, savesPending = 0, deletesPending = 0 }, Effect.none )
+
+    else
+        ( data, Effect.none )
+
+
+handleSaveError : String -> TeamData -> ( TeamData, Effect Msg )
+handleSaveError err data =
+    case data.form of
+        FormSaving formData ->
+            ( { data
+                | form = FormEditing formData [ err ]
+                , savesPending = 0
+                , deletesPending = 0
+              }
+            , Effect.none
+            )
+
         _ ->
             ( data, Effect.none )
 
 
 
 -- HELPERS
+
+
+entryToFormRow : Api.RosterEntry -> FormRow
+entryToFormRow entry =
+    { id = Just entry.id
+    , student = Maybe.withDefault "" entry.student
+    , entryType = entryTypeToString entry.entryType
+    , role = roleToString entry.role
+    , character = Maybe.withDefault "" entry.character
+    }
+
+
+entryTypeToString : Api.EntryType -> String
+entryTypeToString et =
+    case et of
+        Api.ActiveEntry ->
+            "active"
+
+        Api.SubstituteEntry ->
+            "substitute"
+
+        Api.NonActiveEntry ->
+            "non_active"
+
+
+roleToString : Maybe Api.RosterRole -> String
+roleToString maybeRole =
+    case maybeRole of
+        Nothing ->
+            ""
+
+        Just Api.PretrialAttorneyRole ->
+            "pretrial_attorney"
+
+        Just Api.TrialAttorneyRole ->
+            "trial_attorney"
+
+        Just Api.WitnessRole ->
+            "witness"
+
+        Just Api.ClerkRole ->
+            "clerk"
+
+        Just Api.BailiffRole ->
+            "bailiff"
+
+        Just Api.ArtistRole ->
+            "artist"
+
+        Just Api.JournalistRole ->
+            "journalist"
+
+
+parseEntryType : String -> Api.EntryType
+parseEntryType s =
+    case s of
+        "substitute" ->
+            Api.SubstituteEntry
+
+        "non_active" ->
+            Api.NonActiveEntry
+
+        _ ->
+            Api.ActiveEntry
+
+
+parseRole : String -> Maybe Api.RosterRole
+parseRole s =
+    case s of
+        "pretrial_attorney" ->
+            Just Api.PretrialAttorneyRole
+
+        "trial_attorney" ->
+            Just Api.TrialAttorneyRole
+
+        "witness" ->
+            Just Api.WitnessRole
+
+        "clerk" ->
+            Just Api.ClerkRole
+
+        "bailiff" ->
+            Just Api.BailiffRole
+
+        "artist" ->
+            Just Api.ArtistRole
+
+        "journalist" ->
+            Just Api.JournalistRole
+
+        _ ->
+            Nothing
+
+
+validateForm : FormData -> Result (List String) (List FormRow)
+validateForm formData =
+    let
+        nonEmptyRows =
+            List.filter (\r -> r.student /= "" || r.role /= "") formData.rows
+
+        errors =
+            nonEmptyRows
+                |> List.indexedMap
+                    (\i r ->
+                        []
+                            |> addErrorIf (r.student == "" && r.entryType /= "non_active")
+                                ("Row " ++ String.fromInt (i + 1) ++ ": student is required.")
+                            |> addErrorIf (r.entryType == "active" && r.role == "")
+                                ("Row " ++ String.fromInt (i + 1) ++ ": role is required for active members.")
+                            |> addErrorIf (r.role == "witness" && r.character == "")
+                                ("Row " ++ String.fromInt (i + 1) ++ ": character is required for witnesses.")
+                    )
+                |> List.concat
+
+        duplicateStudents =
+            let
+                studentIds =
+                    List.filterMap
+                        (\r ->
+                            if r.student /= "" then
+                                Just r.student
+
+                            else
+                                Nothing
+                        )
+                        nonEmptyRows
+
+                hasDuplicates ids =
+                    List.length ids /= List.length (unique ids)
+            in
+            if hasDuplicates studentIds then
+                [ "Each student can only appear once per roster." ]
+
+            else
+                []
+    in
+    if List.isEmpty nonEmptyRows then
+        Err [ "Add at least one roster entry." ]
+
+    else if List.isEmpty errors && List.isEmpty duplicateStudents then
+        Ok nonEmptyRows
+
+    else
+        Err (errors ++ duplicateStudents)
+
+
+unique : List comparable -> List comparable
+unique list =
+    List.foldl
+        (\item acc ->
+            if List.member item acc then
+                acc
+
+            else
+                acc ++ [ item ]
+        )
+        []
+        list
+
+
+addErrorIf : Bool -> String -> List String -> List String
+addErrorIf condition err errors =
+    if condition then
+        errors ++ [ err ]
+
+    else
+        errors
+
+
+updateFormRows : (List FormRow -> List FormRow) -> FormState -> FormState
+updateFormRows transform state =
+    case state of
+        FormEditing formData _ ->
+            FormEditing { formData | rows = transform formData.rows } []
+
+        _ ->
+            state
+
+
+updateRow : Int -> (FormRow -> FormRow) -> FormState -> FormState
+updateRow idx transform state =
+    updateFormRows
+        (List.indexedMap
+            (\i r ->
+                if i == idx then
+                    transform r
+
+                else
+                    r
+            )
+        )
+        state
 
 
 teamSideForRound : Api.Team -> List Api.Trial -> Api.Round -> Maybe Api.RosterSide
@@ -429,6 +1006,16 @@ submissionStatus maybeSub entries =
                 { label = "Draft", variant = "warning" }
 
 
+isSubmitted : Maybe Api.RosterSubmission -> Bool
+isSubmitted maybeSub =
+    case maybeSub of
+        Just sub ->
+            sub.submittedAt /= Nothing
+
+        Nothing ->
+            False
+
+
 tasksForEntry : String -> List Api.AttorneyTask -> List Api.AttorneyTask
 tasksForEntry entryId tasks =
     tasks
@@ -450,6 +1037,29 @@ taskTypeName tt =
 
         Api.ClosingTask ->
             "Closing"
+
+
+roleOptionsForSide : Api.RosterSide -> List { value : String, label : String }
+roleOptionsForSide side =
+    let
+        common =
+            [ { value = "", label = "Select role..." }
+            , { value = "pretrial_attorney", label = "Pretrial Attorney" }
+            , { value = "trial_attorney", label = "Trial Attorney" }
+            , { value = "witness", label = "Witness" }
+            , { value = "artist", label = "Courtroom Artist" }
+            , { value = "journalist", label = "Courtroom Journalist" }
+            ]
+
+        sideSpecific =
+            case side of
+                Api.Prosecution ->
+                    [ { value = "clerk", label = "Clerk" } ]
+
+                Api.Defense ->
+                    [ { value = "bailiff", label = "Bailiff" } ]
+    in
+    common ++ sideSpecific
 
 
 
@@ -540,6 +1150,17 @@ viewRoundRow data round =
 
                 status =
                     submissionStatus maybeSub roundEntries
+
+                isEditingThisRound =
+                    case data.form of
+                        FormEditing fd _ ->
+                            fd.roundId == round.id
+
+                        FormSaving fd ->
+                            fd.roundId == round.id
+
+                        FormHidden ->
+                            False
             in
             div
                 [ Attr.class "collapse collapse-arrow bg-base-200"
@@ -560,12 +1181,34 @@ viewRoundRow data round =
                     ]
                 , if isExpanded then
                     div [ Attr.class "collapse-content" ]
-                        [ viewRosterEntries data roundEntries side
+                        [ if isEditingThisRound then
+                            viewRosterForm data
+
+                          else
+                            viewRosterReadOnly data roundEntries side maybeSub round.id
                         ]
 
                   else
                     text ""
                 ]
+
+
+viewRosterReadOnly : TeamData -> List Api.RosterEntry -> Api.RosterSide -> Maybe Api.RosterSubmission -> String -> Html Msg
+viewRosterReadOnly data entries side maybeSub roundId =
+    div []
+        [ viewRosterEntries data entries side
+        , if not (isSubmitted maybeSub) then
+            div [ Attr.class "mt-4" ]
+                [ button
+                    [ Attr.class "btn btn-primary btn-sm"
+                    , Events.onClick (EditRoster roundId side)
+                    ]
+                    [ text "Edit Roster" ]
+                ]
+
+          else
+            text ""
+        ]
 
 
 viewRosterEntries : TeamData -> List Api.RosterEntry -> Api.RosterSide -> Html Msg
@@ -648,3 +1291,167 @@ viewTaskBadge : Api.AttorneyTask -> Html Msg
 viewTaskBadge task =
     span [ Attr.class "badge badge-ghost badge-sm" ]
         [ text (taskTypeName task.taskType) ]
+
+
+
+-- FORM VIEW
+
+
+viewRosterForm : TeamData -> Html Msg
+viewRosterForm data =
+    case data.form of
+        FormEditing formData errors ->
+            viewFormCard data formData errors False
+
+        FormSaving formData ->
+            viewFormCard data formData [] True
+
+        FormHidden ->
+            text ""
+
+
+viewFormCard : TeamData -> FormData -> List String -> Bool -> Html Msg
+viewFormCard data formData errors saving =
+    let
+        sideCharacters =
+            data.caseCharacters
+                |> List.filter (\c -> c.side == formData.side)
+
+        assignedStudents =
+            List.map .student formData.rows
+                |> List.filter (\s -> s /= "")
+    in
+    div [ Attr.class "py-2" ]
+        [ UI.errorList errors
+        , table [ Attr.class "table table-sm w-full" ]
+            [ thead []
+                [ tr []
+                    [ th [] [ text "Student" ]
+                    , th [] [ text "Type" ]
+                    , th [] [ text "Role" ]
+                    , th [] [ text "Character" ]
+                    , th [] []
+                    ]
+                ]
+            , tbody []
+                (List.indexedMap
+                    (viewFormRow data.students sideCharacters assignedStudents formData.side)
+                    formData.rows
+                )
+            ]
+        , div [ Attr.class "flex gap-2 mt-4" ]
+            [ button
+                [ Attr.class "btn btn-ghost btn-sm"
+                , Events.onClick AddRow
+                , Attr.disabled saving
+                ]
+                [ text "+ Add Row" ]
+            ]
+        , div [ Attr.class "flex gap-2 mt-4" ]
+            [ button
+                [ Attr.class "btn btn-primary btn-sm"
+                , Events.onClick SaveDraft
+                , Attr.disabled saving
+                ]
+                (if saving && not formData.submitting then
+                    [ span [ Attr.class "loading loading-spinner loading-sm" ] []
+                    , text "Saving..."
+                    ]
+
+                 else
+                    [ text "Save Draft" ]
+                )
+            , button
+                [ Attr.class "btn btn-success btn-sm"
+                , Events.onClick SubmitRoster
+                , Attr.disabled saving
+                ]
+                (if saving && formData.submitting then
+                    [ span [ Attr.class "loading loading-spinner loading-sm" ] []
+                    , text "Submitting..."
+                    ]
+
+                 else
+                    [ text "Submit Roster" ]
+                )
+            , button
+                [ Attr.class "btn btn-ghost btn-sm"
+                , Events.onClick CancelRosterForm
+                , Attr.disabled saving
+                ]
+                [ text "Cancel" ]
+            ]
+        ]
+
+
+viewFormRow : List Api.Student -> List Api.CaseCharacter -> List String -> Api.RosterSide -> Int -> FormRow -> Html Msg
+viewFormRow students characters assignedStudents side idx row =
+    let
+        availableStudents =
+            students
+                |> List.filter
+                    (\s ->
+                        s.id == row.student || not (List.member s.id assignedStudents)
+                    )
+    in
+    tr []
+        [ td []
+            [ select
+                [ Attr.class "select select-sm select-bordered w-full"
+                , Events.onInput (UpdateRowStudent idx)
+                , Attr.value row.student
+                ]
+                ({ value = "", label = "Select student..." }
+                    :: List.map (\s -> { value = s.id, label = s.name }) availableStudents
+                    |> List.map (\o -> option [ Attr.value o.value, Attr.selected (o.value == row.student) ] [ text o.label ])
+                )
+            ]
+        , td []
+            [ select
+                [ Attr.class "select select-sm select-bordered"
+                , Events.onInput (UpdateRowEntryType idx)
+                , Attr.value row.entryType
+                ]
+                [ option [ Attr.value "active", Attr.selected (row.entryType == "active") ] [ text "Active" ]
+                , option [ Attr.value "substitute", Attr.selected (row.entryType == "substitute") ] [ text "Substitute" ]
+                , option [ Attr.value "non_active", Attr.selected (row.entryType == "non_active") ] [ text "Non-Active" ]
+                ]
+            ]
+        , td []
+            [ if row.entryType == "non_active" then
+                text "—"
+
+              else
+                select
+                    [ Attr.class "select select-sm select-bordered"
+                    , Events.onInput (UpdateRowRole idx)
+                    , Attr.value row.role
+                    ]
+                    (List.map
+                        (\o -> option [ Attr.value o.value, Attr.selected (o.value == row.role) ] [ text o.label ])
+                        (roleOptionsForSide side)
+                    )
+            ]
+        , td []
+            [ if row.role == "witness" then
+                select
+                    [ Attr.class "select select-sm select-bordered"
+                    , Events.onInput (UpdateRowCharacter idx)
+                    , Attr.value row.character
+                    ]
+                    ({ value = "", label = "Select character..." }
+                        :: List.map (\c -> { value = c.id, label = c.characterName }) characters
+                        |> List.map (\o -> option [ Attr.value o.value, Attr.selected (o.value == row.character) ] [ text o.label ])
+                    )
+
+              else
+                text ""
+            ]
+        , td []
+            [ button
+                [ Attr.class "btn btn-ghost btn-sm btn-square text-error"
+                , Events.onClick (RemoveRow idx)
+                ]
+                [ text "×" ]
+            ]
+        ]

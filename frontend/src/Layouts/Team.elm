@@ -156,6 +156,7 @@ viewNavbar shared model route =
         , div [ Attr.class "navbar-center hidden lg:flex" ]
             [ ul [ Attr.class "menu menu-horizontal px-1" ]
                 [ navItem route Route.Path.Team_Manage "Eligible Students"
+                , navItem route Route.Path.Team_Rosters "Rosters"
                 ]
             ]
         , div [ Attr.class "navbar-end" ]
