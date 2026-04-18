@@ -62,6 +62,9 @@ isTeamRoute path =
         Route.Path.Team_Manage ->
             True
 
+        Route.Path.Team_Rosters ->
+            True
+
         _ ->
             False
 
