@@ -6,8 +6,6 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
-- Issue #61: Rosters UI (coach round roster management)
-
 ### Added (PR #86)
 - 6 PocketBase migrations: pronouns on students,
   roster_deadline_hours on tournaments, and new
