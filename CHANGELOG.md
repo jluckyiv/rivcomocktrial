@@ -6,6 +6,24 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.4.0 — Rosters UI (Phase 1)
+
+### Added (PR #89)
+- `/admin/case-characters`: full CRUD for tournament
+  case witnesses (prosecution/defense) (#85)
+- `/team/rosters`: read-only roster view with round
+  accordion, side badges, submission status (#85)
+- `/admin/rosters`: compliance dashboard — matrix of
+  teams × rounds showing P/D submission status (#85)
+- "Rosters" nav link in team layout (#85)
+- Auth gate for `/team/rosters` route (#85)
+
+### Fixed (PR #89)
+- PocketBase `required: true` on number fields rejects
+  `0` as blank — migration removes `required` from
+  `sort_order` on case_characters, roster_entries,
+  attorney_tasks (#85)
+
 ### Added (PR #86)
 - 6 PocketBase migrations: pronouns on students,
   roster_deadline_hours on tournaments, and new
