@@ -6,6 +6,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.4.2 — Admin Roster Override (Phase 3)
+
+### Added (PR #91)
+- Admin roster drill-down: click matrix cell to view
+  roster entries in detail card (#85)
+- Admin override form: edit any roster regardless of
+  submission/lock status via adminCreate/Update/Delete
+- Selected cell ring highlight in compliance matrix
+- Closes #85 — all three phases complete
+
 ## v0.4.1 — Roster Editing Form (Phase 2)
 
 ### Added (PR #90)
