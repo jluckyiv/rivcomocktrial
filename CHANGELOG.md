@@ -6,6 +6,21 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.4.1 — Roster Editing Form (Phase 2)
+
+### Added (PR #90)
+- Roster editing form on `/team/rosters`: add/remove
+  entry rows with student, role, character selects (#85)
+- Witness character dropdown (case characters for side)
+- Duplicate student prevention within roster (#85)
+- Save Draft and Submit Roster flows (#85)
+- Read-only view after submission (#85)
+
+### Fixed (PR #90)
+- "Rosters" nav link missing from desktop team menu
+- Migration 1776301300: open read access on rounds,
+  trials, students for coach data loading (#85)
+
 ## v0.4.0 — Rosters UI (Phase 1)
 
 ### Added (PR #89)
