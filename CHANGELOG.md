@@ -6,6 +6,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.4.3 — Post-Login Redirect
+
+### Added (PR #92)
+- Post-login redirect: unauthenticated users return to
+  their originally requested page after logging in (#87)
+- Auth gate captures intended route as `?redirect=`
+  query param on login URL
+- Works for both admin and coach login flows
+- Closes #87
+
 ## v0.4.2 — Admin Roster Override (Phase 3)
 
 ### Added (PR #91)
