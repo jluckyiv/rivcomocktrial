@@ -1,6 +1,7 @@
 module Pages.Team.Login exposing (Model, Msg, page)
 
 import Api
+import Dict
 import Effect exposing (Effect)
 import Html exposing (..)
 import Html.Attributes as Attr
@@ -20,7 +21,7 @@ import View exposing (View)
 page : Shared.Model -> Route () -> Page Model Msg
 page shared route =
     Page.new
-        { init = init shared
+        { init = init shared route
         , update = update
         , view = view
         , subscriptions = subscriptions
@@ -42,25 +43,40 @@ type alias Model =
     { email : String
     , password : String
     , state : State
+    , redirectPath : Maybe Route.Path.Path
     }
 
 
-init : Shared.Model -> () -> ( Model, Effect Msg )
-init shared _ =
+init :
+    Shared.Model
+    -> Route ()
+    -> ()
+    -> ( Model, Effect Msg )
+init shared route _ =
+    let
+        redirectPath =
+            Dict.get "redirect" route.query
+                |> Maybe.andThen Route.Path.fromString
+    in
     case shared.coachAuth of
         LoggedIn _ ->
             ( { email = ""
               , password = ""
               , state = Ready
+              , redirectPath = redirectPath
               }
             , Effect.pushRoutePath
-                Route.Path.Team_Manage
+                (redirectPath
+                    |> Maybe.withDefault
+                        Route.Path.Team_Manage
+                )
             )
 
         NotLoggedIn ->
             ( { email = ""
               , password = ""
               , state = Ready
+              , redirectPath = redirectPath
               }
             , Effect.none
             )
@@ -122,6 +138,8 @@ update msg model =
                                         , email = response.record.email
                                         , name = response.record.name
                                         }
+                                    , redirect =
+                                        model.redirectPath
                                     }
                                 )
                             )

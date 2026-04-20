@@ -1,5 +1,6 @@
 module Pages.Admin.Login exposing (Model, Msg, page)
 
+import Dict
 import Effect exposing (Effect)
 import Html exposing (..)
 import Html.Attributes as Attr
@@ -8,6 +9,7 @@ import Json.Decode
 import Page exposing (Page)
 import Pb
 import Route exposing (Route)
+import Route.Path
 import Shared
 import Shared.Msg
 import View exposing (View)
@@ -16,7 +18,7 @@ import View exposing (View)
 page : Shared.Model -> Route () -> Page Model Msg
 page shared route =
     Page.new
-        { init = init
+        { init = init route
         , update = update
         , view = view
         , subscriptions = subscriptions
@@ -32,15 +34,22 @@ type alias Model =
     , password : String
     , error : Maybe String
     , loading : Bool
+    , redirectPath : Maybe Route.Path.Path
     }
 
 
-init : () -> ( Model, Effect Msg )
-init _ =
+init :
+    Route ()
+    -> ()
+    -> ( Model, Effect Msg )
+init route _ =
     ( { email = ""
       , password = ""
       , error = Nothing
       , loading = False
+      , redirectPath =
+            Dict.get "redirect" route.query
+                |> Maybe.andThen Route.Path.fromString
       }
     , Effect.none
     )
@@ -85,11 +94,22 @@ update msg model =
                     case Pb.decodeToken value of
                         Ok token ->
                             ( { model | loading = False }
-                            , Effect.sendSharedMsg (Shared.Msg.AdminLoggedIn token)
+                            , Effect.sendSharedMsg
+                                (Shared.Msg.AdminLoggedIn
+                                    { token = token
+                                    , redirect =
+                                        model.redirectPath
+                                    }
+                                )
                             )
 
                         Err _ ->
-                            ( { model | loading = False, error = Just "Invalid email or password." }
+                            ( { model
+                                | loading = False
+                                , error =
+                                    Just
+                                        "Invalid email or password."
+                              }
                             , Effect.none
                             )
 
@@ -117,9 +137,15 @@ view model =
         [ section [ Attr.class "hero is-fullheight" ]
             [ div [ Attr.class "hero-body" ]
                 [ div [ Attr.class "container" ]
-                    [ div [ Attr.class "columns is-centered" ]
+                    [ div
+                        [ Attr.class "columns is-centered"
+                        ]
                         [ div [ Attr.class "column is-4" ]
-                            [ h1 [ Attr.class "title has-text-centered" ] [ text "Admin Login" ]
+                            [ h1
+                                [ Attr.class
+                                    "title has-text-centered"
+                                ]
+                                [ text "Admin Login" ]
                             , viewLoginForm model
                             ]
                         ]
@@ -135,17 +161,22 @@ viewLoginForm model =
     Html.form [ Events.onSubmit SubmitLogin ]
         [ case model.error of
             Just err ->
-                div [ Attr.class "notification is-danger" ] [ text err ]
+                div
+                    [ Attr.class "notification is-danger"
+                    ]
+                    [ text err ]
 
             Nothing ->
                 text ""
         , div [ Attr.class "field" ]
-            [ label [ Attr.class "label" ] [ text "Email" ]
+            [ label [ Attr.class "label" ]
+                [ text "Email" ]
             , div [ Attr.class "control" ]
                 [ input
                     [ Attr.class "input"
                     , Attr.type_ "email"
-                    , Attr.placeholder "admin@example.com"
+                    , Attr.placeholder
+                        "admin@example.com"
                     , Attr.value model.email
                     , Events.onInput EmailChanged
                     ]
@@ -153,7 +184,8 @@ viewLoginForm model =
                 ]
             ]
         , div [ Attr.class "field" ]
-            [ label [ Attr.class "label" ] [ text "Password" ]
+            [ label [ Attr.class "label" ]
+                [ text "Password" ]
             , div [ Attr.class "control" ]
                 [ input
                     [ Attr.class "input"

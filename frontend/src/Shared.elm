@@ -97,12 +97,15 @@ type alias Msg =
 update : Route () -> Msg -> Model -> ( Model, Effect Msg )
 update route msg model =
     case msg of
-        Shared.Msg.AdminLoggedIn token ->
+        Shared.Msg.AdminLoggedIn { token, redirect } ->
             ( { model | adminToken = Just token }
             , Effect.batch
                 [ Effect.saveAdminToken (Just token)
                 , Effect.pushRoutePath
-                    Route.Path.Admin_Tournaments
+                    (redirect
+                        |> Maybe.withDefault
+                            Route.Path.Admin_Tournaments
+                    )
                 ]
             )
 
@@ -114,15 +117,19 @@ update route msg model =
                 ]
             )
 
-        Shared.Msg.CoachLoggedIn credentials ->
-            ( { model | coachAuth = LoggedIn credentials }
+        Shared.Msg.CoachLoggedIn { token, user, redirect } ->
+            ( { model
+                | coachAuth =
+                    LoggedIn { token = token, user = user }
+              }
             , Effect.batch
-                [ Effect.saveCoachToken
-                    (Just credentials.token)
-                , Effect.saveCoachUser
-                    (Just credentials.user)
+                [ Effect.saveCoachToken (Just token)
+                , Effect.saveCoachUser (Just user)
                 , Effect.pushRoutePath
-                    Route.Path.Team_Manage
+                    (redirect
+                        |> Maybe.withDefault
+                            Route.Path.Team_Manage
+                    )
                 ]
             )
 
