@@ -36,7 +36,9 @@ onPageLoad shared route =
             _ ->
                 Auth.Action.pushRoute
                     { path = Route.Path.Team_Login
-                    , query = Dict.empty
+                    , query =
+                        Dict.singleton "redirect"
+                            (Route.Path.toString route.path)
                     , hash = Nothing
                     }
 
@@ -51,7 +53,9 @@ onPageLoad shared route =
             Nothing ->
                 Auth.Action.pushRoute
                     { path = Route.Path.Admin_Login
-                    , query = Dict.empty
+                    , query =
+                        Dict.singleton "redirect"
+                            (Route.Path.toString route.path)
                     , hash = Nothing
                     }
 
