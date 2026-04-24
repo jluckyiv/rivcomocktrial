@@ -6,6 +6,19 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.4.4 — Roster Form Refactor + Security Fix
+
+### Added (PR #94)
+- `RosterForm.elm`: shared module for form types,
+  validation, row-update helpers, and view — eliminates
+  ~300 lines of duplicated logic across roster pages
+
+### Fixed (PR #94)
+- Coach roster page (`/team/rosters`) leaked all trials
+  and attorney_tasks to any logged-in coach; queries now
+  filter to the team's own records
+- Closes no issue (security hardening + refactor)
+
 ### Added (PR #93)
 - Contextual "Case Characters" link per tournament row
   on `/admin/tournaments` (#88)
