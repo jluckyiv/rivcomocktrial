@@ -22,10 +22,16 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
-      - run: npm install
+      - name: Install dependencies
+        run: npm install
         working-directory: frontend
 
-      - run: npx elm-test
+      - name: Generate elm-land source files
+        run: npx elm-land generate
+        working-directory: frontend
+
+      - name: Run tests
+        run: npx elm-test
         working-directory: frontend
 
   review:
@@ -40,8 +46,14 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
-      - run: npm install
+      - name: Install dependencies
+        run: npm install
         working-directory: frontend
 
-      - run: npx elm-review
+      - name: Generate elm-land source files
+        run: npx elm-land generate
+        working-directory: frontend
+
+      - name: Run elm-review
+        run: npx elm-review
         working-directory: frontend
