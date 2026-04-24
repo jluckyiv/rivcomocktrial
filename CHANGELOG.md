@@ -6,6 +6,11 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added (PR #93)
+- Contextual "Case Characters" link per tournament row
+  on `/admin/tournaments` (#88)
+- Closes #88
+
 ## v0.4.3 — Post-Login Redirect
 
 ### Added (PR #92)
