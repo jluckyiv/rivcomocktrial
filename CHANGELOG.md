@@ -6,6 +6,28 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.4.5 — Tooling: elm-review + CI
+
+### Added (PR #99)
+- `elm-review` 2.13.5 with `NoUnused.*` and `NoDebug.*`
+  rules; `review/` config committed; 3 legacy errors
+  suppressed (elm-land placeholder, pre-persistence
+  domain scaffolding)
+- CI workflow (`.github/workflows/ci.yml`): parallel
+  `elm-test` and `elm-review` jobs on push/PR when
+  `frontend/**` changes; `elm-land generate` runs first
+  to materialise generated source directories
+- `fe:review` and `fe:test` scripts in `package.json`
+
+### Fixed (PR #99)
+- Delete `RegistrationTest.elm`; trim `FixturesTest.elm`
+  — both referenced `Registration` module deleted in
+  PR #78; all 650 remaining tests pass
+- `elm-review --fix-all-without-prompt` removed unused
+  imports and renamed unused parameters to `_` across
+  src/ and tests/
+- Closes #95, Closes #98
+
 ## v0.4.4 — Roster Form Refactor + Security Fix
 
 ### Added (PR #94)
