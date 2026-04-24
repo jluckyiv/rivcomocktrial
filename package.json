@@ -8,6 +8,8 @@
     "pb:dev": "docker compose watch",
     "pb:kill": "pkill -f 'docker compose watch' || true; docker compose down",
     "fe:dev": "cd frontend && PATH=\"./node_modules/.bin:$PATH\" elm-land server",
-    "fe:build": "cd frontend && PATH=\"./node_modules/.bin:$PATH\" elm-land build"
+    "fe:build": "cd frontend && PATH=\"./node_modules/.bin:$PATH\" elm-land build",
+    "fe:review": "cd frontend && npx elm-review",
+    "fe:test": "cd frontend && npx elm-test"
   }
 }

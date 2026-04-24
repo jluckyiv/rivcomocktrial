@@ -1,9 +1,7 @@
 module ActiveTrialTest exposing (suite)
 
 import ActiveTrial exposing (TrialStatus(..))
-import Assignment exposing (Assignment(..))
 import Courtroom
-import Error exposing (Error(..))
 import Expect
 import Pairing
 import Test exposing (Test, describe, test)

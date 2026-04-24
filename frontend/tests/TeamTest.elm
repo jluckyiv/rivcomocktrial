@@ -1,10 +1,7 @@
 module TeamTest exposing (suite)
 
 import Coach
-import District
 import Expect
-import School
-import Student
 import Team
 import Test exposing (Test, describe, test)
 import TestHelpers

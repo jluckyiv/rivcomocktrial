@@ -1,6 +1,5 @@
 module PublicationTest exposing (suite)
 
-import Error exposing (Error(..))
 import Expect
 import Publication
     exposing

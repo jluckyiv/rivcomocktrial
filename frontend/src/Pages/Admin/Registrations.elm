@@ -18,10 +18,10 @@ import View exposing (View)
 
 
 page : Auth.User -> Shared.Model -> Route () -> Page Model Msg
-page user shared route =
+page _ _ _ =
     Page.new
-        { init = init user
-        , update = update user
+        { init = init
+        , update = update
         , view = view
         , subscriptions = subscriptions
         }
@@ -45,8 +45,8 @@ type alias Model =
     }
 
 
-init : Auth.User -> () -> ( Model, Effect Msg )
-init user _ =
+init : () -> ( Model, Effect Msg )
+init _ =
     ( { coaches = Loading
       , teams = Loading
       , error = Nothing
@@ -80,11 +80,10 @@ type Msg
 
 
 update :
-    Auth.User
-    -> Msg
+    Msg
     -> Model
     -> ( Model, Effect Msg )
-update user msg model =
+update msg model =
     case msg of
         ApproveCoach id ->
             ( model

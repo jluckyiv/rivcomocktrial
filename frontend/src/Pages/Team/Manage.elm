@@ -7,7 +7,6 @@ import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
 import Json.Decode
-import Json.Encode
 import Layouts
 import Page exposing (Page)
 import Pb
@@ -19,7 +18,7 @@ import View exposing (View)
 
 
 page : Auth.User -> Shared.Model -> Route () -> Page Model Msg
-page user shared route =
+page _ shared _ =
     Page.new
         { init = init shared
         , update = update

@@ -19,11 +19,9 @@ import PowerMatch
     exposing
         ( CrossBracketStrategy(..)
         , PowerMatchResult
-        , ProposedPairing
         , RankedTeam
         )
 import Route exposing (Route)
-import Route.Path
 import School
 import Shared
 import Team as DomainTeam
@@ -32,10 +30,10 @@ import View exposing (View)
 
 
 page : Auth.User -> Shared.Model -> Route () -> Page Model Msg
-page user shared route =
+page _ _ route =
     Page.new
-        { init = init user route
-        , update = update user
+        { init = init route
+        , update = update
         , view = view
         , subscriptions = subscriptions
         }
@@ -84,8 +82,8 @@ type alias Model =
     }
 
 
-init : Auth.User -> Route () -> () -> ( Model, Effect Msg )
-init user route _ =
+init : Route () -> () -> ( Model, Effect Msg )
+init route _ =
     let
         roundId =
             Dict.get "round" route.query |> Maybe.withDefault ""
@@ -170,8 +168,8 @@ type Msg
     | PbMsg Json.Decode.Value
 
 
-update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
-update user msg model =
+update : Msg -> Model -> ( Model, Effect Msg )
+update msg model =
     case msg of
         SwitchMode mode ->
             ( { model | inputMode = mode }, Effect.none )
@@ -311,7 +309,7 @@ update user msg model =
                     buildMatchHistory model.teams model.trials
 
                 rankedTeams =
-                    buildRankedTeams model.teams model.allTrials
+                    buildRankedTeams model.teams
 
                 result =
                     PowerMatch.powerMatch
@@ -615,8 +613,8 @@ buildMatchHistory teams trials =
     MatchHistory.fromRecords records
 
 
-buildRankedTeams : List Team -> List Trial -> List RankedTeam
-buildRankedTeams teams allTrials =
+buildRankedTeams : List Team -> List RankedTeam
+buildRankedTeams teams =
     List.filterMap
         (\apiTeam ->
             toDomainTeam apiTeam
@@ -859,7 +857,8 @@ viewDropdownForm model =
             model.teams
                 |> List.filter
                     (\t ->
-                        t.id == model.formProsecution
+                        t.id
+                            == model.formProsecution
                             || not (List.member t.id pairedTeamIds)
                     )
                 |> List.filter (\t -> t.id /= model.formDefense || t.id == "")
@@ -868,7 +867,8 @@ viewDropdownForm model =
             model.teams
                 |> List.filter
                     (\t ->
-                        t.id == model.formDefense
+                        t.id
+                            == model.formDefense
                             || not (List.member t.id pairedTeamIds)
                     )
                 |> List.filter (\t -> t.id /= model.formProsecution || t.id == "")
@@ -884,7 +884,8 @@ viewDropdownForm model =
             model.courtrooms
                 |> List.filter
                     (\c ->
-                        c.id == model.formCourtroom
+                        c.id
+                            == model.formCourtroom
                             || not (List.member c.id usedCourtroomIds)
                     )
     in

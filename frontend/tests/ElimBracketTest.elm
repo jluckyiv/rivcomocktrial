@@ -1,9 +1,10 @@
 module ElimBracketTest exposing (..)
 
-import ElimBracket exposing (Matchup, bracket, higherSeed, lowerSeed)
+import District
+import ElimBracket exposing (bracket, higherSeed, lowerSeed)
 import ElimSideRules
-import Error exposing (Error(..))
 import Expect
+import School
 import Side exposing (Side(..))
 import Team exposing (Team)
 import Test exposing (Test, describe, test)
@@ -15,9 +16,6 @@ import TestHelpers
         , teamName
         , teamNumber
         )
-
-import District
-import School
 
 
 makeTeam : Int -> Team

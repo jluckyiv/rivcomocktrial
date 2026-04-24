@@ -1,6 +1,5 @@
 module TestHelpers exposing
     ( alice
-    , applicant
     , bob
     , charlie
     , coach
@@ -24,14 +23,12 @@ module TestHelpers exposing
     , teamC
     , teamName
     , teamNumber
-    , testActiveTrial
     , testJudge
     , testPresider
     , testScorer
     , testSubmittedBallot
     , testTrial
     , trialFor
-    , validRoster
     , volunteerName
     , witness1
     , witness2
@@ -39,16 +36,12 @@ module TestHelpers exposing
     , witness4
     )
 
-import ActiveTrial exposing (ActiveTrial)
-import Assignment exposing (Assignment(..))
 import Coach exposing (TeacherCoach, TeacherCoachApplicant)
 import Courtroom exposing (Courtroom)
 import District
 import Email exposing (Email)
 import Judge
 import Pairing
-import PresiderBallot
-import Roster exposing (AttorneyDuty(..), RoleAssignment(..), Roster)
 import School
 import Side exposing (Side(..))
 import Student
@@ -153,28 +146,6 @@ witness4 =
 
         Err _ ->
             Debug.todo "witness4 must be valid"
-
-
-validRoster : Roster
-validRoster =
-    case
-        Roster.create Prosecution
-            [ ClerkRole alice
-            , BailiffRole bob
-            , PretrialAttorney charlie
-            , WitnessRole diana witness1
-            , WitnessRole eve witness2
-            , WitnessRole frank witness3
-            , WitnessRole grace witness4
-            , TrialAttorney henry Opening
-            , TrialAttorney iris (DirectOf witness1)
-            ]
-    of
-        Ok r ->
-            r
-
-        Err _ ->
-            Debug.todo "validRoster must be valid"
 
 
 coachName : String -> String -> Coach.Name
@@ -390,11 +361,6 @@ trialFor prosecution defense =
 
         Nothing ->
             Debug.todo "trialFor must be valid"
-
-
-testActiveTrial : ActiveTrial
-testActiveTrial =
-    ActiveTrial.fromTrial testTrial
 
 
 testSubmittedBallot : SubmittedBallot

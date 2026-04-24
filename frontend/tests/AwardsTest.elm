@@ -1,10 +1,9 @@
 module AwardsTest exposing (suite)
 
-import Awards exposing (AwardCategory(..), StudentScore)
+import Awards exposing (AwardCategory(..))
 import Expect
 import Rank exposing (NominationCategory(..))
 import Side exposing (Side(..))
-import Student
 import Test exposing (Test, describe, test)
 import TestHelpers
 import Witness

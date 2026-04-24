@@ -1,7 +1,6 @@
 module CourtroomTest exposing (suite)
 
 import Courtroom
-import Error exposing (Error(..))
 import Expect
 import Test exposing (Test, describe, test)
 

@@ -11,28 +11,13 @@ module PowerMatchFixtures exposing
     , team02
     , team03
     , team04
-    , team05
     , team06
-    , team08
     , team09
-    , team10
-    , team11
-    , team12
-    , team13
-    , team14
     , team15
     , team16
-    , team17
     , team19
-    , team20
-    , team21
     , team22
     , team23
-    , team24
-    , team25
-    , team26
-    , team27
-    , team28
     )
 
 import District

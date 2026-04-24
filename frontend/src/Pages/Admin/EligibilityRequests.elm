@@ -18,10 +18,10 @@ import View exposing (View)
 
 
 page : Auth.User -> Shared.Model -> Route () -> Page Model Msg
-page user shared route =
+page _ _ _ =
     Page.new
-        { init = init user
-        , update = update user
+        { init = init
+        , update = update
         , view = view
         , subscriptions = subscriptions
         }
@@ -45,8 +45,8 @@ type alias Model =
     }
 
 
-init : Auth.User -> () -> ( Model, Effect Msg )
-init _ _ =
+init : () -> ( Model, Effect Msg )
+init _ =
     ( { requests = Loading
       , teams = Loading
       , error = Nothing
@@ -78,8 +78,8 @@ type Msg
     | PbMsg Json.Decode.Value
 
 
-update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
-update _ msg model =
+update : Msg -> Model -> ( Model, Effect Msg )
+update msg model =
     case msg of
         ApproveRequest id ->
             ( model

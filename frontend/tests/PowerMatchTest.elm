@@ -1,12 +1,11 @@
 module PowerMatchTest exposing (..)
 
 import Expect
-import MatchHistory exposing (MatchHistory)
+import MatchHistory
 import PowerMatch
     exposing
         ( CrossBracketStrategy(..)
         , PowerMatchResult
-        , ProposedPairing
         , RankedTeam
         , powerMatch
         )
@@ -171,8 +170,10 @@ structuralInvariantTests =
                                         sides =
                                             MatchHistory.sideHistory allHistory team
                                     in
-                                    sides.prosecution >= 3
-                                        || sides.defense >= 3
+                                    sides.prosecution
+                                        >= 3
+                                        || sides.defense
+                                        >= 3
                                 )
                                 F.allTeams
                     in
@@ -281,8 +282,10 @@ structuralInvariantTests =
                                         sides =
                                             MatchHistory.sideHistory allHistory team
                                     in
-                                    sides.prosecution >= 3
-                                        || sides.defense >= 3
+                                    sides.prosecution
+                                        >= 3
+                                        || sides.defense
+                                        >= 3
                                 )
                                 F.allTeams
                     in

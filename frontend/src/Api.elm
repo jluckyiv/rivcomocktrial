@@ -1,30 +1,66 @@
 module Api exposing
-    ( Tournament, School, Team, Student
-    , Courtroom, Round, Trial, CoachUser
-    , EligibilityEntry, ChangeRequest, CoCoach, AttorneyCoach
-    , CaseCharacter, RosterSubmission, RosterEntry, AttorneyTask
-    , ChangeType(..), RequestStatus(..), EligibilityStatus(..)
-    , TournamentStatus(..), TeamStatus(..), CoachUserStatus(..), RoundType(..)
-    , Pronoun(..), RosterSide(..), EntryType(..), RosterRole(..), TaskType(..)
-    , tournamentDecoder, schoolDecoder, teamDecoder
-    , studentDecoder, courtroomDecoder, roundDecoder
-    , trialDecoder, coachUserDecoder
-    , eligibilityEntryDecoder, changeRequestDecoder
-    , coCoachDecoder, attorneyCoachDecoder
-    , caseCharacterDecoder, rosterSubmissionDecoder
-    , rosterEntryDecoder, attorneyTaskDecoder
-    , encodeTournament, encodeSchool, encodeTeam
-    , encodeStudent, encodeCourtroom, encodeRound
-    , encodeTrial, encodeCoachRegistration
-    , encodePendingTeamRegistration
-    , encodeEligibilityEntry, encodeChangeRequest
-    , encodeChangeType, encodeRequestStatus
-    , encodeCoCoach, encodeAttorneyCoach
-    , encodeTournamentStatus, encodeTeamStatus, encodeCoachUserStatus, encodeRoundType
-    , encodeCaseCharacter, encodeRosterSubmission
-    , encodeRosterEntry, encodeAttorneyTask
-    , roundTypeToString, tournamentStatusFromString
-    , pronounToString, rosterSideToString
+    ( AttorneyCoach
+    , AttorneyTask
+    , CaseCharacter
+    , ChangeRequest
+    , ChangeType(..)
+    , CoCoach
+    , CoachUser
+    , CoachUserStatus(..)
+    , Courtroom
+    , EligibilityEntry
+    , EligibilityStatus
+    , EntryType(..)
+    , RequestStatus(..)
+    , RosterEntry
+    , RosterRole(..)
+    , RosterSide(..)
+    , RosterSubmission
+    , Round
+    , RoundType(..)
+    , School
+    , Student
+    , TaskType(..)
+    , Team
+    , TeamStatus(..)
+    , Tournament
+    , TournamentStatus(..)
+    , Trial
+    , attorneyCoachDecoder
+    , attorneyTaskDecoder
+    , caseCharacterDecoder
+    , changeRequestDecoder
+    , coCoachDecoder
+    , coachUserDecoder
+    , courtroomDecoder
+    , eligibilityEntryDecoder
+    , encodeAttorneyCoach
+    , encodeCaseCharacter
+    , encodeChangeRequest
+    , encodeCoCoach
+    , encodeCoachRegistration
+    , encodeCoachUserStatus
+    , encodeCourtroom
+    , encodeEligibilityEntry
+    , encodeRequestStatus
+    , encodeRosterEntry
+    , encodeRosterSubmission
+    , encodeRound
+    , encodeSchool
+    , encodeStudent
+    , encodeTeam
+    , encodeTournament
+    , encodeTrial
+    , rosterEntryDecoder
+    , rosterSideToString
+    , rosterSubmissionDecoder
+    , roundDecoder
+    , roundTypeToString
+    , schoolDecoder
+    , studentDecoder
+    , teamDecoder
+    , tournamentDecoder
+    , trialDecoder
     )
 
 {-| PocketBase record types, decoders, and encoders.
@@ -65,13 +101,6 @@ type CoachUserStatus
 type RoundType
     = Preliminary
     | Elimination
-
-
-type Pronoun
-    = HeHim
-    | SheHer
-    | TheyThem
-    | OtherPronoun String
 
 
 type RosterSide
@@ -781,22 +810,6 @@ encodeTournamentStatus s =
             Encode.string "completed"
 
 
-encodeTeamStatus : TeamStatus -> Encode.Value
-encodeTeamStatus s =
-    case s of
-        TeamPending ->
-            Encode.string "pending"
-
-        TeamActive ->
-            Encode.string "active"
-
-        TeamWithdrawn ->
-            Encode.string "withdrawn"
-
-        TeamRejected ->
-            Encode.string "rejected"
-
-
 encodeCoachUserStatus : CoachUserStatus -> Encode.Value
 encodeCoachUserStatus s =
     case s of
@@ -866,22 +879,6 @@ encodeRosterRole rr =
 
         JournalistRole ->
             Encode.string "journalist"
-
-
-encodeTaskType : TaskType -> Encode.Value
-encodeTaskType tt =
-    case tt of
-        OpeningTask ->
-            Encode.string "opening"
-
-        DirectTask ->
-            Encode.string "direct"
-
-        CrossTask ->
-            Encode.string "cross"
-
-        ClosingTask ->
-            Encode.string "closing"
 
 
 encodeTournament :
@@ -1001,18 +998,6 @@ encodeCoachRegistration r =
         , ( "team_name", Encode.string r.teamName )
         , ( "status", Encode.string "pending" )
         , ( "role", Encode.string "coach" )
-        ]
-
-
-encodePendingTeamRegistration :
-    { school : String, name : String, coach : String }
-    -> Encode.Value
-encodePendingTeamRegistration t =
-    Encode.object
-        [ ( "school", Encode.string t.school )
-        , ( "name", Encode.string t.name )
-        , ( "coach", Encode.string t.coach )
-        , ( "status", Encode.string "pending" )
         ]
 
 
@@ -1163,25 +1148,6 @@ encodeRosterEntry e =
         ]
 
 
-encodeAttorneyTask :
-    { rosterEntry : String
-    , taskType : TaskType
-    , character : Maybe String
-    , sortOrder : Int
-    }
-    -> Encode.Value
-encodeAttorneyTask t =
-    Encode.object
-        [ ( "roster_entry", Encode.string t.rosterEntry )
-        , ( "task_type", encodeTaskType t.taskType )
-        , ( "character"
-          , Maybe.map Encode.string t.character
-                |> Maybe.withDefault Encode.null
-          )
-        , ( "sort_order", Encode.int t.sortOrder )
-        ]
-
-
 
 -- HELPERS
 
@@ -1194,41 +1160,6 @@ roundTypeToString rt =
 
         Elimination ->
             "elimination"
-
-
-tournamentStatusFromString : String -> Maybe TournamentStatus
-tournamentStatusFromString s =
-    case s of
-        "draft" ->
-            Just TournamentDraft
-
-        "registration" ->
-            Just TournamentRegistration
-
-        "active" ->
-            Just TournamentActive
-
-        "completed" ->
-            Just TournamentCompleted
-
-        _ ->
-            Nothing
-
-
-pronounToString : Pronoun -> String
-pronounToString p =
-    case p of
-        HeHim ->
-            "he/him"
-
-        SheHer ->
-            "she/her"
-
-        TheyThem ->
-            "they/them"
-
-        OtherPronoun s ->
-            s
 
 
 rosterSideToString : RosterSide -> String

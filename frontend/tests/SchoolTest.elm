@@ -1,7 +1,6 @@
 module SchoolTest exposing (suite)
 
 import District
-import Error exposing (Error(..))
 import Expect
 import School
 import Test exposing (Test, describe, test)

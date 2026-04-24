@@ -4,13 +4,9 @@ module Coach exposing
     , TeacherCoach
     , TeacherCoachApplicant
     , apply
-    , attorneyCoachEmail
-    , attorneyCoachName
     , createAttorneyCoach
     , nameFromStrings
     , nameToString
-    , teacherCoachApplicantEmail
-    , teacherCoachApplicantName
     , teacherCoachEmail
     , teacherCoachName
     , verify
@@ -63,16 +59,6 @@ apply name email =
     TeacherCoachApplicant { name = name, email = email }
 
 
-teacherCoachApplicantName : TeacherCoachApplicant -> Name
-teacherCoachApplicantName (TeacherCoachApplicant r) =
-    r.name
-
-
-teacherCoachApplicantEmail : TeacherCoachApplicant -> Email
-teacherCoachApplicantEmail (TeacherCoachApplicant r) =
-    r.email
-
-
 type TeacherCoach
     = TeacherCoach { name : Name, email : Email }
 
@@ -99,13 +85,3 @@ type AttorneyCoach
 createAttorneyCoach : Name -> Maybe Email -> AttorneyCoach
 createAttorneyCoach name email =
     AttorneyCoach { name = name, email = email }
-
-
-attorneyCoachName : AttorneyCoach -> Name
-attorneyCoachName (AttorneyCoach r) =
-    r.name
-
-
-attorneyCoachEmail : AttorneyCoach -> Maybe Email
-attorneyCoachEmail (AttorneyCoach r) =
-    r.email

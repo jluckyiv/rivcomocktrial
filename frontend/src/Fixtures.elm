@@ -1,7 +1,4 @@
-module Fixtures exposing
-    ( palmDesertEligibleStudents
-    , teams
-    )
+module Fixtures exposing (teams)
 
 {-| Hardcoded 2026 fixture data for incremental UI development.
 Temporary scaffolding — will be deleted when persistence is added.
@@ -9,15 +6,14 @@ Temporary scaffolding — will be deleted when persistence is added.
 All values are known-valid, so Result unwrapping uses
 crashOnError which produces a clear message if a
 programming error is introduced.
+
 -}
 
 import Coach
 import District exposing (District)
-import EligibleStudents exposing (EligibleStudents)
 import Email exposing (Email)
-import Error exposing (Error(..))
+import Error exposing (Error)
 import School exposing (School)
-import Student exposing (Student)
 import Team exposing (Team)
 
 
@@ -30,14 +26,14 @@ import Team exposing (Team)
 -- literals, so the Err branch is unreachable.
 
 
-crashOnError : String -> Result (List Error) a -> a
-crashOnError label result =
+crashOnError : Result (List Error) a -> a
+crashOnError result =
     case result of
         Ok value ->
             value
 
         Err _ ->
-            crashOnError label result
+            crashOnError result
 
 
 
@@ -46,37 +42,37 @@ crashOnError label result =
 
 districtName : String -> District.Name
 districtName raw =
-    crashOnError ("district name: " ++ raw)
+    crashOnError
         (District.nameFromString raw)
 
 
 schoolName : String -> School.Name
 schoolName raw =
-    crashOnError ("school name: " ++ raw)
+    crashOnError
         (School.nameFromString raw)
 
 
 teamNumber : Int -> Team.Number
 teamNumber n =
-    crashOnError ("team number: " ++ String.fromInt n)
+    crashOnError
         (Team.numberFromInt n)
 
 
 teamName : String -> Team.Name
 teamName raw =
-    crashOnError ("team name: " ++ raw)
+    crashOnError
         (Team.nameFromString raw)
 
 
 coachName : String -> String -> Coach.Name
 coachName first last =
-    crashOnError ("coach name: " ++ first ++ " " ++ last)
+    crashOnError
         (Coach.nameFromStrings first last)
 
 
 email : String -> Email
 email raw =
-    crashOnError ("email: " ++ raw) (Email.fromString raw)
+    crashOnError (Email.fromString raw)
 
 
 coach : String -> String -> String -> Coach.TeacherCoach
@@ -84,60 +80,9 @@ coach first last emailAddr =
     Coach.verify (Coach.apply (coachName first last) (email emailAddr))
 
 
-studentName : String -> String -> Student.Name
-studentName first last =
-    crashOnError ("student name: " ++ first ++ " " ++ last)
-        (Student.nameFromStrings first last Nothing)
-
-
-student : String -> String -> Student.Pronouns -> Student
-student first last pron =
-    Student.create (studentName first last) pron
-
-
 
 -- STUDENTS
-
-
-palmDesertStudents : List Student
-palmDesertStudents =
-    [ student "Jordan" "Smith" Student.TheyThem
-    , student "Maria" "Garcia" Student.SheHer
-    , student "Alex" "Chen" Student.HeHim
-    , student "Sam" "Johnson" Student.HeHim
-    , student "Riley" "Williams" Student.SheHer
-    , student "Taylor" "Brown" Student.TheyThem
-    , student "Morgan" "Davis" Student.HeHim
-    , student "Casey" "Miller" Student.SheHer
-    , student "Avery" "Wilson" Student.TheyThem
-    , student "Quinn" "Moore" Student.HeHim
-    ]
-
-
 -- ELIGIBLE STUDENTS
-
-
-palmDesertEligibleStudents : EligibleStudents
-palmDesertEligibleStudents =
-    buildEligibleStudents "Palm Desert" palmDesertTeam palmDesertStudents
-
-
-buildEligibleStudents : String -> Team -> List Student -> EligibleStudents
-buildEligibleStudents label t studs =
-    let
-        withStudents =
-            List.foldl
-                (\s result ->
-                    Result.andThen (EligibleStudents.addStudent s) result
-                )
-                (Ok (EligibleStudents.create EligibleStudents.defaultConfig t))
-                studs
-    in
-    crashOnError (label ++ " eligible students")
-        (Result.andThen EligibleStudents.submit withStudents)
-
-
-
 -- DISTRICTS
 
 
@@ -211,6 +156,7 @@ sanJacinto : District
 sanJacinto =
     District.create
         (districtName "San Jacinto Unified School District")
+
 
 
 -- SCHOOLS
@@ -348,6 +294,7 @@ mlkSchool =
 sanJacintoSchool : School
 sanJacintoSchool =
     School.create (schoolName "San Jacinto High School") sanJacinto
+
 
 
 -- TEAMS
@@ -531,6 +478,3 @@ teams =
         "Coach"
         "coach28@example.com"
     ]
-
-
-

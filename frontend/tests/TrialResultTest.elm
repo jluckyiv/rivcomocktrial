@@ -1,13 +1,13 @@
 module TrialResultTest exposing (suite)
 
-import Error exposing (Error(..))
+import Error exposing (Error)
 import Expect
 import PresiderBallot
 import Side exposing (Side(..))
 import Standings
 import SubmittedBallot
-import Test exposing (Test, describe, test)
 import Team exposing (Team)
+import Test exposing (Test, describe, test)
 import TestHelpers
     exposing
         ( alice
@@ -18,7 +18,6 @@ import TestHelpers
         , testTrial
         , trialFor
         )
-import Trial
 import TrialResult
 import VerifiedBallot
 
@@ -291,17 +290,20 @@ headToHeadTests =
                     |> Expect.equal { wins = 0, losses = 0 }
         , test "A beat B → { wins = 1, losses = 0 } for A" <|
             \_ ->
-                TrialResult.headToHead teamA teamB
+                TrialResult.headToHead teamA
+                    teamB
                     [ mkResult teamA teamB 8 5 ]
                     |> Expect.equal { wins = 1, losses = 0 }
         , test "B beat A → { wins = 0, losses = 1 } for A" <|
             \_ ->
-                TrialResult.headToHead teamA teamB
+                TrialResult.headToHead teamA
+                    teamB
                     [ mkResult teamB teamA 8 5 ]
                     |> Expect.equal { wins = 0, losses = 1 }
         , test "unrelated trials excluded" <|
             \_ ->
-                TrialResult.headToHead teamA teamB
+                TrialResult.headToHead teamA
+                    teamB
                     [ mkResult teamA teamC 8 5 ]
                     |> Expect.equal { wins = 0, losses = 0 }
         ]

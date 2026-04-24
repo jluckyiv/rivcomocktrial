@@ -6,6 +6,7 @@
     "@tailwindcss/postcss": "^4.2.2",
     "daisyui": "^5.5.19",
     "elm": "^0.19.1-6",
+    "elm-review": "^2.13.5",
     "postcss": "^8.5.8"
   }
 }

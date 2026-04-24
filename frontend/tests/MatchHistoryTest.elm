@@ -1,9 +1,8 @@
 module MatchHistoryTest exposing (..)
 
 import Expect
-import MatchHistory exposing (MatchHistory, MatchRecord, SideCount)
+import MatchHistory
 import PowerMatchFixtures as F
-import Team exposing (Team)
 import Test exposing (Test, describe, test)
 
 

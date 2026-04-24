@@ -1,7 +1,6 @@
 module VolunteerSlotTest exposing (suite)
 
 import Conflict exposing (ConflictSubject(..))
-import Courtroom
 import Expect
 import Round exposing (Round(..))
 import Test exposing (Test, describe, test)
@@ -9,18 +8,11 @@ import TestHelpers
     exposing
         ( courtroomA
         , courtroomB
-        , courtroomName
-        , testJudge
-        , testPresider
+        , teamA
+        , teamC
         , testScorer
         , testTrial
-        , teamA
-        , teamB
-        , teamC
         )
-import Trial
-import TrialRole exposing (TrialRole(..))
-import Volunteer
 import VolunteerSlot exposing (VolunteerStatus(..))
 
 

@@ -3,7 +3,6 @@ module PairingTest exposing (suite)
 import Assignment exposing (Assignment(..))
 import Courtroom
 import Expect
-import Judge
 import Pairing
 import Test exposing (Test, describe, test)
 import TestHelpers exposing (courtroomName, teamA, teamB, testJudge)

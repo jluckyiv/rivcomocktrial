@@ -1,6 +1,5 @@
 module Rank exposing
-    ( Nomination
-    , NominationCategory(..)
+    ( NominationCategory(..)
     , Rank
     , fromInt
     , nominationCategory
@@ -10,7 +9,6 @@ module Rank exposing
 
 import Error exposing (Error(..))
 import Role exposing (Role(..))
-import Student exposing (Student)
 import Validate
 
 
@@ -86,10 +84,3 @@ rankPoints count rank =
         )
         count
         |> Result.map (\valid -> Validate.fromValid valid + 1 - toInt rank)
-
-
-type alias Nomination =
-    { role : Role
-    , student : Student
-    , rank : Rank
-    }

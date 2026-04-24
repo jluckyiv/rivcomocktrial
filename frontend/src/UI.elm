@@ -15,8 +15,8 @@ module UI exposing
     , numberField
     , primaryButton
     , selectField
-    , textareaField
     , textField
+    , textareaField
     , titleBar
     )
 
@@ -26,9 +26,10 @@ need does not exist here, add it before using it in a page.
 
 `titleBar` takes `actions : List { label, msg }`. First action =
 `btn-primary`; subsequent = `btn-outline`.
+
 -}
 
-import Html exposing (Html, button, div, h1, h2, input, label, li, option, p, select, span, table, tbody, td, text, textarea, th, thead, tr, ul)
+import Html exposing (Html, button, div, h1, h2, input, label, li, option, p, select, span, table, tbody, text, textarea, th, thead, tr, ul)
 import Html.Attributes as Attr
 import Html.Events as Events
 
@@ -106,13 +107,15 @@ card children =
     div [ Attr.class "card bg-base-100 shadow-sm mb-6" ] children
 
 
-{-| Card title text. -}
+{-| Card title text.
+-}
 cardTitle : String -> Html msg
 cardTitle t =
     h2 [ Attr.class "card-title" ] [ text t ]
 
 
-{-| Card body wrapper. -}
+{-| Card body wrapper.
+-}
 cardBody : List (Html msg) -> Html msg
 cardBody children =
     div [ Attr.class "card-body" ] children
@@ -267,21 +270,24 @@ cancelButton msg =
 -- STATUS
 
 
-{-| Full-width loading spinner. -}
+{-| Full-width loading spinner.
+-}
 loading : Html msg
 loading =
     div [ Attr.class "flex justify-center p-8" ]
         [ span [ Attr.class "loading loading-spinner loading-md" ] [] ]
 
 
-{-| Single error message alert. For data fetch errors. -}
+{-| Single error message alert. For data fetch errors.
+-}
 error : String -> Html msg
 error msg =
     div [ Attr.class "alert alert-error mb-4" ]
         [ text msg ]
 
 
-{-| List of validation error messages. Hidden when list is empty. -}
+{-| List of validation error messages. Hidden when list is empty.
+-}
 errorList : List String -> Html msg
 errorList errors =
     if List.isEmpty errors then
@@ -294,14 +300,16 @@ errorList errors =
             ]
 
 
-{-| Centered message for empty collection state. -}
+{-| Centered message for empty collection state.
+-}
 emptyState : String -> Html msg
 emptyState msg =
     div [ Attr.class "text-center text-base-content/50 py-8" ]
         [ p [] [ text msg ] ]
 
 
-{-| Renders nothing. Use for NotAsked RemoteData state. -}
+{-| Renders nothing. Use for NotAsked RemoteData state.
+-}
 empty : Html msg
 empty =
     text ""
@@ -406,12 +414,12 @@ filterSelect :
     -> Html msg
 filterSelect config =
     div [ Attr.class "flex items-center gap-2 mb-4" ]
-        ([ if config.label /= "" then
+        [ if config.label /= "" then
             span [ Attr.class "text-sm text-base-content/70" ] [ text config.label ]
 
-           else
+          else
             text ""
-         , select
+        , select
             [ Attr.class "select select-bordered select-sm"
             , Events.onInput config.onInput
             ]
@@ -425,8 +433,7 @@ filterSelect config =
                 )
                 config.options
             )
-         ]
-        )
+        ]
 
 
 
@@ -437,6 +444,7 @@ filterSelect config =
 `"neutral"`, `"info"`, `"success"`, `"warning"`, `"error"`, `"ghost"`.
 
     UI.badge { label = "Pending", variant = "warning" }
+
     UI.badge { label = "Active", variant = "success" }
 
 -}

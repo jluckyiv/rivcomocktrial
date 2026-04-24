@@ -16,7 +16,7 @@ import View exposing (View)
 
 
 page : Shared.Model -> Route () -> Page Model Msg
-page shared route =
+page _ route =
     Page.new
         { init = init route
         , update = update

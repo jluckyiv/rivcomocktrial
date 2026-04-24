@@ -21,10 +21,10 @@ import View exposing (View)
 
 
 page : Auth.User -> Shared.Model -> Route () -> Page Model Msg
-page user shared route =
+page _ _ _ =
     Page.new
-        { init = init user
-        , update = update user
+        { init = init
+        , update = update
         , view = view
         , subscriptions = subscriptions
         }
@@ -66,8 +66,8 @@ type alias Model =
     }
 
 
-init : Auth.User -> () -> ( Model, Effect Msg )
-init user _ =
+init : () -> ( Model, Effect Msg )
+init _ =
     ( { tournaments = Loading
       , form = FormHidden
       , deleting = Nothing
@@ -94,8 +94,8 @@ type Msg
     | DeleteTournament String
 
 
-update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
-update user msg model =
+update : Msg -> Model -> ( Model, Effect Msg )
+update msg model =
     case msg of
         PbMsg value ->
             case Pb.responseTag value of
@@ -403,9 +403,6 @@ view model =
 viewDataTable : Model -> Html Msg
 viewDataTable model =
     case model.tournaments of
-        NotAsked ->
-            UI.empty
-
         Loading ->
             UI.loading
 

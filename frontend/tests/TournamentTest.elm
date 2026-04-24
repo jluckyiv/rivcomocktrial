@@ -1,6 +1,5 @@
 module TournamentTest exposing (suite)
 
-import Error exposing (Error(..))
 import Expect
 import Test exposing (Test, describe, test)
 import Tournament
