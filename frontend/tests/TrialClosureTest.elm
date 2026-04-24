@@ -2,7 +2,7 @@ module TrialClosureTest exposing (suite)
 
 import ActiveTrial exposing (TrialStatus(..))
 import BallotTracking
-import Error exposing (Error(..))
+import Error exposing (Error)
 import Expect
 import Test exposing (Test, describe, test)
 import TestHelpers

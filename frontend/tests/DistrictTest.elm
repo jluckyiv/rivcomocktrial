@@ -1,7 +1,6 @@
 module DistrictTest exposing (suite)
 
 import District
-import Error exposing (Error(..))
 import Expect
 import Test exposing (Test, describe, test)
 

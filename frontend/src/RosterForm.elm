@@ -3,18 +3,12 @@ module RosterForm exposing
     , FormRow
     , FormState(..)
     , FormViewConfig
-    , addErrorIf
     , emptyRow
     , entryToFormRow
-    , entryTypeName
-    , entryTypeToString
     , parseEntryType
     , parseRole
     , roleName
-    , roleOptionsForSide
-    , roleToString
     , sideLabel
-    , unique
     , updateFormRows
     , updateRow
     , validateForm
@@ -105,19 +99,6 @@ entryTypeToString et =
 
         Api.NonActiveEntry ->
             "non_active"
-
-
-entryTypeName : Api.EntryType -> String
-entryTypeName et =
-    case et of
-        Api.ActiveEntry ->
-            "Active"
-
-        Api.SubstituteEntry ->
-            "Substitute"
-
-        Api.NonActiveEntry ->
-            "Non-Active"
 
 
 roleToString : Maybe Api.RosterRole -> String

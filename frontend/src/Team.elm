@@ -4,16 +4,15 @@ module Team exposing
     , Team
     , addStudents
     , attorneyCoach
-    , sameTeam
     , create
     , nameFromString
     , nameToString
     , numberFromInt
     , numberToInt
+    , sameTeam
     , school
     , setAttorneyCoach
     , students
-    , teacherCoach
     , teamName
     , teamNumber
     )
@@ -121,11 +120,6 @@ school (Team r) =
 students : Team -> List Student
 students (Team r) =
     r.students
-
-
-teacherCoach : Team -> TeacherCoach
-teacherCoach (Team r) =
-    r.teacherCoach
 
 
 attorneyCoach : Team -> Maybe AttorneyCoach

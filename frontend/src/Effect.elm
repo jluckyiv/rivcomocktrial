@@ -1,17 +1,11 @@
 port module Effect exposing
     ( Effect
     , none, batch
-    , sendCmd, sendMsg
-    , sendSharedMsg
+    , sendCmd
     , pushRoute, replaceRoute
-    , pushRoutePath, replaceRoutePath
-    , loadExternalUrl, back
-    , saveAdminToken
-    , saveCoachToken
-    , saveCoachUser
-    , portSend
-    , incoming
+    , pushRoutePath
     , map, toCmd
+    , incoming, portSend, saveAdminToken, saveCoachToken, saveCoachUser, sendSharedMsg
     )
 
 {-|
@@ -19,11 +13,10 @@ port module Effect exposing
 @docs Effect
 
 @docs none, batch
-@docs sendCmd, sendMsg
+@docs sendCmd
 
 @docs pushRoute, replaceRoute
-@docs pushRoutePath, replaceRoutePath
-@docs loadExternalUrl, back
+@docs pushRoutePath
 
 @docs map, toCmd
 
@@ -32,7 +25,7 @@ port module Effect exposing
 import Browser.Navigation
 import Dict exposing (Dict)
 import Json.Encode
-import Route exposing (Route)
+import Route
 import Route.Path
 import Shared.Model
 import Shared.Msg
@@ -48,8 +41,6 @@ type Effect msg
       -- ROUTING
     | PushUrl String
     | ReplaceUrl String
-    | LoadExternalUrl String
-    | Back
       -- SHARED
     | SendSharedMsg Shared.Msg.Msg
 
@@ -77,15 +68,6 @@ batch =
 sendCmd : Cmd msg -> Effect msg
 sendCmd =
     SendCmd
-
-
-{-| Send a message as an effect. Useful when emitting events from UI components.
--}
-sendMsg : msg -> Effect msg
-sendMsg msg =
-    Task.succeed msg
-        |> Task.perform identity
-        |> SendCmd
 
 
 {-| Send a shared message as an effect. Useful for cross-page communication
@@ -219,27 +201,6 @@ replaceRoute route =
     ReplaceUrl (Route.toString route)
 
 
-{-| Same as `Effect.replaceRoute`, but without `query` or `hash` support
--}
-replaceRoutePath : Route.Path.Path -> Effect msg
-replaceRoutePath path =
-    ReplaceUrl (Route.Path.toString path)
-
-
-{-| Redirect users to a new URL, somewhere external to your web application.
--}
-loadExternalUrl : String -> Effect msg
-loadExternalUrl =
-    LoadExternalUrl
-
-
-{-| Navigate back one page
--}
-back : Effect msg
-back =
-    Back
-
-
 
 -- INTERNALS
 
@@ -264,12 +225,6 @@ map fn effect =
 
         ReplaceUrl url ->
             ReplaceUrl url
-
-        Back ->
-            Back
-
-        LoadExternalUrl url ->
-            LoadExternalUrl url
 
         SendSharedMsg sharedMsg ->
             SendSharedMsg sharedMsg
@@ -303,12 +258,6 @@ toCmd options effect =
 
         ReplaceUrl url ->
             Browser.Navigation.replaceUrl options.key url
-
-        Back ->
-            Browser.Navigation.back options.key 1
-
-        LoadExternalUrl url ->
-            Browser.Navigation.load url
 
         SendSharedMsg sharedMsg ->
             Task.succeed sharedMsg

@@ -11,8 +11,7 @@ import Side exposing (Side(..))
 import Test exposing (Test, describe, test)
 import TestHelpers
     exposing
-        ( testPresider
-        , testScorer
+        ( testScorer
         , testSubmittedBallot
         , testTrial
         , volunteerName

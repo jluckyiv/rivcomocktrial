@@ -1,7 +1,6 @@
 module JudgeTest exposing (suite)
 
 import Email
-import Error exposing (Error(..))
 import Expect
 import Judge
 import Test exposing (Test, describe, test)

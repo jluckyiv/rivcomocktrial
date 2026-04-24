@@ -1,9 +1,9 @@
 module RosterTest exposing (suite)
 
 import Expect
-import Roster exposing (AttorneyDuty(..), RoleAssignment(..), Roster)
+import Roster exposing (AttorneyDuty(..), RoleAssignment(..))
 import Side exposing (Side(..))
-import Student exposing (Student)
+import Student
 import Test exposing (Test, describe, test)
 import TestHelpers
 import Witness

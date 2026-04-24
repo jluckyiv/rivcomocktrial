@@ -9,7 +9,6 @@ module Student exposing
     , last
     , nameFromStrings
     , preferred
-    , pronouns
     , pronounsToString
     , studentName
     )
@@ -113,11 +112,6 @@ create n p =
 studentName : Student -> Name
 studentName (Student r) =
     r.name
-
-
-pronouns : Student -> Pronouns
-pronouns (Student r) =
-    r.pronouns
 
 
 pronounsToString : Pronouns -> String

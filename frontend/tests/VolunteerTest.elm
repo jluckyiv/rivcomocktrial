@@ -1,7 +1,6 @@
 module VolunteerTest exposing (suite)
 
 import Email
-import Error exposing (Error(..))
 import Expect
 import Test exposing (Test, describe, test)
 import TestHelpers

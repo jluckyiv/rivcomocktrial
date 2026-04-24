@@ -7,7 +7,6 @@ import Html exposing (..)
 import Html.Attributes as Attr
 import Html.Events as Events
 import Json.Decode
-import Json.Encode
 import Layouts
 import Page exposing (Page)
 import Pb
@@ -20,7 +19,7 @@ import View exposing (View)
 
 
 page : Auth.User -> Shared.Model -> Route () -> Page Model Msg
-page user shared route =
+page _ shared _ =
     Page.new
         { init = init shared
         , update = update
@@ -766,7 +765,6 @@ taskTypeName tt =
 
 
 
-
 -- SUBSCRIPTIONS
 
 
@@ -900,7 +898,7 @@ viewRoundRow data round =
 viewRosterReadOnly : TeamData -> List Api.RosterEntry -> Api.RosterSide -> Maybe Api.RosterSubmission -> String -> Html Msg
 viewRosterReadOnly data entries side maybeSub roundId =
     div []
-        [ viewRosterEntries data entries side
+        [ viewRosterEntries data entries
         , if not (isSubmitted maybeSub) then
             div [ Attr.class "mt-4" ]
                 [ button
@@ -915,8 +913,8 @@ viewRosterReadOnly data entries side maybeSub roundId =
         ]
 
 
-viewRosterEntries : TeamData -> List Api.RosterEntry -> Api.RosterSide -> Html Msg
-viewRosterEntries data entries side =
+viewRosterEntries : TeamData -> List Api.RosterEntry -> Html Msg
+viewRosterEntries data entries =
     if List.isEmpty entries then
         p [ Attr.class "text-sm text-base-content/50 py-4" ]
             [ text "No roster entries yet." ]

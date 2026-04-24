@@ -2,6 +2,7 @@
 /.elm-land
 /.env
 /elm-stuff
+review/elm-stuff
 /node_modules
 .DS_Store
 *.pem

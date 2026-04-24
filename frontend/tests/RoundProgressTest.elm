@@ -1,13 +1,12 @@
 module RoundProgressTest exposing (suite)
 
-import ActiveTrial exposing (TrialStatus(..))
-import Assignment exposing (Assignment(..))
+import ActiveTrial
 import Courtroom
 import Expect
 import Pairing
 import RoundProgress exposing (RoundProgress(..))
-import Test exposing (Test, describe, test)
 import Team exposing (Team)
+import Test exposing (Test, describe, test)
 import TestHelpers
     exposing
         ( courtroomName

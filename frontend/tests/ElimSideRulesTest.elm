@@ -1,7 +1,6 @@
 module ElimSideRulesTest exposing (suite)
 
 import ElimSideRules exposing (MeetingHistory(..))
-import Error exposing (Error(..))
 import Expect
 import Side exposing (Side(..))
 import Test exposing (Test, describe, test)

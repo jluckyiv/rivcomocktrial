@@ -1,7 +1,11 @@
 module Shared exposing
-    ( Flags, decoder
-    , Model, Msg
-    , init, update, subscriptions
+    ( Flags
+    , Model
+    , Msg
+    , decoder
+    , init
+    , subscriptions
+    , update
     )
 
 import Effect exposing (Effect)
@@ -37,8 +41,7 @@ decoder =
         )
 
 
-coachUserDecoder :
-    Json.Decode.Decoder Shared.Model.CoachUser
+coachUserDecoder : Json.Decode.Decoder Shared.Model.CoachUser
 coachUserDecoder =
     Json.Decode.map3 Shared.Model.CoachUser
         (Json.Decode.field "id" Json.Decode.string)
@@ -58,7 +61,7 @@ init :
     Result Json.Decode.Error Flags
     -> Route ()
     -> ( Model, Effect Msg )
-init flagsResult route =
+init flagsResult _ =
     let
         flags =
             case flagsResult of
@@ -95,7 +98,7 @@ type alias Msg =
 
 
 update : Route () -> Msg -> Model -> ( Model, Effect Msg )
-update route msg model =
+update _ msg model =
     case msg of
         Shared.Msg.AdminLoggedIn { token, redirect } ->
             ( { model | adminToken = Just token }
@@ -148,5 +151,5 @@ update route msg model =
 
 
 subscriptions : Route () -> Model -> Sub Msg
-subscriptions route model =
+subscriptions _ _ =
     Sub.none

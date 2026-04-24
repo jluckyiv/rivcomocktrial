@@ -1,6 +1,5 @@
 module Awards exposing
     ( AwardCategory(..)
-    , AwardCriteria
     , AwardTiebreaker(..)
     , StudentScore
     , nominationCategory
@@ -37,13 +36,7 @@ nominationCategory category =
 
 
 type AwardTiebreaker
-    = ByRankPoints
-    | ByRawScore
-    | ByMedianDelta
-
-
-type alias AwardCriteria =
-    List AwardTiebreaker
+    = ByRawScore
 
 
 type alias StudentScore =

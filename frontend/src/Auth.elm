@@ -77,5 +77,5 @@ viewCustomPage :
     Shared.Model
     -> Route ()
     -> View Never
-viewCustomPage shared route =
+viewCustomPage _ _ =
     View.fromString "Loading..."

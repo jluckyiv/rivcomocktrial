@@ -1,6 +1,5 @@
 module Layouts.Team exposing (Model, Msg, Props, layout)
 
-import Auth
 import Effect exposing (Effect)
 import Html exposing (..)
 import Html.Attributes as Attr
@@ -19,7 +18,7 @@ type alias Props =
 
 
 layout : Props -> Shared.Model -> Route () -> Layout () Model Msg contentMsg
-layout props shared route =
+layout _ shared route =
     Layout.new
         { init = init
         , update = update
@@ -72,7 +71,7 @@ update msg model =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions model =
+subscriptions _ =
     Sub.none
 
 

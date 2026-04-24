@@ -15,11 +15,11 @@ type alias Props =
 
 
 layout : Props -> Shared.Model -> Route () -> Layout () Model Msg contentMsg
-layout props shared route =
+layout _ _ _ =
     Layout.new
         { init = init
         , update = update
-        , view = view route
+        , view = view
         , subscriptions = subscriptions
         }
 
@@ -48,7 +48,7 @@ type Msg
 
 
 update : Msg -> Model -> ( Model, Effect Msg )
-update msg model =
+update _ model =
     ( model, Effect.none )
 
 
@@ -57,7 +57,7 @@ update msg model =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions model =
+subscriptions _ =
     Sub.none
 
 
@@ -65,11 +65,11 @@ subscriptions model =
 -- VIEW
 
 
-view : Route () -> { toContentMsg : Msg -> contentMsg, content : View contentMsg, model : Model } -> View contentMsg
-view route { toContentMsg, content, model } =
+view : { toContentMsg : Msg -> contentMsg, content : View contentMsg, model : Model } -> View contentMsg
+view { content } =
     { title = content.title ++ " | Riverside County Mock Trial"
     , body =
-        [ viewNavbar route
+        [ viewNavbar
         , main_ [ Attr.class "p-6" ]
             [ div [ Attr.class "max-w-4xl mx-auto" ]
                 content.body
@@ -78,8 +78,8 @@ view route { toContentMsg, content, model } =
     }
 
 
-viewNavbar : Route () -> Html msg
-viewNavbar route =
+viewNavbar : Html msg
+viewNavbar =
     nav [ Attr.class "navbar bg-primary text-primary-content shadow-sm" ]
         [ div [ Attr.class "navbar-start" ]
             [ a [ Attr.class "btn btn-ghost text-base font-bold normal-case", Route.Path.href Route.Path.Home_ ]

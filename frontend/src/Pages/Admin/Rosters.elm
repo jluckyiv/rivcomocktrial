@@ -19,10 +19,10 @@ import View exposing (View)
 
 
 page : Auth.User -> Shared.Model -> Route () -> Page Model Msg
-page user shared route =
+page _ _ _ =
     Page.new
-        { init = init user
-        , update = update user
+        { init = init
+        , update = update
         , view = view
         , subscriptions = subscriptions
         }
@@ -57,8 +57,8 @@ type alias Model =
     }
 
 
-init : Auth.User -> () -> ( Model, Effect Msg )
-init user _ =
+init : () -> ( Model, Effect Msg )
+init _ =
     ( { tournaments = []
       , teams = Loading
       , rounds = Loading
@@ -107,8 +107,8 @@ type Msg
     | SubmitRoster
 
 
-update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
-update user msg model =
+update : Msg -> Model -> ( Model, Effect Msg )
+update msg model =
     case msg of
         PbMsg value ->
             handlePbMsg value model
@@ -560,8 +560,6 @@ submissionForCell teamId roundId side submissions =
             Nothing
 
 
-
-
 teamName : Team -> String
 teamName team =
     if team.name /= "" then
@@ -825,9 +823,6 @@ viewSelectedCell model =
 
                 cellEntries =
                     entriesForCell cell.teamId cell.roundId cell.side model.entries
-
-                maybeSub =
-                    submissionForCell cell.teamId cell.roundId cell.side model.submissions
             in
             UI.card
                 [ UI.cardBody
@@ -847,7 +842,7 @@ viewSelectedCell model =
                         ]
                     , case model.form of
                         RosterForm.FormHidden ->
-                            viewCellReadOnly cellEntries maybeSub model
+                            viewCellReadOnly cellEntries model
 
                         RosterForm.FormEditing _ _ ->
                             viewFormCard model
@@ -858,8 +853,8 @@ viewSelectedCell model =
                 ]
 
 
-viewCellReadOnly : List RosterEntry -> Maybe RosterSubmission -> Model -> Html Msg
-viewCellReadOnly entries maybeSub model =
+viewCellReadOnly : List RosterEntry -> Model -> Html Msg
+viewCellReadOnly entries model =
     div []
         [ if List.isEmpty entries then
             p [ Attr.class "text-sm text-base-content/50 py-4" ] [ text "No roster entries." ]

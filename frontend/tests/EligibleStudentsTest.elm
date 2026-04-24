@@ -4,7 +4,7 @@ import Coach
 import District
 import EligibleStudents exposing (Status(..))
 import Email
-import Error exposing (Error(..))
+import Error exposing (Error)
 import Expect
 import School
 import Student

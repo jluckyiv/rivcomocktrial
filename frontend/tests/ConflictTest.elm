@@ -7,7 +7,6 @@ import Conflict
         )
 import Expect
 import Round exposing (Round(..))
-import School
 import Team
 import Test exposing (Test, describe, test)
 import TestHelpers

@@ -18,10 +18,10 @@ import View exposing (View)
 
 
 page : Auth.User -> Shared.Model -> Route () -> Page Model Msg
-page user shared route =
+page _ _ _ =
     Page.new
-        { init = init user
-        , update = update user
+        { init = init
+        , update = update
         , view = view
         , subscriptions = subscriptions
         }
@@ -68,8 +68,8 @@ type alias Model =
     }
 
 
-init : Auth.User -> () -> ( Model, Effect Msg )
-init user _ =
+init : () -> ( Model, Effect Msg )
+init _ =
     ( { students = Loading
       , schools = []
       , form = FormHidden
@@ -105,8 +105,8 @@ type Msg
     | BulkImport
 
 
-update : Auth.User -> Msg -> Model -> ( Model, Effect Msg )
-update user msg model =
+update : Msg -> Model -> ( Model, Effect Msg )
+update msg model =
     case msg of
         PbMsg value ->
             case Pb.responseTag value of
@@ -272,7 +272,7 @@ update user msg model =
             ( { model | bulk = BulkEditing val }, Effect.none )
 
         BulkImport ->
-            handleBulkImport user model
+            handleBulkImport model
 
 
 
@@ -320,8 +320,8 @@ updateFormField transform state =
             state
 
 
-handleBulkImport : Auth.User -> Model -> ( Model, Effect Msg )
-handleBulkImport user model =
+handleBulkImport : Model -> ( Model, Effect Msg )
+handleBulkImport model =
     let
         bulkText =
             case model.bulk of
@@ -439,9 +439,6 @@ view model =
 viewDataTable : Model -> Html Msg
 viewDataTable model =
     case model.students of
-        NotAsked ->
-            UI.empty
-
         Loading ->
             UI.loading
 
