@@ -512,6 +512,11 @@ viewRow deleting t =
                     , Events.onClick (EditTournament t)
                     ]
                     [ text "Edit" ]
+                , a
+                    [ Attr.class "btn btn-sm btn-outline"
+                    , Route.Path.href Route.Path.Admin_CaseCharacters
+                    ]
+                    [ text "Case Characters" ]
                 , button
                     [ Attr.class "btn btn-sm btn-outline btn-error"
                     , Events.onClick (DeleteTournament t.id)
