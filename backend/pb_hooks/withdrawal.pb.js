@@ -10,22 +10,22 @@ onRecordAfterUpdateSuccess((e) => {
 
     const teamId = req.get("team");
 
-    const teams = $app.findRecordsByFilter(
-        "teams",
-        "id = '" + teamId + "'",
-        "",
-        1,
-        0
-    );
-
-    if (teams.length === 0) {
+    let team;
+    try {
+        team = $app.findRecordById("teams", teamId);
+    } catch (_) {
         console.error(
             "[withdrawal] Team not found for withdrawal request " + req.id
         );
         return;
     }
 
-    const team = teams[0];
     team.set("status", "withdrawn");
-    $app.save(team);
+    try {
+        $app.save(team);
+    } catch (err) {
+        console.error(
+            "[withdrawal] Failed to save team status for request " + req.id + " — " + err
+        );
+    }
 }, "withdrawal_requests");

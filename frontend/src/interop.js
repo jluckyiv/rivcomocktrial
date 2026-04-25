@@ -20,7 +20,7 @@ pbAdmin.autoCancellation(false)
 // Restore admin auth from localStorage on load
 const savedAdminToken = localStorage.getItem("adminToken")
 if (savedAdminToken) {
-    pbAdmin.authStore.save(savedAdminToken, { id: "admin" })
+    pbAdmin.authStore.save(savedAdminToken, null)
 }
 
 // Restore coach auth from localStorage on load
@@ -36,7 +36,7 @@ if (savedCoachToken) {
     }
 }
 
-export const flags = ({ env }) => {
+export const flags = (_env) => {
     const coachUser = (() => {
         try {
             const raw = localStorage.getItem("coachUser")
@@ -53,7 +53,7 @@ export const flags = ({ env }) => {
     }
 }
 
-export const onReady = ({ app, env }) => {
+export const onReady = ({ app, env: _env }) => {
     const send = (tag, data) => {
         if (app.ports.incoming) {
             app.ports.incoming.send({ tag, data })
@@ -78,9 +78,7 @@ export const onReady = ({ app, env }) => {
                 case "SaveAdminToken":
                     if (data) {
                         localStorage.setItem("adminToken", data)
-                        pbAdmin.authStore.save(data, {
-                            id: "admin",
-                        })
+                        pbAdmin.authStore.save(data, null)
                     } else {
                         localStorage.removeItem("adminToken")
                         pbAdmin.authStore.clear()
@@ -90,6 +88,7 @@ export const onReady = ({ app, env }) => {
                 case "SaveCoachToken":
                     if (data) {
                         localStorage.setItem("coachToken", data)
+                        pb.authStore.save(data, pb.authStore.record)
                     } else {
                         localStorage.removeItem("coachToken")
                         localStorage.removeItem("coachUser")
@@ -107,6 +106,14 @@ export const onReady = ({ app, env }) => {
                         localStorage.removeItem("coachUser")
                     }
                     break
+
+                default:
+                    if (app.ports.incoming) {
+                        app.ports.incoming.send({
+                            tag: tag,
+                            error: "Unknown tag: " + tag,
+                        })
+                    }
             }
         })
     }
@@ -158,10 +165,6 @@ function handlePbSend(data, send, sendError) {
                 .collection("_superusers")
                 .authWithPassword(data.email, data.password)
                 .then((auth) => {
-                    localStorage.setItem(
-                        "adminToken",
-                        auth.token
-                    )
                     send(tag, { token: auth.token })
                 })
                 .catch((err) => sendError(tag, err))
@@ -171,19 +174,6 @@ function handlePbSend(data, send, sendError) {
             pb.collection("users")
                 .authWithPassword(data.email, data.password)
                 .then((auth) => {
-                    const user = {
-                        id: auth.record.id,
-                        email: auth.record.email,
-                        name: auth.record.name || "",
-                    }
-                    localStorage.setItem(
-                        "coachToken",
-                        auth.token
-                    )
-                    localStorage.setItem(
-                        "coachUser",
-                        JSON.stringify(user)
-                    )
                     send(tag, {
                         token: auth.token,
                         record: auth.record,
@@ -191,5 +181,8 @@ function handlePbSend(data, send, sendError) {
                 })
                 .catch((err) => sendError(tag, err))
             break
+
+        default:
+            sendError(tag, { message: "Unknown action: " + action })
     }
 }

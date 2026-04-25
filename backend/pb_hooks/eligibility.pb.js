@@ -17,27 +17,29 @@ onRecordAfterUpdateSuccess((e) => {
         // Mark matching active entry as removed.
         const entries = $app.findRecordsByFilter(
             "eligibility_list_entries",
-            "team = '" + teamId + "' && name = '" + studentName + "' && status = 'active'",
+            "team = {:teamId} && name = {:studentName} && status = 'active'",
             "",
             1,
-            0
+            0,
+            { teamId, studentName }
         );
 
         for (const entry of entries) {
             entry.set("status", "removed");
-            $app.save(entry);
+            try {
+                $app.save(entry);
+            } catch (err) {
+                console.error(
+                    "[eligibility] Failed to save entry removal for request " + req.id + " — " + err
+                );
+            }
         }
     } else if (changeType === "add") {
-        // Find the team to get its tournament ID.
-        const teams = $app.findRecordsByFilter(
-            "teams",
-            "id = '" + teamId + "'",
-            "",
-            1,
-            0
-        );
-
-        if (teams.length === 0) {
+        // Look up the team by its primary key.
+        let team;
+        try {
+            team = $app.findRecordById("teams", teamId);
+        } catch (_) {
             console.error(
                 "[eligibility] Team not found for change request " + req.id
             );
@@ -47,9 +49,15 @@ onRecordAfterUpdateSuccess((e) => {
         const col = $app.findCollectionByNameOrId("eligibility_list_entries");
         const entry = new Record(col);
         entry.set("team", teamId);
-        entry.set("tournament", teams[0].get("tournament"));
+        entry.set("tournament", team.get("tournament"));
         entry.set("name", studentName);
         entry.set("status", "active");
-        $app.save(entry);
+        try {
+            $app.save(entry);
+        } catch (err) {
+            console.error(
+                "[eligibility] Failed to save new entry for request " + req.id + " — " + err
+            );
+        }
     }
 }, "eligibility_change_requests");
