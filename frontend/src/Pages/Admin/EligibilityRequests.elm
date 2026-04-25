@@ -4,8 +4,6 @@ import Api
 import Auth
 import Effect exposing (Effect)
 import Html exposing (..)
-import Html.Attributes as Attr
-import Html.Events as Events
 import Json.Decode
 import Json.Encode
 import Layouts
@@ -279,17 +277,9 @@ viewActions : String -> Api.RequestStatus -> Html Msg
 viewActions requestId status =
     case status of
         Api.Pending ->
-            div [ Attr.class "flex gap-2" ]
-                [ button
-                    [ Attr.class "btn btn-sm btn-success"
-                    , Events.onClick (ApproveRequest requestId)
-                    ]
-                    [ text "Approve" ]
-                , button
-                    [ Attr.class "btn btn-sm btn-error"
-                    , Events.onClick (RejectRequest requestId)
-                    ]
-                    [ text "Reject" ]
+            UI.buttonRow
+                [ UI.smallButton { label = "Approve", variant = "success", msg = ApproveRequest requestId }
+                , UI.smallButton { label = "Reject", variant = "error", msg = RejectRequest requestId }
                 ]
 
         _ ->

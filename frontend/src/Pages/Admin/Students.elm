@@ -520,7 +520,7 @@ viewFormCard context formData errors saving schools =
                         , required = False
                         }
                     ]
-                , div [ Attr.class "flex gap-2 mt-4" ]
+                , UI.actionRow
                     [ UI.primaryButton { label = "Save", loading = saving }
                     , UI.cancelButton CancelForm
                     ]
@@ -568,24 +568,18 @@ viewBulkInput state =
                         }
                     , case bulkError of
                         Just err ->
-                            div [ Attr.class "mt-2" ] [ UI.error err ]
+                            UI.error err
 
                         Nothing ->
                             UI.empty
-                    , div [ Attr.class "flex gap-2 mt-4" ]
-                        [ button
-                            [ Attr.class "btn btn-info"
-                            , Events.onClick BulkImport
-                            , Attr.disabled (saving || String.trim bulkText == "")
-                            ]
-                            (if saving then
-                                [ span [ Attr.class "loading loading-spinner loading-sm" ] []
-                                , text "Importing..."
-                                ]
-
-                             else
-                                [ text "Import" ]
-                            )
+                    , UI.actionRow
+                        [ UI.loadingActionButton
+                            { label = "Import"
+                            , variant = "info"
+                            , loading = saving
+                            , disabled = String.trim bulkText == ""
+                            , msg = BulkImport
+                            }
                         , UI.cancelButton CancelBulk
                         ]
                     ]
@@ -598,23 +592,19 @@ viewRow deleting schoolName s =
         [ td [] [ text s.name ]
         , td [] [ text (schoolName s.school) ]
         , td []
-            [ div [ Attr.class "flex gap-2" ]
-                [ button
-                    [ Attr.class "btn btn-sm btn-outline btn-info"
-                    , Events.onClick (EditStudent s)
-                    ]
-                    [ text "Edit" ]
-                , button
-                    [ Attr.class "btn btn-sm btn-outline btn-error"
-                    , Events.onClick (DeleteStudent s.id)
-                    , Attr.disabled (deleting == Just s.id)
-                    ]
-                    (if deleting == Just s.id then
-                        [ span [ Attr.class "loading loading-spinner loading-sm" ] [] ]
-
-                     else
-                        [ text "Delete" ]
-                    )
+            [ UI.buttonRow
+                [ UI.rowActionButton
+                    { label = "Edit"
+                    , variant = "info"
+                    , loading = False
+                    , msg = EditStudent s
+                    }
+                , UI.rowActionButton
+                    { label = "Delete"
+                    , variant = "error"
+                    , loading = deleting == Just s.id
+                    , msg = DeleteStudent s.id
+                    }
                 ]
             ]
         ]

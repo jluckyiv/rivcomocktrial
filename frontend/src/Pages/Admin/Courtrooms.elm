@@ -436,7 +436,7 @@ viewFormCard context formData errors saving =
                         , required = False
                         }
                     ]
-                , div [ Attr.class "flex gap-2 mt-4" ]
+                , UI.actionRow
                     [ UI.primaryButton { label = "Save", loading = saving }
                     , UI.cancelButton CancelForm
                     ]
@@ -484,24 +484,18 @@ viewBulkInput state =
                         }
                     , case bulkError of
                         Just err ->
-                            div [ Attr.class "mt-2" ] [ UI.error err ]
+                            UI.error err
 
                         Nothing ->
                             UI.empty
-                    , div [ Attr.class "flex gap-2 mt-4" ]
-                        [ button
-                            [ Attr.class "btn btn-info"
-                            , Events.onClick BulkImport
-                            , Attr.disabled (saving || String.trim bulkText == "")
-                            ]
-                            (if saving then
-                                [ span [ Attr.class "loading loading-spinner loading-sm" ] []
-                                , text "Importing..."
-                                ]
-
-                             else
-                                [ text "Import" ]
-                            )
+                    , UI.actionRow
+                        [ UI.loadingActionButton
+                            { label = "Import"
+                            , variant = "info"
+                            , loading = saving
+                            , disabled = String.trim bulkText == ""
+                            , msg = BulkImport
+                            }
                         , UI.cancelButton CancelBulk
                         ]
                     ]
@@ -514,23 +508,19 @@ viewRow deleting c =
         [ td [] [ text c.name ]
         , td [] [ text c.location ]
         , td []
-            [ div [ Attr.class "flex gap-2" ]
-                [ button
-                    [ Attr.class "btn btn-sm btn-outline btn-info"
-                    , Events.onClick (EditCourtroom c)
-                    ]
-                    [ text "Edit" ]
-                , button
-                    [ Attr.class "btn btn-sm btn-outline btn-error"
-                    , Events.onClick (DeleteCourtroom c.id)
-                    , Attr.disabled (deleting == Just c.id)
-                    ]
-                    (if deleting == Just c.id then
-                        [ span [ Attr.class "loading loading-spinner loading-sm" ] [] ]
-
-                     else
-                        [ text "Delete" ]
-                    )
+            [ UI.buttonRow
+                [ UI.rowActionButton
+                    { label = "Edit"
+                    , variant = "info"
+                    , loading = False
+                    , msg = EditCourtroom c
+                    }
+                , UI.rowActionButton
+                    { label = "Delete"
+                    , variant = "error"
+                    , loading = deleting == Just c.id
+                    , msg = DeleteCourtroom c.id
+                    }
                 ]
             ]
         ]
