@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { pbCreate, pbPatch, pbDelete, pbList } from "./helpers/pb";
+import { adminLogin } from "./helpers/auth";
 
 let createdIds: { collection: string; id: string }[] = [];
 
@@ -8,18 +9,6 @@ async function cleanup() {
     await pbDelete(collection, id);
   }
   createdIds = [];
-}
-
-async function adminLogin(page: import("@playwright/test").Page) {
-  await page.goto("/admin/login");
-  await page.fill(
-    'input[placeholder="admin@example.com"]',
-    process.env.PB_ADMIN_EMAIL!
-  );
-  await page.fill('input[type="password"]', process.env.PB_ADMIN_PASSWORD!);
-  await page.getByRole("button", { name: "Login" }).click();
-  // Wait for the admin nav — only present after successful login.
-  await page.locator("text=RCMT Admin").waitFor();
 }
 
 test.describe("Admin dashboard", () => {

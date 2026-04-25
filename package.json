@@ -12,7 +12,9 @@
     "fe:build": "cd frontend && PATH=\"./node_modules/.bin:$PATH\" elm-land build",
     "fe:review": "cd frontend && npx elm-review",
     "fe:test": "cd frontend && npx elm-test",
-    "e2e": "PB_ADMIN_EMAIL=$(op read 'op://Private/localhost dev pocketbase admin user/Email') PB_ADMIN_PASSWORD=$(op read 'op://Private/localhost dev pocketbase admin user/Password') npx playwright test",
+    "pb:credentials": "mkdir -p .pocketbase && op read 'op://Private/localhost dev pocketbase admin user/Email' > .pocketbase/adminUserEmail && op read 'op://Private/localhost dev pocketbase admin user/Password' > .pocketbase/adminUserPassword && echo 'Credentials saved to .pocketbase/'",
+    "pb:deploy-frontend": "docker cp frontend/dist/. rivcomocktrial-pocketbase-1:/pb/pb_public/",
+    "e2e": "PB_ADMIN_EMAIL=$(cat .pocketbase/adminUserEmail 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Email') PB_ADMIN_PASSWORD=$(cat .pocketbase/adminUserPassword 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Password') npx playwright test",
     "lint:js": "eslint frontend/src/interop.js backend/pb_hooks/",
     "lint": "npm run lint:js && npm run fe:review"
   },
