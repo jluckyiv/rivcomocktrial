@@ -16,6 +16,7 @@ module UI exposing
     , numberField
     , primaryButton
     , selectField
+    , statCard
     , textField
     , textareaField
     , titleBar
@@ -457,3 +458,31 @@ badge config =
 note : String -> Html msg
 note t =
     p [ Attr.class "text-sm text-base-content/60 mt-1" ] [ text t ]
+
+
+{-| DaisyUI stat component. Use inside a `div [ class "stats shadow w-full" ]`.
+
+`variant` maps to a DaisyUI text-color utility: `"warning"`, `"success"`,
+`"error"`, `"info"`, `"neutral"`. Pass `""` for the default base color.
+
+    div [ Attr.class "stats shadow w-full" ]
+        [ UI.statCard { label = "Pending Approvals", value = "3", variant = "warning" }
+        , UI.statCard { label = "Active Teams", value = "12", variant = "success" }
+        ]
+
+-}
+statCard : { label : String, value : String, variant : String } -> Html msg
+statCard config =
+    div [ Attr.class "stat" ]
+        [ div [ Attr.class "stat-title" ] [ text config.label ]
+        , div
+            [ Attr.class
+                (if config.variant == "" then
+                    "stat-value"
+
+                 else
+                    "stat-value text-" ++ config.variant
+                )
+            ]
+            [ text config.value ]
+        ]
