@@ -50,10 +50,12 @@ type alias TeamData =
     , changeRequests : RemoteData (List Api.ChangeRequest)
     , coCoaches : RemoteData (List Api.CoCoach)
     , attorneyCoaches : RemoteData (List Api.AttorneyCoach)
+    , withdrawalRequest : RemoteData (Maybe Api.WithdrawalRequest)
     , studentForm : StudentFormState
     , changeRequestForm : ChangeRequestFormState
     , coCoachForm : CoCoachFormState
     , attorneyForm : AttorneyFormState
+    , withdrawalForm : WithdrawalFormState
     }
 
 
@@ -96,6 +98,12 @@ type AttorneyFormState
     | AttorneyFormSaving { name : String, contact : String }
 
 
+type WithdrawalFormState
+    = WithdrawalFormHidden
+    | WithdrawalFormOpen { reason : String }
+    | WithdrawalFormSaving { reason : String }
+
+
 emptyTeamData : Api.Team -> TeamData
 emptyTeamData team =
     { team = team
@@ -104,10 +112,12 @@ emptyTeamData team =
     , changeRequests = Loading
     , coCoaches = Loading
     , attorneyCoaches = Loading
+    , withdrawalRequest = Loading
     , studentForm = StudentFormHidden
     , changeRequestForm = ChangeRequestFormHidden
     , coCoachForm = CoCoachFormHidden
     , attorneyForm = AttorneyFormHidden
+    , withdrawalForm = WithdrawalFormHidden
     }
 
 
@@ -161,6 +171,10 @@ type Msg
     | SaveAttorney
     | CancelAttorneyForm
     | RemoveAttorney String
+    | ShowWithdrawalForm
+    | UpdateWithdrawalReason String
+    | ConfirmWithdrawal
+    | CancelWithdrawalForm
     | PbMsg Json.Decode.Value
 
 
@@ -233,6 +247,15 @@ handleInitialPbMsg value model =
                             , tag = "attorney-coaches"
                             , filter = "team = '" ++ teamId ++ "'"
                             , sort = "name"
+                            }
+                        , Pb.publicList
+                            { collection = "withdrawal_requests"
+                            , tag = "withdrawal-requests"
+                            , filter =
+                                "team = '"
+                                    ++ teamId
+                                    ++ "' && status = 'pending'"
+                            , sort = "-created"
                             }
                         ]
                     )
@@ -621,6 +644,42 @@ updateTeamData msg data =
                 }
             )
 
+        ShowWithdrawalForm ->
+            ( { data | withdrawalForm = WithdrawalFormOpen { reason = "" } }
+            , Effect.none
+            )
+
+        UpdateWithdrawalReason val ->
+            case data.withdrawalForm of
+                WithdrawalFormOpen _ ->
+                    ( { data | withdrawalForm = WithdrawalFormOpen { reason = val } }
+                    , Effect.none
+                    )
+
+                _ ->
+                    ( data, Effect.none )
+
+        ConfirmWithdrawal ->
+            case data.withdrawalForm of
+                WithdrawalFormOpen fields ->
+                    ( { data | withdrawalForm = WithdrawalFormSaving fields }
+                    , Pb.publicCreate
+                        { collection = "withdrawal_requests"
+                        , tag = "save-withdrawal"
+                        , body =
+                            Api.encodeWithdrawalRequest
+                                { team = data.team.id
+                                , reason = fields.reason
+                                }
+                        }
+                    )
+
+                _ ->
+                    ( data, Effect.none )
+
+        CancelWithdrawalForm ->
+            ( { data | withdrawalForm = WithdrawalFormHidden }, Effect.none )
+
 
 handleTeamPbMsg : Json.Decode.Value -> TeamData -> ( TeamData, Effect Msg )
 handleTeamPbMsg value data =
@@ -849,6 +908,49 @@ handleTeamPbMsg value data =
                 Err _ ->
                     ( data, Effect.none )
 
+        Just "withdrawal-requests" ->
+            case Pb.decodeList Api.withdrawalRequestDecoder value of
+                Ok (req :: _) ->
+                    ( { data | withdrawalRequest = Succeeded (Just req) }
+                    , Effect.none
+                    )
+
+                Ok [] ->
+                    ( { data | withdrawalRequest = Succeeded Nothing }
+                    , Effect.none
+                    )
+
+                Err _ ->
+                    ( { data
+                        | withdrawalRequest =
+                            Failed "Failed to load withdrawal request."
+                      }
+                    , Effect.none
+                    )
+
+        Just "save-withdrawal" ->
+            case Pb.decodeRecord Api.withdrawalRequestDecoder value of
+                Ok req ->
+                    ( { data
+                        | withdrawalRequest = Succeeded (Just req)
+                        , withdrawalForm = WithdrawalFormHidden
+                      }
+                    , Effect.none
+                    )
+
+                Err _ ->
+                    ( { data
+                        | withdrawalForm =
+                            case data.withdrawalForm of
+                                WithdrawalFormSaving fields ->
+                                    WithdrawalFormOpen fields
+
+                                other ->
+                                    other
+                      }
+                    , Effect.none
+                    )
+
         _ ->
             ( data, Effect.none )
 
@@ -905,13 +1007,17 @@ viewTeam data =
 
                 _ ->
                     False
+
+        readOnly =
+            data.team.status == Api.TeamWithdrawn
     in
     [ UI.titleBar
         { title = "Manage Team — " ++ data.team.name
         , actions = []
         }
-    , viewEligibilitySection locked data
-    , viewCoachesSection data
+    , viewWithdrawalSection data
+    , viewEligibilitySection locked readOnly data
+    , viewCoachesSection readOnly data
     ]
 
 
@@ -938,21 +1044,21 @@ changeTypeFromString s =
             Api.RemoveStudent
 
 
-viewEligibilitySection : Bool -> TeamData -> Html Msg
-viewEligibilitySection locked data =
+viewEligibilitySection : Bool -> Bool -> TeamData -> Html Msg
+viewEligibilitySection locked readOnly data =
     div []
         (if locked then
-            [ viewLockedEligibilityList data
+            [ viewLockedEligibilityList readOnly data
             , viewChangeRequests data
             ]
 
          else
-            [ viewUnlockedEligibilityList data ]
+            [ viewUnlockedEligibilityList readOnly data ]
         )
 
 
-viewUnlockedEligibilityList : TeamData -> Html Msg
-viewUnlockedEligibilityList data =
+viewUnlockedEligibilityList : Bool -> TeamData -> Html Msg
+viewUnlockedEligibilityList readOnly data =
     case data.entries of
         Loading ->
             UI.loading
@@ -968,7 +1074,11 @@ viewUnlockedEligibilityList data =
                             ++ String.fromInt (List.length entries)
                             ++ " students)"
                         )
-                    , viewStudentForm data.studentForm
+                    , if readOnly then
+                        UI.empty
+
+                      else
+                        viewStudentForm data.studentForm
                     , if List.isEmpty entries then
                         UI.emptyState "No students added yet."
 
@@ -982,10 +1092,10 @@ viewUnlockedEligibilityList data =
                                         ]
                                     ]
                                 , tbody []
-                                    (List.map viewEditableEntryRow entries)
+                                    (List.map (viewEditableEntryRow readOnly) entries)
                                 ]
                             ]
-                    , if data.studentForm == StudentFormHidden then
+                    , if not readOnly && data.studentForm == StudentFormHidden then
                         div [ Attr.class "mt-4" ]
                             [ button
                                 [ Attr.class "btn btn-sm btn-outline"
@@ -1049,22 +1159,26 @@ viewStudentForm formState =
                 ]
 
 
-viewEditableEntryRow : Api.EligibilityEntry -> Html Msg
-viewEditableEntryRow entry =
+viewEditableEntryRow : Bool -> Api.EligibilityEntry -> Html Msg
+viewEditableEntryRow readOnly entry =
     tr []
         [ td [] [ text entry.name ]
         , td []
-            [ button
-                [ Attr.class "btn btn-sm btn-ghost"
-                , Events.onClick (RemoveEntry entry.id)
-                ]
-                [ text "Remove" ]
+            [ if readOnly then
+                UI.empty
+
+              else
+                button
+                    [ Attr.class "btn btn-sm btn-ghost"
+                    , Events.onClick (RemoveEntry entry.id)
+                    ]
+                    [ text "Remove" ]
             ]
         ]
 
 
-viewLockedEligibilityList : TeamData -> Html Msg
-viewLockedEligibilityList data =
+viewLockedEligibilityList : Bool -> TeamData -> Html Msg
+viewLockedEligibilityList readOnly data =
     case data.entries of
         Loading ->
             UI.loading
@@ -1086,7 +1200,11 @@ viewLockedEligibilityList data =
                                 ++ "To request a change, use the buttons below."
                             )
                         ]
-                    , viewChangeRequestForm data.changeRequestForm
+                    , if readOnly then
+                        UI.empty
+
+                      else
+                        viewChangeRequestForm data.changeRequestForm
                     , if List.isEmpty entries then
                         UI.emptyState "No students on the eligibility list."
 
@@ -1100,10 +1218,10 @@ viewLockedEligibilityList data =
                                         ]
                                     ]
                                 , tbody []
-                                    (List.map viewLockedEntryRow entries)
+                                    (List.map (viewLockedEntryRow readOnly) entries)
                                 ]
                             ]
-                    , if data.changeRequestForm == ChangeRequestFormHidden then
+                    , if not readOnly && data.changeRequestForm == ChangeRequestFormHidden then
                         div [ Attr.class "mt-4 flex gap-2" ]
                             [ button
                                 [ Attr.class "btn btn-sm btn-outline"
@@ -1118,17 +1236,21 @@ viewLockedEligibilityList data =
                 ]
 
 
-viewLockedEntryRow : Api.EligibilityEntry -> Html Msg
-viewLockedEntryRow entry =
+viewLockedEntryRow : Bool -> Api.EligibilityEntry -> Html Msg
+viewLockedEntryRow readOnly entry =
     tr []
         [ td [] [ text entry.name ]
         , td []
-            [ button
-                [ Attr.class "btn btn-sm btn-ghost"
-                , Events.onClick
-                    (ShowChangeRequestForm entry.name Api.RemoveStudent)
-                ]
-                [ text "Request Remove" ]
+            [ if readOnly then
+                UI.empty
+
+              else
+                button
+                    [ Attr.class "btn btn-sm btn-ghost"
+                    , Events.onClick
+                        (ShowChangeRequestForm entry.name Api.RemoveStudent)
+                    ]
+                    [ text "Request Remove" ]
             ]
         ]
 
@@ -1288,20 +1410,24 @@ viewChangeRequestBadge status =
             UI.badge { label = "Rejected", variant = "error" }
 
 
-viewCoachesSection : TeamData -> Html Msg
-viewCoachesSection data =
+viewCoachesSection : Bool -> TeamData -> Html Msg
+viewCoachesSection readOnly data =
     div [ Attr.class "grid grid-cols-1 md:grid-cols-2 gap-4 mt-4" ]
-        [ viewCoCoachesCard data
-        , viewAttorneyCoachesCard data
+        [ viewCoCoachesCard readOnly data
+        , viewAttorneyCoachesCard readOnly data
         ]
 
 
-viewCoCoachesCard : TeamData -> Html Msg
-viewCoCoachesCard data =
+viewCoCoachesCard : Bool -> TeamData -> Html Msg
+viewCoCoachesCard readOnly data =
     UI.card
         [ UI.cardBody
             [ UI.cardTitle "Co-Teacher Coaches"
-            , viewCoCoachForm data.coCoachForm
+            , if readOnly then
+                UI.empty
+
+              else
+                viewCoCoachForm data.coCoachForm
             , case data.coCoaches of
                 Loading ->
                     UI.loading
@@ -1323,10 +1449,10 @@ viewCoCoachesCard data =
                                     ]
                                 ]
                             , tbody []
-                                (List.map viewCoCoachRow coaches)
+                                (List.map (viewCoCoachRow readOnly) coaches)
                             ]
                         ]
-            , if data.coCoachForm == CoCoachFormHidden then
+            , if not readOnly && data.coCoachForm == CoCoachFormHidden then
                 div [ Attr.class "mt-4" ]
                     [ button
                         [ Attr.class "btn btn-sm btn-outline"
@@ -1399,27 +1525,35 @@ viewCoCoachForm formState =
                 ]
 
 
-viewCoCoachRow : Api.CoCoach -> Html Msg
-viewCoCoachRow c =
+viewCoCoachRow : Bool -> Api.CoCoach -> Html Msg
+viewCoCoachRow readOnly c =
     tr []
         [ td [] [ text c.name ]
         , td [] [ text c.email ]
         , td []
-            [ button
-                [ Attr.class "btn btn-sm btn-ghost"
-                , Events.onClick (RemoveCoCoach c.id)
-                ]
-                [ text "Remove" ]
+            [ if readOnly then
+                UI.empty
+
+              else
+                button
+                    [ Attr.class "btn btn-sm btn-ghost"
+                    , Events.onClick (RemoveCoCoach c.id)
+                    ]
+                    [ text "Remove" ]
             ]
         ]
 
 
-viewAttorneyCoachesCard : TeamData -> Html Msg
-viewAttorneyCoachesCard data =
+viewAttorneyCoachesCard : Bool -> TeamData -> Html Msg
+viewAttorneyCoachesCard readOnly data =
     UI.card
         [ UI.cardBody
             [ UI.cardTitle "Attorney Coaches"
-            , viewAttorneyForm data.attorneyForm
+            , if readOnly then
+                UI.empty
+
+              else
+                viewAttorneyForm data.attorneyForm
             , case data.attorneyCoaches of
                 Loading ->
                     UI.loading
@@ -1441,10 +1575,10 @@ viewAttorneyCoachesCard data =
                                     ]
                                 ]
                             , tbody []
-                                (List.map viewAttorneyRow coaches)
+                                (List.map (viewAttorneyRow readOnly) coaches)
                             ]
                         ]
-            , if data.attorneyForm == AttorneyFormHidden then
+            , if not readOnly && data.attorneyForm == AttorneyFormHidden then
                 div [ Attr.class "mt-4" ]
                     [ button
                         [ Attr.class "btn btn-sm btn-outline"
@@ -1518,16 +1652,105 @@ viewAttorneyForm formState =
                 ]
 
 
-viewAttorneyRow : Api.AttorneyCoach -> Html Msg
-viewAttorneyRow c =
+viewAttorneyRow : Bool -> Api.AttorneyCoach -> Html Msg
+viewAttorneyRow readOnly c =
     tr []
         [ td [] [ text c.name ]
         , td [] [ text c.contact ]
         , td []
-            [ button
-                [ Attr.class "btn btn-sm btn-ghost"
-                , Events.onClick (RemoveAttorney c.id)
+            [ if readOnly then
+                UI.empty
+
+              else
+                button
+                    [ Attr.class "btn btn-sm btn-ghost"
+                    , Events.onClick (RemoveAttorney c.id)
+                    ]
+                    [ text "Remove" ]
+            ]
+        ]
+
+
+viewWithdrawalSection : TeamData -> Html Msg
+viewWithdrawalSection data =
+    if data.team.status == Api.TeamWithdrawn then
+        div [ Attr.class "alert alert-error mt-4" ]
+            [ text "This team has withdrawn from the competition." ]
+
+    else
+        case data.withdrawalRequest of
+            Loading ->
+                UI.empty
+
+            Failed _ ->
+                UI.empty
+
+            Succeeded (Just _) ->
+                div [ Attr.class "alert alert-warning mt-4" ]
+                    [ text "A withdrawal request is pending admin review." ]
+
+            Succeeded Nothing ->
+                case data.withdrawalForm of
+                    WithdrawalFormHidden ->
+                        div [ Attr.class "mt-4" ]
+                            [ button
+                                [ Attr.class "btn btn-sm btn-outline btn-error"
+                                , Events.onClick ShowWithdrawalForm
+                                ]
+                                [ text "Request Withdrawal" ]
+                            ]
+
+                    WithdrawalFormOpen fields ->
+                        viewWithdrawalForm fields
+
+                    WithdrawalFormSaving _ ->
+                        div [ Attr.class "mt-4 flex items-center gap-2" ]
+                            [ span [ Attr.class "loading loading-spinner loading-sm" ] []
+                            , text "Submitting..."
+                            ]
+
+
+viewWithdrawalForm : { reason : String } -> Html Msg
+viewWithdrawalForm fields =
+    Html.form
+        [ Events.onSubmit ConfirmWithdrawal
+        , Attr.class "mt-4"
+        ]
+        [ UI.card
+            [ UI.cardBody
+                [ UI.cardTitle "Request Withdrawal"
+                , div [ Attr.class "alert alert-warning mb-4" ]
+                    [ text
+                        ("Submitting this request will notify RCOE. "
+                            ++ "Your team will remain active until an admin confirms."
+                        )
+                    ]
+                , label [ Attr.class "form-control w-full" ]
+                    [ div [ Attr.class "label" ]
+                        [ span [ Attr.class "label-text" ]
+                            [ text "Reason (optional)" ]
+                        ]
+                    , textarea
+                        [ Attr.class "textarea textarea-bordered w-full"
+                        , Attr.value fields.reason
+                        , Attr.placeholder "Briefly explain why you need to withdraw"
+                        , Events.onInput UpdateWithdrawalReason
+                        ]
+                        []
+                    ]
+                , div [ Attr.class "mt-4 flex gap-2" ]
+                    [ button
+                        [ Attr.class "btn btn-error"
+                        , Attr.type_ "submit"
+                        ]
+                        [ text "Confirm Withdrawal" ]
+                    , button
+                        [ Attr.class "btn btn-ghost"
+                        , Attr.type_ "button"
+                        , Events.onClick CancelWithdrawalForm
+                        ]
+                        [ text "Cancel" ]
+                    ]
                 ]
-                [ text "Remove" ]
             ]
         ]

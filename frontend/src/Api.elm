@@ -26,6 +26,8 @@ module Api exposing
     , Tournament
     , TournamentStatus(..)
     , Trial
+    , WithdrawalRequest
+    , withdrawalRequestDecoder
     , attorneyCoachDecoder
     , attorneyTaskDecoder
     , caseCharacterDecoder
@@ -50,8 +52,10 @@ module Api exposing
     , encodeSchool
     , encodeStudent
     , encodeTeam
+    , encodeTeamStatus
     , encodeTournament
     , encodeTrial
+    , encodeWithdrawalRequest
     , rosterEntryDecoder
     , rosterSideToString
     , rosterSubmissionDecoder
@@ -256,6 +260,16 @@ type alias ChangeRequest =
     , studentName : String
     , changeType : ChangeType
     , notes : String
+    , status : RequestStatus
+    , created : String
+    , updated : String
+    }
+
+
+type alias WithdrawalRequest =
+    { id : String
+    , team : String
+    , reason : String
     , status : RequestStatus
     , created : String
     , updated : String
@@ -696,6 +710,17 @@ changeRequestDecoder =
         |> andMap (Decode.field "updated" Decode.string)
 
 
+withdrawalRequestDecoder : Decoder WithdrawalRequest
+withdrawalRequestDecoder =
+    Decode.succeed WithdrawalRequest
+        |> andMap (Decode.field "id" Decode.string)
+        |> andMap (Decode.field "team" Decode.string)
+        |> andMap (fieldWithDefault "reason" Decode.string "")
+        |> andMap (fieldWithDefault "status" requestStatusDecoder Pending)
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
+
+
 coCoachDecoder : Decoder CoCoach
 coCoachDecoder =
     Decode.map4 CoCoach
@@ -1035,6 +1060,33 @@ encodeRequestStatus rs =
 
         Rejected ->
             Encode.string "rejected"
+
+
+encodeTeamStatus : TeamStatus -> Encode.Value
+encodeTeamStatus s =
+    case s of
+        TeamPending ->
+            Encode.string "pending"
+
+        TeamActive ->
+            Encode.string "active"
+
+        TeamWithdrawn ->
+            Encode.string "withdrawn"
+
+        TeamRejected ->
+            Encode.string "rejected"
+
+
+encodeWithdrawalRequest :
+    { team : String, reason : String }
+    -> Encode.Value
+encodeWithdrawalRequest r =
+    Encode.object
+        [ ( "team", Encode.string r.team )
+        , ( "reason", Encode.string r.reason )
+        , ( "status", encodeRequestStatus Pending )
+        ]
 
 
 encodeChangeRequest :
