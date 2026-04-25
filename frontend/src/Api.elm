@@ -666,7 +666,7 @@ teamDecoder : Decoder Team
 teamDecoder =
     Decode.succeed Team
         |> andMap (Decode.field "id" Decode.string)
-        |> andMap (fieldWithDefault "tournament" Decode.string "")
+        |> andMap (Decode.field "tournament" Decode.string)
         |> andMap (Decode.field "school" Decode.string)
         |> andMap (fieldWithDefault "team_number" Decode.int 0)
         |> andMap (fieldWithDefault "name" Decode.string "")
@@ -705,9 +705,9 @@ roundDecoder : Decoder Round
 roundDecoder =
     Decode.map8 Round
         (Decode.field "id" Decode.string)
-        (fieldWithDefault "number" Decode.int 0)
+        (Decode.field "number" Decode.int)
         (fieldWithDefault "date" Decode.string "")
-        (fieldWithDefault "type" roundTypeDecoder Preliminary)
+        (Decode.field "type" roundTypeDecoder)
         (fieldWithDefault "published" Decode.bool False)
         (Decode.field "tournament" Decode.string)
         (Decode.field "created" Decode.string)
@@ -799,9 +799,9 @@ eligibilityEntryDecoder =
     Decode.map7 EligibilityEntry
         (Decode.field "id" Decode.string)
         (Decode.field "team" Decode.string)
-        (fieldWithDefault "tournament" Decode.string "")
+        (Decode.field "tournament" Decode.string)
         (Decode.field "name" Decode.string)
-        (fieldWithDefault "status" eligibilityStatusDecoder Active)
+        (Decode.field "status" eligibilityStatusDecoder)
         (Decode.field "created" Decode.string)
         (Decode.field "updated" Decode.string)
 
@@ -811,10 +811,10 @@ changeRequestDecoder =
     Decode.succeed ChangeRequest
         |> andMap (Decode.field "id" Decode.string)
         |> andMap (Decode.field "team" Decode.string)
-        |> andMap (fieldWithDefault "student_name" Decode.string "")
-        |> andMap (fieldWithDefault "change_type" changeTypeDecoder AddStudent)
+        |> andMap (Decode.field "student_name" Decode.string)
+        |> andMap (Decode.field "change_type" changeTypeDecoder)
         |> andMap (fieldWithDefault "notes" Decode.string "")
-        |> andMap (fieldWithDefault "status" requestStatusDecoder Pending)
+        |> andMap (Decode.field "status" requestStatusDecoder)
         |> andMap (Decode.field "created" Decode.string)
         |> andMap (Decode.field "updated" Decode.string)
 
@@ -825,7 +825,7 @@ withdrawalRequestDecoder =
         |> andMap (Decode.field "id" Decode.string)
         |> andMap (Decode.field "team" Decode.string)
         |> andMap (fieldWithDefault "reason" Decode.string "")
-        |> andMap (fieldWithDefault "status" requestStatusDecoder Pending)
+        |> andMap (Decode.field "status" requestStatusDecoder)
         |> andMap (Decode.field "created" Decode.string)
         |> andMap (Decode.field "updated" Decode.string)
 
@@ -853,7 +853,7 @@ caseCharacterDecoder =
     Decode.succeed CaseCharacter
         |> andMap (Decode.field "id" Decode.string)
         |> andMap (Decode.field "tournament" Decode.string)
-        |> andMap (fieldWithDefault "side" rosterSideDecoder Prosecution)
+        |> andMap (Decode.field "side" rosterSideDecoder)
         |> andMap (Decode.field "character_name" Decode.string)
         |> andMap (fieldWithDefault "description" Decode.string "")
         |> andMap (fieldWithDefault "sort_order" Decode.int 0)
@@ -883,13 +883,13 @@ rosterEntryDecoder =
         |> andMap (Decode.field "id" Decode.string)
         |> andMap (Decode.field "team" Decode.string)
         |> andMap (Decode.field "round" Decode.string)
-        |> andMap (fieldWithDefault "side" rosterSideDecoder Prosecution)
+        |> andMap (Decode.field "side" rosterSideDecoder)
         |> andMap
             (fieldWithDefault "student"
                 (Decode.nullable Decode.string)
                 Nothing
             )
-        |> andMap (fieldWithDefault "entry_type" entryTypeDecoder ActiveEntry)
+        |> andMap (Decode.field "entry_type" entryTypeDecoder)
         |> andMap
             (fieldWithDefault "role"
                 (Decode.nullable rosterRoleDecoder)
@@ -914,7 +914,7 @@ attorneyTaskDecoder =
     Decode.succeed AttorneyTask
         |> andMap (Decode.field "id" Decode.string)
         |> andMap (Decode.field "roster_entry" Decode.string)
-        |> andMap (fieldWithDefault "task_type" taskTypeDecoder OpeningTask)
+        |> andMap (Decode.field "task_type" taskTypeDecoder)
         |> andMap
             (fieldWithDefault "character"
                 (Decode.nullable Decode.string)
