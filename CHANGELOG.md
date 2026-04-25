@@ -6,6 +6,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.5.6 — JS Linting Setup (#116)
+
+### Added
+
+- ESLint 10 (flat config) + Prettier with `eslint-config-prettier` for
+  `frontend/src/interop.js` and `backend/pb_hooks/`
+- `npm run lint:js` — lint JS files only
+- `npm run lint` — lint JS + elm-review
+
 ## v0.5.5 — M4 Phase 1 Audit Fixes (#112)
 
 ### Fixed
