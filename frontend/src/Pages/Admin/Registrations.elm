@@ -11,6 +11,7 @@ import Json.Encode
 import Layouts
 import Page exposing (Page)
 import Pb
+import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Shared
 import UI
@@ -30,12 +31,6 @@ page _ _ _ =
 
 
 -- MODEL
-
-
-type RemoteData a
-    = Loading
-    | Succeeded a
-    | Failed String
 
 
 type alias Model =

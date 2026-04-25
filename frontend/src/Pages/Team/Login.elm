@@ -15,6 +15,7 @@ import Route.Path
 import Shared
 import Shared.Model exposing (CoachAuth(..))
 import Shared.Msg
+import UI
 import View exposing (View)
 
 
@@ -172,23 +173,21 @@ view : Model -> View Msg
 view model =
     { title = "Coach Login"
     , body =
-        [ div [ Attr.class "columns is-centered" ]
-            [ div [ Attr.class "column is-half" ]
-                [ div [ Attr.class "box" ]
-                    [ h1 [ Attr.class "title" ]
-                        [ text "Coach Login" ]
-                    , viewState model.state
-                    , viewForm model
-                    , p
-                        [ Attr.class
-                            "has-text-centered mt-4"
-                        ]
-                        [ text "Don't have an account? "
-                        , a
-                            [ Route.Path.href
-                                Route.Path.Register_TeacherCoach
+        [ div [ Attr.class "flex justify-center mt-12" ]
+            [ div [ Attr.class "w-full max-w-sm" ]
+                [ UI.card
+                    [ UI.cardBody
+                        [ UI.cardTitle "Coach Login"
+                        , viewState model.state
+                        , viewForm model
+                        , p [ Attr.class "text-center text-sm mt-4" ]
+                            [ text "Don't have an account? "
+                            , a
+                                [ Route.Path.href
+                                    Route.Path.Register_TeacherCoach
+                                ]
+                                [ text "Register here" ]
                             ]
-                            [ text "Register here" ]
                         ]
                     ]
                 ]
@@ -201,14 +200,10 @@ viewState : State -> Html msg
 viewState state =
     case state of
         Failed errorMsg ->
-            div
-                [ Attr.class
-                    "notification is-danger is-light"
-                ]
-                [ text errorMsg ]
+            UI.error errorMsg
 
         _ ->
-            text ""
+            UI.empty
 
 
 viewForm : Model -> Html Msg
@@ -223,49 +218,19 @@ viewForm model =
                     False
     in
     Html.form [ Events.onSubmit Submit ]
-        [ div [ Attr.class "field" ]
-            [ label [ Attr.class "label" ]
-                [ text "Email" ]
-            , div [ Attr.class "control" ]
-                [ input
-                    [ Attr.class "input"
-                    , Attr.type_ "email"
-                    , Attr.placeholder "you@school.edu"
-                    , Attr.value model.email
-                    , Events.onInput UpdateEmail
-                    , Attr.disabled submitting
-                    ]
-                    []
-                ]
-            ]
-        , div [ Attr.class "field" ]
-            [ label [ Attr.class "label" ]
-                [ text "Password" ]
-            , div [ Attr.class "control" ]
-                [ input
-                    [ Attr.class "input"
-                    , Attr.type_ "password"
-                    , Attr.value model.password
-                    , Events.onInput UpdatePassword
-                    , Attr.disabled submitting
-                    ]
-                    []
-                ]
-            ]
-        , div [ Attr.class "field" ]
-            [ div [ Attr.class "control" ]
-                [ button
-                    [ Attr.class
-                        (if submitting then
-                            "button is-info is-fullwidth is-loading"
-
-                         else
-                            "button is-info is-fullwidth"
-                        )
-                    , Attr.type_ "submit"
-                    , Attr.disabled submitting
-                    ]
-                    [ text "Login" ]
-                ]
+        [ UI.textField
+            { label = "Email"
+            , value = model.email
+            , onInput = UpdateEmail
+            , required = True
+            }
+        , UI.passwordField
+            { label = "Password"
+            , value = model.password
+            , onInput = UpdatePassword
+            }
+        , div [ Attr.class "mt-4" ]
+            [ UI.primaryButton
+                { label = "Login", loading = submitting }
             ]
         ]
