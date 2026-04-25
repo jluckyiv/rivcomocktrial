@@ -56,6 +56,31 @@ type alias BulkParsedPairing =
     }
 
 
+type FormContext
+    = Creating
+    | Editing String
+
+
+type alias TrialForm =
+    { prosecution : String
+    , defense : String
+    , courtroom : String
+    }
+
+
+type FormState
+    = FormOpen FormContext TrialForm (List String)
+    | FormSaving FormContext TrialForm
+
+
+type BulkState
+    = BulkIdle
+    | BulkEditing String
+    | BulkPreview String (List BulkParsedPairing)
+    | BulkSaving String (List BulkParsedPairing)
+    | BulkFailed String (List String)
+
+
 type alias Model =
     { roundId : String
     , round : Maybe Round
@@ -64,22 +89,19 @@ type alias Model =
     , courtrooms : List Courtroom
     , allTrials : List Trial
     , loading : Bool
-    , formErrors : List String
+    , errors : List String
     , inputMode : InputMode
-    , formProsecution : String
-    , formDefense : String
-    , formCourtroom : String
-    , formSaving : Bool
-    , editingId : Maybe String
+    , form : FormState
     , deleting : Maybe String
-    , bulkText : String
-    , bulkParsed : List BulkParsedPairing
-    , bulkErrors : List String
-    , showBulkPreview : Bool
-    , bulkSaving : Bool
+    , bulk : BulkState
     , crossBracketStrategy : CrossBracketStrategy
     , powerMatchResult : Maybe PowerMatchResult
     }
+
+
+emptyForm : TrialForm
+emptyForm =
+    { prosecution = "", defense = "", courtroom = "" }
 
 
 init : Route () -> () -> ( Model, Effect Msg )
@@ -95,19 +117,11 @@ init route _ =
       , courtrooms = []
       , allTrials = []
       , loading = True
-      , formErrors = []
+      , errors = []
       , inputMode = DropdownMode
-      , formProsecution = ""
-      , formDefense = ""
-      , formCourtroom = ""
-      , formSaving = False
-      , editingId = Nothing
+      , form = FormOpen Creating emptyForm []
       , deleting = Nothing
-      , bulkText = ""
-      , bulkParsed = []
-      , bulkErrors = []
-      , showBulkPreview = False
-      , bulkSaving = False
+      , bulk = BulkIdle
       , crossBracketStrategy = HighHigh
       , powerMatchResult = Nothing
       }
@@ -175,57 +189,76 @@ update msg model =
             ( { model | inputMode = mode }, Effect.none )
 
         FormProsecutionChanged val ->
-            ( { model | formProsecution = val, formErrors = [] }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | prosecution = val }) model.form }
+            , Effect.none
+            )
 
         FormDefenseChanged val ->
-            ( { model | formDefense = val, formErrors = [] }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | defense = val }) model.form }
+            , Effect.none
+            )
 
         FormCourtroomChanged val ->
-            ( { model | formCourtroom = val, formErrors = [] }, Effect.none )
+            ( { model | form = updateFormField (\f -> { f | courtroom = val }) model.form }
+            , Effect.none
+            )
 
         SaveTrial ->
-            case validateDropdownForm model of
-                Err errors ->
-                    ( { model | formErrors = errors }, Effect.none )
+            case model.form of
+                FormOpen ctx f _ ->
+                    case validateTrialForm f of
+                        Err errors ->
+                            ( { model | form = FormOpen ctx f errors }, Effect.none )
 
-                Ok data ->
-                    ( { model | formSaving = True, formErrors = [] }
-                    , case model.editingId of
-                        Just id ->
-                            Pb.adminUpdate
-                                { collection = "trials"
-                                , id = id
-                                , tag = "save-trial"
-                                , body = Api.encodeTrial data
-                                }
+                        Ok _ ->
+                            ( { model | form = FormSaving ctx f }
+                            , case ctx of
+                                Editing id ->
+                                    Pb.adminUpdate
+                                        { collection = "trials"
+                                        , id = id
+                                        , tag = "save-trial"
+                                        , body =
+                                            Api.encodeTrial
+                                                { round = model.roundId
+                                                , prosecutionTeam = f.prosecution
+                                                , defenseTeam = f.defense
+                                                , courtroom = f.courtroom
+                                                }
+                                        }
 
-                        Nothing ->
-                            Pb.adminCreate
-                                { collection = "trials"
-                                , tag = "save-trial"
-                                , body = Api.encodeTrial data
-                                }
-                    )
+                                Creating ->
+                                    Pb.adminCreate
+                                        { collection = "trials"
+                                        , tag = "save-trial"
+                                        , body =
+                                            Api.encodeTrial
+                                                { round = model.roundId
+                                                , prosecutionTeam = f.prosecution
+                                                , defenseTeam = f.defense
+                                                , courtroom = f.courtroom
+                                                }
+                                        }
+                            )
+
+                FormSaving _ _ ->
+                    ( model, Effect.none )
 
         EditTrial trial ->
             ( { model
-                | editingId = Just trial.id
-                , formProsecution = trial.prosecutionTeam
-                , formDefense = trial.defenseTeam
-                , formCourtroom = trial.courtroom
+                | form =
+                    FormOpen (Editing trial.id)
+                        { prosecution = trial.prosecutionTeam
+                        , defense = trial.defenseTeam
+                        , courtroom = trial.courtroom
+                        }
+                        []
               }
             , Effect.none
             )
 
         CancelEdit ->
-            ( { model
-                | editingId = Nothing
-                , formProsecution = ""
-                , formDefense = ""
-                , formCourtroom = ""
-              }
-            , Effect.none
-            )
+            ( { model | form = FormOpen Creating emptyForm [] }, Effect.none )
 
         DeleteTrial id ->
             ( { model | deleting = Just id }
@@ -237,65 +270,73 @@ update msg model =
             )
 
         BulkTextChanged val ->
-            ( { model | bulkText = val, showBulkPreview = False, bulkErrors = [] }, Effect.none )
+            ( { model | bulk = BulkEditing val }, Effect.none )
 
         ParseBulkText ->
             let
+                text =
+                    bulkStateText model.bulk
+
                 parsed =
-                    parseBulkInput model.bulkText
+                    parseBulkInput text
 
                 errors =
                     validateBulkParsed model.teams parsed
             in
             case errors of
                 [] ->
-                    ( { model | bulkParsed = parsed, showBulkPreview = True, bulkErrors = [] }, Effect.none )
+                    ( { model | bulk = BulkPreview text parsed }, Effect.none )
 
                 _ ->
-                    ( { model | bulkErrors = errors, showBulkPreview = False }, Effect.none )
+                    ( { model | bulk = BulkFailed text errors }, Effect.none )
 
         ConfirmBulkCreate ->
-            let
-                cmds =
-                    List.filterMap
-                        (\p ->
-                            let
-                                pTeam =
-                                    findTeamByNumber model.teams p.prosecutionTeamNumber
+            case model.bulk of
+                BulkPreview text parsed ->
+                    let
+                        cmds =
+                            List.filterMap
+                                (\p ->
+                                    let
+                                        pTeam =
+                                            findTeamByNumber model.teams p.prosecutionTeamNumber
 
-                                dTeam =
-                                    findTeamByNumber model.teams p.defenseTeamNumber
+                                        dTeam =
+                                            findTeamByNumber model.teams p.defenseTeamNumber
 
-                                courtroom =
-                                    findCourtroomByName model.courtrooms p.courtroomName
-                            in
-                            case ( pTeam, dTeam ) of
-                                ( Just pt, Just dt ) ->
-                                    Just
-                                        (Pb.adminCreate
-                                            { collection = "trials"
-                                            , tag = "bulk-trial"
-                                            , body =
-                                                Api.encodeTrial
-                                                    { round = model.roundId
-                                                    , prosecutionTeam = pt.id
-                                                    , defenseTeam = dt.id
-                                                    , courtroom = courtroom |> Maybe.map .id |> Maybe.withDefault ""
+                                        courtroom =
+                                            findCourtroomByName model.courtrooms p.courtroomName
+                                    in
+                                    case ( pTeam, dTeam ) of
+                                        ( Just pt, Just dt ) ->
+                                            Just
+                                                (Pb.adminCreate
+                                                    { collection = "trials"
+                                                    , tag = "bulk-trial"
+                                                    , body =
+                                                        Api.encodeTrial
+                                                            { round = model.roundId
+                                                            , prosecutionTeam = pt.id
+                                                            , defenseTeam = dt.id
+                                                            , courtroom = courtroom |> Maybe.map .id |> Maybe.withDefault ""
+                                                            }
                                                     }
-                                            }
-                                        )
+                                                )
 
-                                _ ->
-                                    Nothing
-                        )
-                        model.bulkParsed
-            in
-            ( { model | bulkSaving = True }
-            , Effect.batch cmds
-            )
+                                        _ ->
+                                            Nothing
+                                )
+                                parsed
+                    in
+                    ( { model | bulk = BulkSaving text parsed }
+                    , Effect.batch cmds
+                    )
+
+                _ ->
+                    ( model, Effect.none )
 
         CancelBulkPreview ->
-            ( { model | showBulkPreview = False, bulkParsed = [] }, Effect.none )
+            ( { model | bulk = BulkEditing (bulkStateText model.bulk) }, Effect.none )
 
         SetCrossBracketStrategy strategy ->
             ( { model | crossBracketStrategy = strategy }, Effect.none )
@@ -368,7 +409,7 @@ update msg model =
                             ( { model | trials = trials, loading = False }, Effect.none )
 
                         Err _ ->
-                            ( { model | loading = False, formErrors = [ "Failed to load trials." ] }, Effect.none )
+                            ( { model | loading = False, errors = [ "Failed to load trials." ] }, Effect.none )
 
                 Just "all-trials" ->
                     case Pb.decodeList Api.trialDecoder value of
@@ -403,7 +444,7 @@ update msg model =
                             )
 
                         Err _ ->
-                            ( { model | formErrors = [ "Failed to load rounds." ] }, Effect.none )
+                            ( { model | errors = [ "Failed to load rounds." ] }, Effect.none )
 
                 Just "teams" ->
                     case Pb.decodeList Api.teamDecoder value of
@@ -418,7 +459,7 @@ update msg model =
                             ( { model | teams = filtered }, Effect.none )
 
                         Err _ ->
-                            ( { model | formErrors = [ "Failed to load teams." ] }, Effect.none )
+                            ( { model | errors = [ "Failed to load teams." ] }, Effect.none )
 
                 Just "courtrooms" ->
                     case Pb.decodeList Api.courtroomDecoder value of
@@ -431,53 +472,61 @@ update msg model =
                 Just "save-trial" ->
                     case Pb.decodeRecord Api.trialDecoder value of
                         Ok trial ->
-                            let
-                                updatedTrials =
-                                    case model.editingId of
-                                        Just _ ->
-                                            List.map
-                                                (\t ->
-                                                    if t.id == trial.id then
-                                                        trial
+                            case model.form of
+                                FormSaving ctx _ ->
+                                    let
+                                        updatedTrials =
+                                            case ctx of
+                                                Editing _ ->
+                                                    List.map
+                                                        (\t ->
+                                                            if t.id == trial.id then
+                                                                trial
 
-                                                    else
-                                                        t
-                                                )
-                                                model.trials
+                                                            else
+                                                                t
+                                                        )
+                                                        model.trials
 
-                                        Nothing ->
-                                            model.trials ++ [ trial ]
+                                                Creating ->
+                                                    model.trials ++ [ trial ]
 
-                                updatedAll =
-                                    case model.editingId of
-                                        Just _ ->
-                                            List.map
-                                                (\t ->
-                                                    if t.id == trial.id then
-                                                        trial
+                                        updatedAll =
+                                            case ctx of
+                                                Editing _ ->
+                                                    List.map
+                                                        (\t ->
+                                                            if t.id == trial.id then
+                                                                trial
 
-                                                    else
-                                                        t
-                                                )
-                                                model.allTrials
+                                                            else
+                                                                t
+                                                        )
+                                                        model.allTrials
 
-                                        Nothing ->
-                                            model.allTrials ++ [ trial ]
-                            in
-                            ( { model
-                                | trials = updatedTrials
-                                , allTrials = updatedAll
-                                , formProsecution = ""
-                                , formDefense = ""
-                                , formCourtroom = ""
-                                , formSaving = False
-                                , editingId = Nothing
-                              }
-                            , Effect.none
-                            )
+                                                Creating ->
+                                                    model.allTrials ++ [ trial ]
+                                    in
+                                    ( { model
+                                        | trials = updatedTrials
+                                        , allTrials = updatedAll
+                                        , form = FormOpen Creating emptyForm []
+                                      }
+                                    , Effect.none
+                                    )
+
+                                _ ->
+                                    ( model, Effect.none )
 
                         Err _ ->
-                            ( { model | formSaving = False, formErrors = [ "Failed to save trial." ] }, Effect.none )
+                            case model.form of
+                                FormSaving ctx f ->
+                                    ( { model | form = FormOpen ctx f [ "Failed to save trial." ] }
+                                    , Effect.none
+                                    )
+
+                                _ ->
+                                    ( model, Effect.none )
 
                 Just "delete-trial" ->
                     case Pb.decodeDelete value of
@@ -491,7 +540,7 @@ update msg model =
                             )
 
                         Err _ ->
-                            ( { model | deleting = Nothing, formErrors = [ "Failed to delete trial." ] }, Effect.none )
+                            ( { model | deleting = Nothing }, Effect.none )
 
                 Just "bulk-trial" ->
                     case Pb.decodeRecord Api.trialDecoder value of
@@ -499,45 +548,115 @@ update msg model =
                             ( { model
                                 | trials = model.trials ++ [ trial ]
                                 , allTrials = model.allTrials ++ [ trial ]
-                                , bulkSaving = False
-                                , showBulkPreview = False
-                                , bulkText = ""
-                                , bulkParsed = []
+                                , bulk = BulkIdle
                               }
                             , Effect.none
                             )
 
                         Err _ ->
-                            ( { model | bulkSaving = False, formErrors = [ "Failed to create some trials." ] }, Effect.none )
+                            case model.bulk of
+                                BulkSaving text _ ->
+                                    ( { model | bulk = BulkFailed text [ "Failed to create some trials." ] }
+                                    , Effect.none
+                                    )
+
+                                _ ->
+                                    ( model, Effect.none )
 
                 _ ->
                     ( model, Effect.none )
 
 
 
+-- FORM HELPERS
+
+
+updateFormField : (TrialForm -> TrialForm) -> FormState -> FormState
+updateFormField fn form =
+    case form of
+        FormOpen ctx f _ ->
+            FormOpen ctx (fn f) []
+
+        FormSaving _ _ ->
+            form
+
+
+formContext : FormState -> FormContext
+formContext form =
+    case form of
+        FormOpen ctx _ _ ->
+            ctx
+
+        FormSaving ctx _ ->
+            ctx
+
+
+formData : FormState -> TrialForm
+formData form =
+    case form of
+        FormOpen _ f _ ->
+            f
+
+        FormSaving _ f ->
+            f
+
+
+formErrors : FormState -> List String
+formErrors form =
+    case form of
+        FormOpen _ _ errors ->
+            errors
+
+        FormSaving _ _ ->
+            []
+
+
+isSaving : FormState -> Bool
+isSaving form =
+    case form of
+        FormSaving _ _ ->
+            True
+
+        FormOpen _ _ _ ->
+            False
+
+
+bulkStateText : BulkState -> String
+bulkStateText bulk =
+    case bulk of
+        BulkIdle ->
+            ""
+
+        BulkEditing text ->
+            text
+
+        BulkPreview text _ ->
+            text
+
+        BulkSaving text _ ->
+            text
+
+        BulkFailed text _ ->
+            text
+
+
+
 -- VALIDATION
 
 
-validateDropdownForm :
-    Model
-    -> Result (List String) { round : String, prosecutionTeam : String, defenseTeam : String, courtroom : String }
-validateDropdownForm model =
+validateTrialForm : TrialForm -> Result (List String) TrialForm
+validateTrialForm f =
     let
         errors =
             []
-                |> addErrorIf (String.trim model.formProsecution == "") "Prosecution team is required"
-                |> addErrorIf (String.trim model.formDefense == "") "Defense team is required"
+                |> addErrorIf (String.trim f.prosecution == "") "Prosecution team is required"
+                |> addErrorIf (String.trim f.defense == "") "Defense team is required"
                 |> addErrorIf
-                    (model.formProsecution /= "" && model.formProsecution == model.formDefense)
+                    (f.prosecution /= "" && f.prosecution == f.defense)
                     "Prosecution and defense cannot be the same team"
     in
     if List.isEmpty errors then
-        Ok
-            { round = model.roundId
-            , prosecutionTeam = model.formProsecution
-            , defenseTeam = model.formDefense
-            , courtroom = model.formCourtroom
-            }
+        Ok f
 
     else
         Err errors
@@ -777,7 +896,7 @@ view model =
 
         else
             [ viewHeader model
-            , UI.errorList model.formErrors
+            , UI.errorList model.errors
             , viewModeToggle model
             , case model.inputMode of
                 DropdownMode ->
@@ -846,10 +965,27 @@ viewModeToggle model =
 viewDropdownForm : Model -> Html Msg
 viewDropdownForm model =
     let
+        ctx =
+            formContext model.form
+
+        f =
+            formData model.form
+
+        saving =
+            isSaving model.form
+
+        editingId =
+            case ctx of
+                Editing id ->
+                    Just id
+
+                Creating ->
+                    Nothing
+
         -- Teams already paired in this round (excluding the trial being edited)
         pairedTeamIds =
             model.trials
-                |> List.filter (\t -> Just t.id /= model.editingId)
+                |> List.filter (\t -> Just t.id /= editingId)
                 |> List.concatMap (\t -> [ t.prosecutionTeam, t.defenseTeam ])
 
         -- Available teams: not yet paired, plus the currently selected values
@@ -858,25 +994,25 @@ viewDropdownForm model =
                 |> List.filter
                     (\t ->
                         t.id
-                            == model.formProsecution
+                            == f.prosecution
                             || not (List.member t.id pairedTeamIds)
                     )
-                |> List.filter (\t -> t.id /= model.formDefense || t.id == "")
+                |> List.filter (\t -> t.id /= f.defense || t.id == "")
 
         availableForDefense =
             model.teams
                 |> List.filter
                     (\t ->
                         t.id
-                            == model.formDefense
+                            == f.defense
                             || not (List.member t.id pairedTeamIds)
                     )
-                |> List.filter (\t -> t.id /= model.formProsecution || t.id == "")
+                |> List.filter (\t -> t.id /= f.prosecution || t.id == "")
 
         -- Courtrooms already assigned in this round (excluding the trial being edited)
         usedCourtroomIds =
             model.trials
-                |> List.filter (\t -> Just t.id /= model.editingId)
+                |> List.filter (\t -> Just t.id /= editingId)
                 |> List.map .courtroom
                 |> List.filter (\id -> id /= "")
 
@@ -885,25 +1021,26 @@ viewDropdownForm model =
                 |> List.filter
                     (\c ->
                         c.id
-                            == model.formCourtroom
+                            == f.courtroom
                             || not (List.member c.id usedCourtroomIds)
                     )
     in
     UI.card
         [ UI.cardBody
             [ UI.cardTitle
-                (case model.editingId of
-                    Just _ ->
+                (case ctx of
+                    Editing _ ->
                         "Edit Trial"
 
-                    Nothing ->
+                    Creating ->
                         "Add Trial"
                 )
+            , UI.errorList (formErrors model.form)
             , Html.form [ Events.onSubmit SaveTrial ]
                 [ UI.formColumns
                     [ UI.selectField
                         { label = "Prosecution"
-                        , value = model.formProsecution
+                        , value = f.prosecution
                         , onInput = FormProsecutionChanged
                         , options =
                             { value = "", label = "Select team..." }
@@ -911,7 +1048,7 @@ viewDropdownForm model =
                         }
                     , UI.selectField
                         { label = "Defense"
-                        , value = model.formDefense
+                        , value = f.defense
                         , onInput = FormDefenseChanged
                         , options =
                             { value = "", label = "Select team..." }
@@ -919,7 +1056,7 @@ viewDropdownForm model =
                         }
                     , UI.selectField
                         { label = "Courtroom"
-                        , value = model.formCourtroom
+                        , value = f.courtroom
                         , onInput = FormCourtroomChanged
                         , options =
                             { value = "", label = "None" }
@@ -927,12 +1064,12 @@ viewDropdownForm model =
                         }
                     ]
                 , div [ Attr.class "flex gap-2 mt-4" ]
-                    [ UI.primaryButton { label = "Save", loading = model.formSaving }
-                    , case model.editingId of
-                        Just _ ->
+                    [ UI.primaryButton { label = "Save", loading = saving }
+                    , case ctx of
+                        Editing _ ->
                             UI.cancelButton CancelEdit
 
-                        Nothing ->
+                        Creating ->
                             UI.empty
                     ]
                 ]
@@ -1030,30 +1167,53 @@ viewPowerMatchSection model =
 
 viewBulkTextSection : Model -> Html Msg
 viewBulkTextSection model =
+    let
+        text =
+            bulkStateText model.bulk
+
+        bulkErrorList =
+            case model.bulk of
+                BulkFailed _ errors ->
+                    errors
+
+                _ ->
+                    []
+
+        showPreview =
+            case model.bulk of
+                BulkPreview _ _ ->
+                    True
+
+                BulkSaving _ _ ->
+                    True
+
+                _ ->
+                    False
+    in
     UI.card
         [ UI.cardBody
             [ UI.cardTitle "Bulk Text Entry"
             , p [ Attr.class "text-sm text-base-content/70 mb-3" ]
-                [ text "Format: "
-                , code [] [ text "{team_number} v {team_number} [{courtroom_name}]" ]
+                [ Html.text "Format: "
+                , code [] [ Html.text "{team_number} v {team_number} [{courtroom_name}]" ]
                 , br [] []
-                , text "One pairing per line. Courtroom is optional."
+                , Html.text "One pairing per line. Courtroom is optional."
                 ]
             , UI.textareaField
                 { label = ""
-                , value = model.bulkText
+                , value = text
                 , onInput = BulkTextChanged
                 , rows = 8
                 , placeholder = "101 v 202 [Dept A]\n103 v 204\n105 v 206 [Dept B]"
                 }
-            , UI.errorList model.bulkErrors
-            , if model.showBulkPreview then
+            , UI.errorList bulkErrorList
+            , if showPreview then
                 viewBulkPreview model
 
               else
                 div [ Attr.class "mt-4" ]
                     [ button [ Attr.class "btn btn-info", Events.onClick ParseBulkText ]
-                        [ text "Preview" ]
+                        [ Html.text "Preview" ]
                     ]
             ]
         ]
@@ -1061,6 +1221,18 @@ viewBulkTextSection model =
 
 viewBulkPreview : Model -> Html Msg
 viewBulkPreview model =
+    let
+        ( bulkParsed, saving ) =
+            case model.bulk of
+                BulkPreview _ parsed ->
+                    ( parsed, False )
+
+                BulkSaving _ parsed ->
+                    ( parsed, True )
+
+                _ ->
+                    ( [], False )
+    in
     div [ Attr.class "mt-4" ]
         [ h3 [ Attr.class "font-semibold mb-2" ] [ text "Preview" ]
         , div [ Attr.class "overflow-x-auto" ]
@@ -1088,7 +1260,7 @@ viewBulkPreview model =
                                 , td [] [ text p.courtroomName ]
                                 ]
                         )
-                        model.bulkParsed
+                        bulkParsed
                     )
                 ]
             ]
@@ -1096,9 +1268,9 @@ viewBulkPreview model =
             [ button
                 [ Attr.class "btn btn-success"
                 , Events.onClick ConfirmBulkCreate
-                , Attr.disabled model.bulkSaving
+                , Attr.disabled saving
                 ]
-                (if model.bulkSaving then
+                (if saving then
                     [ span [ Attr.class "loading loading-spinner loading-sm" ] []
                     , text "Creating..."
                     ]
