@@ -151,7 +151,6 @@ update msg model =
                                 , roundId = cell.roundId
                                 , side = cell.side
                                 , rows = rows
-                                , submitting = False
                                 }
                                 []
                       }
@@ -193,18 +192,10 @@ update msg model =
             ( { model | form = RosterForm.updateRow idx (\r -> { r | student = val }) model.form }, Effect.none )
 
         UpdateRowEntryType idx val ->
-            ( { model | form = RosterForm.updateRow idx (\r -> { r | entryType = val, role = "", character = "" }) model.form }, Effect.none )
+            ( { model | form = RosterForm.updateRowEntryType idx val model.form }, Effect.none )
 
         UpdateRowRole idx val ->
-            let
-                clearCharacter r =
-                    if val /= "witness" then
-                        { r | role = val, character = "" }
-
-                    else
-                        { r | role = val }
-            in
-            ( { model | form = RosterForm.updateRow idx clearCharacter model.form }, Effect.none )
+            ( { model | form = RosterForm.updateRowRole idx val model.form }, Effect.none )
 
         UpdateRowCharacter idx val ->
             ( { model | form = RosterForm.updateRow idx (\r -> { r | character = val }) model.form }, Effect.none )
@@ -254,8 +245,8 @@ handleSave submitting model =
 
                                     else
                                         Just row.student
-                                , entryType = RosterForm.parseEntryType row.entryType
-                                , role = RosterForm.parseRole row.role
+                                , entryType = row.entryType
+                                , role = row.role
                                 , character =
                                     if row.character == "" then
                                         Nothing
@@ -343,12 +334,14 @@ handleSave submitting model =
 
                         allEffects =
                             createEffects ++ updateEffects ++ deleteEffects ++ submissionEffect
-
-                        savingFormData =
-                            { formData | submitting = submitting }
                     in
                     ( { model
-                        | form = RosterForm.FormSaving savingFormData
+                        | form =
+                            if submitting then
+                                RosterForm.FormSubmitting formData
+
+                            else
+                                RosterForm.FormSavingDraft formData
                         , savesPending = List.length createEffects + List.length updateEffects + List.length submissionEffect
                         , deletesPending = List.length deleteEffects
                       }
@@ -519,7 +512,16 @@ checkSaveComplete model =
 handleSaveError : String -> Model -> ( Model, Effect Msg )
 handleSaveError err model =
     case model.form of
-        RosterForm.FormSaving formData ->
+        RosterForm.FormSavingDraft formData ->
+            ( { model
+                | form = RosterForm.FormEditing formData [ err ]
+                , savesPending = 0
+                , deletesPending = 0
+              }
+            , Effect.none
+            )
+
+        RosterForm.FormSubmitting formData ->
             ( { model
                 | form = RosterForm.FormEditing formData [ err ]
                 , savesPending = 0
@@ -847,7 +849,10 @@ viewSelectedCell model =
                         RosterForm.FormEditing _ _ ->
                             viewFormCard model
 
-                        RosterForm.FormSaving _ ->
+                        RosterForm.FormSavingDraft _ ->
+                            viewFormCard model
+
+                        RosterForm.FormSubmitting _ ->
                             viewFormCard model
                     ]
                 ]
@@ -907,12 +912,4 @@ viewFormCard model =
             , onCancel = CancelForm
             }
     in
-    case model.form of
-        RosterForm.FormEditing formData errors ->
-            RosterForm.viewFormContent config formData errors False
-
-        RosterForm.FormSaving formData ->
-            RosterForm.viewFormContent config formData [] True
-
-        RosterForm.FormHidden ->
-            text ""
+    RosterForm.viewFormContent config model.form

@@ -5,12 +5,12 @@ module RosterForm exposing
     , FormViewConfig
     , emptyRow
     , entryToFormRow
-    , parseEntryType
-    , parseRole
     , roleName
     , sideLabel
     , updateFormRows
     , updateRow
+    , updateRowEntryType
+    , updateRowRole
     , validateForm
     , viewFormContent
     )
@@ -37,7 +37,8 @@ import UI
 type FormState
     = FormHidden
     | FormEditing FormData (List String)
-    | FormSaving FormData
+    | FormSavingDraft FormData
+    | FormSubmitting FormData
 
 
 {-| Form data for a roster edit session.
@@ -51,15 +52,14 @@ type alias FormData =
     , roundId : String
     , side : Api.RosterSide
     , rows : List FormRow
-    , submitting : Bool
     }
 
 
 type alias FormRow =
     { id : Maybe String
     , student : String
-    , entryType : String
-    , role : String
+    , entryType : Api.EntryType
+    , role : Maybe Api.RosterRole
     , character : String
     }
 
@@ -68,8 +68,8 @@ emptyRow : FormRow
 emptyRow =
     { id = Nothing
     , student = ""
-    , entryType = "active"
-    , role = ""
+    , entryType = Api.ActiveEntry
+    , role = Nothing
     , character = ""
     }
 
@@ -82,8 +82,8 @@ entryToFormRow : Api.RosterEntry -> FormRow
 entryToFormRow entry =
     { id = Just entry.id
     , student = Maybe.withDefault "" entry.student
-    , entryType = entryTypeToString entry.entryType
-    , role = roleToString entry.role
+    , entryType = entry.entryType
+    , role = entry.role
     , character = Maybe.withDefault "" entry.character
     }
 
@@ -239,18 +239,18 @@ validateForm : FormData -> Result (List String) (List FormRow)
 validateForm formData =
     let
         nonEmptyRows =
-            List.filter (\r -> r.student /= "" || r.role /= "") formData.rows
+            List.filter (\r -> r.student /= "" || r.role /= Nothing) formData.rows
 
         errors =
             nonEmptyRows
                 |> List.indexedMap
                     (\i r ->
                         []
-                            |> addErrorIf (r.student == "" && r.entryType /= "non_active")
+                            |> addErrorIf (r.student == "" && r.entryType /= Api.NonActiveEntry)
                                 ("Row " ++ String.fromInt (i + 1) ++ ": student is required.")
-                            |> addErrorIf (r.entryType == "active" && r.role == "")
+                            |> addErrorIf (r.entryType == Api.ActiveEntry && r.role == Nothing)
                                 ("Row " ++ String.fromInt (i + 1) ++ ": role is required for active members.")
-                            |> addErrorIf (r.role == "witness" && r.character == "")
+                            |> addErrorIf (r.role == Just Api.WitnessRole && r.character == "")
                                 ("Row " ++ String.fromInt (i + 1) ++ ": character is required for witnesses.")
                     )
                 |> List.concat
@@ -339,6 +339,38 @@ updateRow idx transform state =
         state
 
 
+{-| Update entryType from a raw select string, clearing role and character.
+-}
+updateRowEntryType : Int -> String -> FormState -> FormState
+updateRowEntryType idx val =
+    updateRow idx
+        (\r ->
+            { r
+                | entryType = parseEntryType val
+                , role = Nothing
+                , character = ""
+            }
+        )
+
+
+{-| Update role from a raw select string, clearing character when not a witness.
+-}
+updateRowRole : Int -> String -> FormState -> FormState
+updateRowRole idx val =
+    let
+        parsed =
+            parseRole val
+    in
+    updateRow idx
+        (\r ->
+            if parsed /= Just Api.WitnessRole then
+                { r | role = parsed, character = "" }
+
+            else
+                { r | role = parsed }
+        )
+
+
 
 -- VIEW
 
@@ -364,21 +396,48 @@ type alias FormViewConfig msg =
     }
 
 
-{-| Render the roster editing form.
+type SavingState
+    = NotSaving
+    | SavingDraft
+    | SubmittingRoster
 
-The caller pattern-matches on FormState and passes FormData,
-errors, and saving flag. This function handles the table of
-rows plus the action buttons.
+
+{-| Render the roster form for the given FormState.
+
+Returns Html.text "" when FormHidden. Callers can pass `model.form`
+directly without pattern-matching first.
 
 -}
 viewFormContent :
     FormViewConfig msg
+    -> FormState
+    -> Html msg
+viewFormContent config formState =
+    case formState of
+        FormHidden ->
+            text ""
+
+        FormEditing formData errors ->
+            viewFormBody config formData errors NotSaving
+
+        FormSavingDraft formData ->
+            viewFormBody config formData [] SavingDraft
+
+        FormSubmitting formData ->
+            viewFormBody config formData [] SubmittingRoster
+
+
+viewFormBody :
+    FormViewConfig msg
     -> FormData
     -> List String
-    -> Bool
+    -> SavingState
     -> Html msg
-viewFormContent config formData errors saving =
+viewFormBody config formData errors savingState =
     let
+        saving =
+            savingState /= NotSaving
+
         sideCharacters =
             config.caseCharacters
                 |> List.filter (\c -> c.side == formData.side)
@@ -401,7 +460,7 @@ viewFormContent config formData errors saving =
                 ]
             , tbody []
                 (List.indexedMap
-                    (viewFormRow config sideCharacters assignedStudents formData.side)
+                    (viewFormRow config sideCharacters assignedStudents formData.side saving)
                     formData.rows
                 )
             ]
@@ -419,26 +478,28 @@ viewFormContent config formData errors saving =
                 , Events.onClick config.onSaveDraft
                 , Attr.disabled saving
                 ]
-                (if saving && not formData.submitting then
-                    [ span [ Attr.class "loading loading-spinner loading-sm" ] []
-                    , text "Saving..."
-                    ]
+                (case savingState of
+                    SavingDraft ->
+                        [ span [ Attr.class "loading loading-spinner loading-sm" ] []
+                        , text "Saving..."
+                        ]
 
-                 else
-                    [ text "Save Draft" ]
+                    _ ->
+                        [ text "Save Draft" ]
                 )
             , button
                 [ Attr.class "btn btn-success btn-sm"
                 , Events.onClick config.onSubmitRoster
                 , Attr.disabled saving
                 ]
-                (if saving && formData.submitting then
-                    [ span [ Attr.class "loading loading-spinner loading-sm" ] []
-                    , text "Submitting..."
-                    ]
+                (case savingState of
+                    SubmittingRoster ->
+                        [ span [ Attr.class "loading loading-spinner loading-sm" ] []
+                        , text "Submitting..."
+                        ]
 
-                 else
-                    [ text "Submit Roster" ]
+                    _ ->
+                        [ text "Submit Roster" ]
                 )
             , button
                 [ Attr.class "btn btn-ghost btn-sm"
@@ -455,10 +516,11 @@ viewFormRow :
     -> List Api.CaseCharacter
     -> List String
     -> Api.RosterSide
+    -> Bool
     -> Int
     -> FormRow
     -> Html msg
-viewFormRow config sideCharacters assignedStudents side idx row =
+viewFormRow config sideCharacters assignedStudents side saving idx row =
     let
         availableStudents =
             config.students
@@ -466,6 +528,12 @@ viewFormRow config sideCharacters assignedStudents side idx row =
                     (\s ->
                         s.id == row.student || not (List.member s.id assignedStudents)
                     )
+
+        entryTypeStr =
+            entryTypeToString row.entryType
+
+        roleStr =
+            roleToString row.role
     in
     tr []
         [ td []
@@ -473,6 +541,7 @@ viewFormRow config sideCharacters assignedStudents side idx row =
                 [ Attr.class "select select-sm select-bordered w-full"
                 , Events.onInput (config.onUpdateStudent idx)
                 , Attr.value row.student
+                , Attr.disabled saving
                 ]
                 ({ value = "", label = "Select student..." }
                     :: List.map (\s -> { value = s.id, label = s.name }) availableStudents
@@ -483,34 +552,37 @@ viewFormRow config sideCharacters assignedStudents side idx row =
             [ select
                 [ Attr.class "select select-sm select-bordered"
                 , Events.onInput (config.onUpdateEntryType idx)
-                , Attr.value row.entryType
+                , Attr.value entryTypeStr
+                , Attr.disabled saving
                 ]
-                [ option [ Attr.value "active", Attr.selected (row.entryType == "active") ] [ text "Active" ]
-                , option [ Attr.value "substitute", Attr.selected (row.entryType == "substitute") ] [ text "Substitute" ]
-                , option [ Attr.value "non_active", Attr.selected (row.entryType == "non_active") ] [ text "Non-Active" ]
+                [ option [ Attr.value "active", Attr.selected (entryTypeStr == "active") ] [ text "Active" ]
+                , option [ Attr.value "substitute", Attr.selected (entryTypeStr == "substitute") ] [ text "Substitute" ]
+                , option [ Attr.value "non_active", Attr.selected (entryTypeStr == "non_active") ] [ text "Non-Active" ]
                 ]
             ]
         , td []
-            [ if row.entryType == "non_active" then
+            [ if row.entryType == Api.NonActiveEntry then
                 text "—"
 
               else
                 select
                     [ Attr.class "select select-sm select-bordered"
                     , Events.onInput (config.onUpdateRole idx)
-                    , Attr.value row.role
+                    , Attr.value roleStr
+                    , Attr.disabled saving
                     ]
                     (List.map
-                        (\o -> option [ Attr.value o.value, Attr.selected (o.value == row.role) ] [ text o.label ])
+                        (\o -> option [ Attr.value o.value, Attr.selected (o.value == roleStr) ] [ text o.label ])
                         (roleOptionsForSide side)
                     )
             ]
         , td []
-            [ if row.role == "witness" then
+            [ if row.role == Just Api.WitnessRole then
                 select
                     [ Attr.class "select select-sm select-bordered"
                     , Events.onInput (config.onUpdateCharacter idx)
                     , Attr.value row.character
+                    , Attr.disabled saving
                     ]
                     ({ value = "", label = "Select character..." }
                         :: List.map (\c -> { value = c.id, label = c.characterName }) sideCharacters
@@ -524,6 +596,7 @@ viewFormRow config sideCharacters assignedStudents side idx row =
             [ button
                 [ Attr.class "btn btn-ghost btn-sm btn-square text-error"
                 , Events.onClick (config.onRemoveRow idx)
+                , Attr.disabled saving
                 ]
                 [ text "×" ]
             ]
