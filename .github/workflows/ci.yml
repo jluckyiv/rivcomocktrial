@@ -75,9 +75,24 @@ jobs:
           missing=0
           # Framework files are not domain modules; skip them.
           framework_re='^(Api|Pb|Effect|Shared|Auth|UI|RemoteData)\.elm$'
+          # Pre-existing gaps grandfathered in by PR #139 (the PR that
+          # introduced this check). The list can only shrink:
+          #   - Error.elm (5 lines, type wrapper, no testable logic)
+          #   - Student.elm (Name/Pronouns covered by NameTest +
+          #     PronounsTest under different filenames; align when
+          #     Student's slice lands)
+          #   - RosterForm.elm (real test debt; address in roster
+          #     submission slice)
+          # Adding a new module to this list is forbidden; the CI
+          # PR review should reject it.
+          exempt_re='^(Error|Student|RosterForm)\.elm$'
           for f in $(find frontend/src -maxdepth 1 -name '*.elm' | sort); do
             base=$(basename "$f")
             if echo "$base" | grep -qE "$framework_re"; then
+              continue
+            fi
+            if echo "$base" | grep -qE "$exempt_re"; then
+              echo "::warning file=$f::grandfathered gap (no sibling test); see ci.yml exempt_re"
               continue
             fi
             test="frontend/tests/${base%.elm}Test.elm"
