@@ -30,11 +30,16 @@ page _ route =
 -- MODEL
 
 
+type LoginState
+    = Idle
+    | Loading
+    | Failed String
+
+
 type alias Model =
     { email : String
     , password : String
-    , error : Maybe String
-    , loading : Bool
+    , loginState : LoginState
     , redirectPath : Maybe Route.Path.Path
     }
 
@@ -46,8 +51,7 @@ init :
 init route _ =
     ( { email = ""
       , password = ""
-      , error = Nothing
-      , loading = False
+      , loginState = Idle
       , redirectPath =
             Dict.get "redirect" route.query
                 |> Maybe.andThen Route.Path.fromString
@@ -81,7 +85,7 @@ update msg model =
             )
 
         SubmitLogin ->
-            ( { model | loading = True, error = Nothing }
+            ( { model | loginState = Loading }
             , Pb.adminLogin
                 { email = model.email
                 , password = model.password
@@ -94,7 +98,7 @@ update msg model =
                 Just "admin-login" ->
                     case Pb.decodeToken value of
                         Ok token ->
-                            ( { model | loading = False }
+                            ( { model | loginState = Idle }
                             , Effect.sendSharedMsg
                                 (Shared.Msg.AdminLoggedIn
                                     { token = token
@@ -106,10 +110,8 @@ update msg model =
 
                         Err _ ->
                             ( { model
-                                | loading = False
-                                , error =
-                                    Just
-                                        "Invalid email or password."
+                                | loginState =
+                                    Failed "Invalid email or password."
                               }
                             , Effect.none
                             )
@@ -140,11 +142,11 @@ view model =
                 [ UI.card
                     [ UI.cardBody
                         [ UI.cardTitle "Admin Login"
-                        , case model.error of
-                            Just err ->
+                        , case model.loginState of
+                            Failed err ->
                                 UI.error err
 
-                            Nothing ->
+                            _ ->
                                 UI.empty
                         , viewLoginForm model
                         ]
@@ -171,6 +173,6 @@ viewLoginForm model =
             }
         , div [ Attr.class "mt-4" ]
             [ UI.primaryButton
-                { label = "Login", loading = model.loading }
+                { label = "Login", loading = model.loginState == Loading }
             ]
         ]

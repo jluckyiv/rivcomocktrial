@@ -973,8 +973,8 @@ scorerTokenDecoder =
                 (Decode.nullable Decode.string)
                 Nothing
             )
-        |> andMap (fieldWithDefault "scorer_role" scorerRoleDecoder Scorer)
-        |> andMap (fieldWithDefault "status" tokenStatusDecoder TokenActive)
+        |> andMap (Decode.field "scorer_role" scorerRoleDecoder)
+        |> andMap (Decode.field "status" tokenStatusDecoder)
         |> andMap (Decode.field "created" Decode.string)
         |> andMap (Decode.field "updated" Decode.string)
 
@@ -1005,8 +1005,8 @@ ballotSubmissionDecoder =
         |> andMap (Decode.field "id" Decode.string)
         |> andMap (Decode.field "scorer_token" Decode.string)
         |> andMap (Decode.field "trial" Decode.string)
-        |> andMap (fieldWithDefault "status" ballotStatusDecoder BallotSubmitted)
-        |> andMap (fieldWithDefault "submitted_at" Decode.string "")
+        |> andMap (Decode.field "status" ballotStatusDecoder)
+        |> andMap (Decode.field "submitted_at" Decode.string)
         |> andMap (Decode.field "created" Decode.string)
         |> andMap (Decode.field "updated" Decode.string)
 
@@ -1071,8 +1071,8 @@ presiderBallotRecordDecoder =
         |> andMap (Decode.field "id" Decode.string)
         |> andMap (Decode.field "scorer_token" Decode.string)
         |> andMap (Decode.field "trial" Decode.string)
-        |> andMap (fieldWithDefault "winner_side" rosterSideDecoder Prosecution)
-        |> andMap (fieldWithDefault "submitted_at" Decode.string "")
+        |> andMap (Decode.field "winner_side" rosterSideDecoder)
+        |> andMap (Decode.field "submitted_at" Decode.string)
         |> andMap (Decode.field "created" Decode.string)
         |> andMap (Decode.field "updated" Decode.string)
 
@@ -1089,7 +1089,7 @@ ballotCorrectionDecoder =
                 (Decode.nullable Decode.string)
                 Nothing
             )
-        |> andMap (fieldWithDefault "corrected_at" Decode.string "")
+        |> andMap (Decode.field "corrected_at" Decode.string)
         |> andMap (Decode.field "created" Decode.string)
         |> andMap (Decode.field "updated" Decode.string)
 
