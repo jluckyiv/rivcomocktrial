@@ -539,6 +539,11 @@ viewRow deleting findTournamentName r =
                     , Attr.href ("/admin/pairings?round=" ++ r.id)
                     ]
                     [ text "Pairings" ]
+                , a
+                    [ Attr.class "btn btn-sm btn-outline btn-primary"
+                    , Attr.href ("/admin/trials?round=" ++ r.id)
+                    ]
+                    [ text "Manage Trials" ]
                 , button
                     [ Attr.class "btn btn-sm btn-outline btn-info"
                     , Events.onClick (EditRound r)

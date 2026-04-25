@@ -15,6 +15,8 @@ module Api exposing
     , EligibilityEntry
     , EligibilityStatus
     , EntryType(..)
+    , Judge
+    , MotionRuling(..)
     , PresiderBallotRecord
     , PresentationType(..)
     , RequestStatus(..)
@@ -23,6 +25,7 @@ module Api exposing
     , RosterSide(..)
     , RosterSubmission
     , Round
+    , RoundStatus(..)
     , RoundType(..)
     , School
     , ScorerRole(..)
@@ -35,6 +38,7 @@ module Api exposing
     , Tournament
     , TournamentStatus(..)
     , Trial
+    , TrialVerdict(..)
     , WithdrawalRequest
     , withdrawalRequestDecoder
     , attorneyCoachDecoder
@@ -60,12 +64,14 @@ module Api exposing
     , encodeCoachUserStatus
     , encodeCourtroom
     , encodeEligibilityEntry
+    , encodeJudge
     , encodePresiderBallotRecord
     , encodePresentationType
     , encodeRequestStatus
     , encodeRosterEntry
     , encodeRosterSubmission
     , encodeRound
+    , encodeRoundStatus
     , encodeScorerRole
     , encodeScorerToken
     , encodeSchool
@@ -74,12 +80,15 @@ module Api exposing
     , encodeTeamStatus
     , encodeTournament
     , encodeTrial
+    , encodeTrialAssignment
     , encodeWithdrawalRequest
+    , judgeDecoder
     , presiderBallotRecordDecoder
     , rosterEntryDecoder
     , rosterSideToString
     , rosterSubmissionDecoder
     , roundDecoder
+    , roundStatusToString
     , roundTypeToString
     , schoolDecoder
     , scorerTokenDecoder
@@ -212,6 +221,12 @@ type alias Courtroom =
     }
 
 
+type RoundStatus
+    = Upcoming
+    | Open
+    | Locked
+
+
 type alias Round =
     { id : String
     , number : Int
@@ -219,6 +234,9 @@ type alias Round =
     , roundType : RoundType
     , published : Bool
     , tournament : String
+    , status : RoundStatus
+    , rankingMin : Maybe Int
+    , rankingMax : Maybe Int
     , created : String
     , updated : String
     }
@@ -230,9 +248,34 @@ type alias Trial =
     , prosecutionTeam : String
     , defenseTeam : String
     , courtroom : String
+    , judge : String
+    , scorer1 : String
+    , scorer2 : String
+    , scorer3 : String
+    , scorer4 : String
+    , scorer5 : String
     , created : String
     , updated : String
     }
+
+
+type alias Judge =
+    { id : String
+    , name : String
+    , email : String
+    , created : String
+    , updated : String
+    }
+
+
+type MotionRuling
+    = Granted
+    | Denied
+
+
+type TrialVerdict
+    = Guilty
+    | NotGuilty
 
 
 type alias CoachUser =
@@ -432,6 +475,8 @@ type alias PresiderBallotRecord =
     , scorerToken : String
     , trial : String
     , winnerSide : RosterSide
+    , motionRuling : Maybe MotionRuling
+    , verdict : Maybe TrialVerdict
     , submittedAt : String
     , created : String
     , updated : String
@@ -535,6 +580,70 @@ roundTypeDecoder =
                     _ ->
                         Decode.fail ("Unknown round type: " ++ s)
             )
+
+
+roundStatusDecoder : Decoder RoundStatus
+roundStatusDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "upcoming" ->
+                        Decode.succeed Upcoming
+
+                    "open" ->
+                        Decode.succeed Open
+
+                    "locked" ->
+                        Decode.succeed Locked
+
+                    _ ->
+                        Decode.fail ("Unknown round status: " ++ s)
+            )
+
+
+motionRulingDecoder : Decoder MotionRuling
+motionRulingDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "granted" ->
+                        Decode.succeed Granted
+
+                    "denied" ->
+                        Decode.succeed Denied
+
+                    _ ->
+                        Decode.fail ("Unknown motion ruling: " ++ s)
+            )
+
+
+trialVerdictDecoder : Decoder TrialVerdict
+trialVerdictDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "guilty" ->
+                        Decode.succeed Guilty
+
+                    "not_guilty" ->
+                        Decode.succeed NotGuilty
+
+                    _ ->
+                        Decode.fail ("Unknown trial verdict: " ++ s)
+            )
+
+
+judgeDecoder : Decoder Judge
+judgeDecoder =
+    Decode.succeed Judge
+        |> andMap (Decode.field "id" Decode.string)
+        |> andMap (Decode.field "name" Decode.string)
+        |> andMap (fieldWithDefault "email" Decode.string "")
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
 
 
 rosterSideDecoder : Decoder RosterSide
@@ -703,27 +812,36 @@ courtroomDecoder =
 
 roundDecoder : Decoder Round
 roundDecoder =
-    Decode.map8 Round
-        (Decode.field "id" Decode.string)
-        (Decode.field "number" Decode.int)
-        (fieldWithDefault "date" Decode.string "")
-        (Decode.field "type" roundTypeDecoder)
-        (fieldWithDefault "published" Decode.bool False)
-        (Decode.field "tournament" Decode.string)
-        (Decode.field "created" Decode.string)
-        (Decode.field "updated" Decode.string)
+    Decode.succeed Round
+        |> andMap (Decode.field "id" Decode.string)
+        |> andMap (Decode.field "number" Decode.int)
+        |> andMap (fieldWithDefault "date" Decode.string "")
+        |> andMap (Decode.field "type" roundTypeDecoder)
+        |> andMap (fieldWithDefault "published" Decode.bool False)
+        |> andMap (Decode.field "tournament" Decode.string)
+        |> andMap (fieldWithDefault "status" roundStatusDecoder Upcoming)
+        |> andMap (fieldWithDefault "ranking_min" (Decode.nullable Decode.int) Nothing)
+        |> andMap (fieldWithDefault "ranking_max" (Decode.nullable Decode.int) Nothing)
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
 
 
 trialDecoder : Decoder Trial
 trialDecoder =
-    Decode.map7 Trial
-        (Decode.field "id" Decode.string)
-        (Decode.field "round" Decode.string)
-        (Decode.field "prosecution_team" Decode.string)
-        (Decode.field "defense_team" Decode.string)
-        (fieldWithDefault "courtroom" Decode.string "")
-        (Decode.field "created" Decode.string)
-        (Decode.field "updated" Decode.string)
+    Decode.succeed Trial
+        |> andMap (Decode.field "id" Decode.string)
+        |> andMap (Decode.field "round" Decode.string)
+        |> andMap (Decode.field "prosecution_team" Decode.string)
+        |> andMap (Decode.field "defense_team" Decode.string)
+        |> andMap (fieldWithDefault "courtroom" Decode.string "")
+        |> andMap (fieldWithDefault "judge" Decode.string "")
+        |> andMap (fieldWithDefault "scorer_1" Decode.string "")
+        |> andMap (fieldWithDefault "scorer_2" Decode.string "")
+        |> andMap (fieldWithDefault "scorer_3" Decode.string "")
+        |> andMap (fieldWithDefault "scorer_4" Decode.string "")
+        |> andMap (fieldWithDefault "scorer_5" Decode.string "")
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
 
 
 coachUserDecoder : Decoder CoachUser
@@ -1072,6 +1190,8 @@ presiderBallotRecordDecoder =
         |> andMap (Decode.field "scorer_token" Decode.string)
         |> andMap (Decode.field "trial" Decode.string)
         |> andMap (Decode.field "winner_side" rosterSideDecoder)
+        |> andMap (fieldWithDefault "motion_ruling" (Decode.nullable motionRulingDecoder) Nothing)
+        |> andMap (fieldWithDefault "verdict" (Decode.nullable trialVerdictDecoder) Nothing)
         |> andMap (Decode.field "submitted_at" Decode.string)
         |> andMap (Decode.field "created" Decode.string)
         |> andMap (Decode.field "updated" Decode.string)
@@ -1281,6 +1401,41 @@ encodeTrial t =
         , ( "defense_team", Encode.string t.defenseTeam )
         , ( "courtroom", Encode.string t.courtroom )
         ]
+
+
+encodeTrialAssignment :
+    { judge : String
+    , scorer1 : String
+    , scorer2 : String
+    , scorer3 : String
+    , scorer4 : String
+    , scorer5 : String
+    }
+    -> Encode.Value
+encodeTrialAssignment t =
+    Encode.object
+        [ ( "judge", Encode.string t.judge )
+        , ( "scorer_1", Encode.string t.scorer1 )
+        , ( "scorer_2", Encode.string t.scorer2 )
+        , ( "scorer_3", Encode.string t.scorer3 )
+        , ( "scorer_4", Encode.string t.scorer4 )
+        , ( "scorer_5", Encode.string t.scorer5 )
+        ]
+
+
+encodeJudge :
+    { name : String, email : String }
+    -> Encode.Value
+encodeJudge j =
+    Encode.object
+        [ ( "name", Encode.string j.name )
+        , ( "email", Encode.string j.email )
+        ]
+
+
+encodeRoundStatus : RoundStatus -> Encode.Value
+encodeRoundStatus s =
+    Encode.string (roundStatusToString s)
 
 
 encodeCoachRegistration :
@@ -1683,6 +1838,19 @@ roundTypeToString rt =
 
         Elimination ->
             "elimination"
+
+
+roundStatusToString : RoundStatus -> String
+roundStatusToString s =
+    case s of
+        Upcoming ->
+            "upcoming"
+
+        Open ->
+            "open"
+
+        Locked ->
+            "locked"
 
 
 rosterSideToString : RosterSide -> String
