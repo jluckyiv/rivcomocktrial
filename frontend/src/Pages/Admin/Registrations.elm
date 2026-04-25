@@ -532,12 +532,12 @@ viewContent model =
                     , "Actions"
                     ]
                 , rows = coaches
-                , rowView = viewCoachRow teams
+                , rowView = viewCoachRow coaches teams
                 }
 
 
-viewCoachRow : List Api.Team -> Api.CoachUser -> Html Msg
-viewCoachRow teams coach =
+viewCoachRow : List Api.CoachUser -> List Api.Team -> Api.CoachUser -> Html Msg
+viewCoachRow coaches teams coach =
     let
         maybeTeam =
             teams
@@ -552,11 +552,55 @@ viewCoachRow teams coach =
         teamStatus =
             maybeTeam
                 |> Maybe.map .status
+
+        -- For pending coaches, check if their school already has an active
+        -- team from a different coach. If so, this is a second-team
+        -- registration and RCOE needs to verify the coaches are different.
+        maybeExistingTeam =
+            case coach.status of
+                Api.CoachPending ->
+                    teams
+                        |> List.filter
+                            (\t ->
+                                t.school == coach.school
+                                    && t.coach /= coach.id
+                                    && t.status == Api.TeamActive
+                            )
+                        |> List.head
+
+                _ ->
+                    Nothing
+
+        teamCell =
+            case maybeExistingTeam of
+                Nothing ->
+                    td [] [ text teamName ]
+
+                Just existingTeam ->
+                    let
+                        existingCoachName =
+                            coaches
+                                |> List.filter (\c -> c.id == existingTeam.coach)
+                                |> List.head
+                                |> Maybe.map .name
+                                |> Maybe.withDefault "unknown"
+                    in
+                    td []
+                        [ text teamName
+                        , UI.badge { label = "2nd Team", variant = "warning" }
+                        , UI.note
+                            ("Same school as: "
+                                ++ existingTeam.name
+                                ++ " (coach: "
+                                ++ existingCoachName
+                                ++ ")"
+                            )
+                        ]
     in
     tr []
         [ td [] [ text coach.name ]
         , td [] [ text coach.email ]
-        , td [] [ text teamName ]
+        , teamCell
         , td [] [ viewUserStatusBadge coach.status ]
         , td [] [ viewTeamStatusBadge teamStatus ]
         , td [] [ viewActions coach.id coach.status maybeTeam ]
