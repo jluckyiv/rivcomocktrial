@@ -20,6 +20,9 @@ docker-compose.override.yml
 .env
 .env.local
 
+# Local PocketBase credentials (run `npm run pb:credentials` to populate)
+.pocketbase/
+
 # Playwright
 test-results/
 playwright-report/
