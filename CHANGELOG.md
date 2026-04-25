@@ -6,6 +6,24 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.5.1 — Second-Team Badge + Registration Hook Fix
+
+### Added (PR #105)
+- Admin `/admin/registrations` shows a "2nd Team" warning badge and a
+  note naming the existing team and coach when a pending coach is from
+  a school that already has an active team; helps RCOE spot duplicate
+  school registrations at a glance (Closes #73)
+- `UI.note` helper renders small muted explanatory text below a cell
+- Playwright e2e suite (`tests/e2e/`) with self-contained
+  beforeAll/afterAll fixtures against the real PocketBase; covers the
+  second-team badge, the no-badge case, and the approve-coach flow
+
+### Fixed (PR #106)
+- Coach-approval hook now scopes the team-status sync to
+  `status = 'pending'` teams only; previously re-saving an approved
+  coach record would accidentally re-activate or re-reject resolved
+  (active, withdrawn) teams
+
 ## v0.5.0 — Attorney Tasks + Type Cleanup + Withdrawal Requests
 
 ### Added (PR #103)
