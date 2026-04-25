@@ -6,6 +6,21 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added (PR #101)
+- Attorney task assignment UI on `/team/rosters`: coaches can
+  now assign opening statement, direct examination, cross
+  examination, and closing argument to each trial attorney
+  per round via an inline form
+- `encodeTaskType` and `encodeAttorneyTask` in `Api.elm` for
+  PocketBase create/update of `attorney_tasks` records
+- Task form validates task type required, character required
+  for direct/cross, no duplicate (type, character) pairs per
+  attorney; character dropdown scopes own-side witnesses for
+  direct, opposing-side witnesses for cross
+- Roster form and task form are mutually exclusive — opening
+  one blocks the other
+- Closes #100
+
 ## v0.4.5 — Tooling: elm-review + CI
 
 ### Added (PR #99)
