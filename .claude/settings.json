@@ -1,0 +1,45 @@
+{
+  "$schema": "https://claude.com/schemas/settings.json",
+  "permissions": {
+    "deny": [
+      "Edit(backend/pb_hooks/**)",
+      "Edit(backend/pb_migrations/**)",
+      "Edit(frontend/src/Api.elm)",
+      "Edit(frontend/src/Pb.elm)",
+      "Write(backend/pb_hooks/**)",
+      "Write(backend/pb_migrations/**)",
+      "Write(frontend/src/Api.elm)",
+      "Write(frontend/src/Pb.elm)",
+      "MultiEdit(backend/pb_hooks/**)",
+      "MultiEdit(backend/pb_migrations/**)",
+      "MultiEdit(frontend/src/Api.elm)",
+      "MultiEdit(frontend/src/Pb.elm)",
+      "NotebookEdit(backend/pb_hooks/**)",
+      "NotebookEdit(backend/pb_migrations/**)",
+      "NotebookEdit(frontend/src/Api.elm)",
+      "NotebookEdit(frontend/src/Pb.elm)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/freeze-bash-guard.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/tdd-first-guard.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
