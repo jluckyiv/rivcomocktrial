@@ -6,6 +6,18 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Changed (PR #102)
+- `FormState`: `FormSaving FormData` split into `FormSavingDraft
+  FormData` and `FormSubmitting FormData` — saving kind is now in
+  the type, not a hidden `submitting : Bool` field inside `FormData`
+- `viewFormContent` now takes `FormState` directly; callers pass
+  `model.form` instead of unpacking it first (Closes #96)
+- `FormRow.entryType` changed from `String` to `Api.EntryType`;
+  `FormRow.role` changed from `String` to `Maybe Api.RosterRole` —
+  new `updateRowEntryType`/`updateRowRole` helpers in `RosterForm`
+  parse select input; save handlers use domain types directly,
+  removing `parseEntryType`/`parseRole` at encode time (Closes #97)
+
 ### Added (PR #101)
 - Attorney task assignment UI on `/team/rosters`: coaches can
   now assign opening statement, direct examination, cross
