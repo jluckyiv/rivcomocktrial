@@ -289,7 +289,6 @@ updateTeamData msg data =
                                 , roundId = roundId
                                 , side = side
                                 , rows = rows
-                                , submitting = False
                                 }
                                 []
                         , expandedRound = Just roundId
@@ -332,18 +331,10 @@ updateTeamData msg data =
             ( { data | form = RosterForm.updateRow idx (\r -> { r | student = val }) data.form }, Effect.none )
 
         UpdateRowEntryType idx val ->
-            ( { data | form = RosterForm.updateRow idx (\r -> { r | entryType = val, role = "", character = "" }) data.form }, Effect.none )
+            ( { data | form = RosterForm.updateRowEntryType idx val data.form }, Effect.none )
 
         UpdateRowRole idx val ->
-            let
-                clearCharacter r =
-                    if val /= "witness" then
-                        { r | role = val, character = "" }
-
-                    else
-                        { r | role = val }
-            in
-            ( { data | form = RosterForm.updateRow idx clearCharacter data.form }, Effect.none )
+            ( { data | form = RosterForm.updateRowRole idx val data.form }, Effect.none )
 
         UpdateRowCharacter idx val ->
             ( { data | form = RosterForm.updateRow idx (\r -> { r | character = val }) data.form }, Effect.none )
@@ -482,8 +473,8 @@ handleSave submitting data =
 
                                     else
                                         Just row.student
-                                , entryType = RosterForm.parseEntryType row.entryType
-                                , role = RosterForm.parseRole row.role
+                                , entryType = row.entryType
+                                , role = row.role
                                 , character =
                                     if row.character == "" then
                                         Nothing
@@ -571,12 +562,14 @@ handleSave submitting data =
 
                         allEffects =
                             createEffects ++ updateEffects ++ deleteEffects ++ submissionEffect
-
-                        savingFormData =
-                            { formData | submitting = submitting }
                     in
                     ( { data
-                        | form = RosterForm.FormSaving savingFormData
+                        | form =
+                            if submitting then
+                                RosterForm.FormSubmitting formData
+
+                            else
+                                RosterForm.FormSavingDraft formData
                         , savesPending = List.length createEffects + List.length updateEffects + List.length submissionEffect
                         , deletesPending = List.length deleteEffects
                       }
@@ -787,7 +780,16 @@ checkSaveComplete data =
 handleSaveError : String -> TeamData -> ( TeamData, Effect Msg )
 handleSaveError err data =
     case data.form of
-        RosterForm.FormSaving formData ->
+        RosterForm.FormSavingDraft formData ->
+            ( { data
+                | form = RosterForm.FormEditing formData [ err ]
+                , savesPending = 0
+                , deletesPending = 0
+              }
+            , Effect.none
+            )
+
+        RosterForm.FormSubmitting formData ->
             ( { data
                 | form = RosterForm.FormEditing formData [ err ]
                 , savesPending = 0
@@ -1285,7 +1287,10 @@ viewRoundRow data round =
                         RosterForm.FormEditing fd _ ->
                             fd.roundId == round.id
 
-                        RosterForm.FormSaving fd ->
+                        RosterForm.FormSavingDraft fd ->
+                            fd.roundId == round.id
+
+                        RosterForm.FormSubmitting fd ->
                             fd.roundId == round.id
 
                         RosterForm.FormHidden ->
@@ -1631,12 +1636,4 @@ viewRosterForm data =
             , onCancel = CancelRosterForm
             }
     in
-    case data.form of
-        RosterForm.FormEditing formData errors ->
-            RosterForm.viewFormContent config formData errors False
-
-        RosterForm.FormSaving formData ->
-            RosterForm.viewFormContent config formData [] True
-
-        RosterForm.FormHidden ->
-            text ""
+    RosterForm.viewFormContent config data.form
