@@ -4,6 +4,12 @@
 // Two SDK instances: pbAdmin (superuser auth) and pb (coach/public).
 // Auth tokens are persisted to localStorage manually; SDK auth
 // stores are in-memory only to avoid key conflicts.
+//
+// SaveCoachToken and SaveCoachUser must always be called together.
+// SaveCoachToken calls pb.authStore.save(token, pb.authStore.record),
+// which reads the record already stored in the authStore. SaveCoachUser
+// must therefore be called first so the record is in place before the
+// token save updates it.
 
 import "./app.css"
 import PocketBase, { BaseAuthStore } from "pocketbase"
@@ -32,7 +38,11 @@ if (savedCoachToken) {
         )
         pb.authStore.save(savedCoachToken, savedCoachUser)
     } catch {
-        // Corrupted localStorage data; ignore
+        console.warn(
+            "[interop] Corrupted coachUser in localStorage; clearing coach auth."
+        )
+        localStorage.removeItem("coachUser")
+        localStorage.removeItem("coachToken")
     }
 }
 
