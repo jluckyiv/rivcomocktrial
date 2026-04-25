@@ -20,26 +20,11 @@ import VerifiedBallot
 suite : Test
 suite =
     describe "BallotAssembly"
-        [ rosterSideToSideSuite
-        , assembleStudentSuite
+        [ assembleStudentSuite
         , assembleScoredPresentationSuite
         , assembleSubmittedBallotSuite
         , assembleVerifiedBallotSuite
         , assemblePresiderBallotSuite
-        ]
-
-
-rosterSideToSideSuite : Test
-rosterSideToSideSuite =
-    describe "rosterSideToSide"
-        [ test "Prosecution maps to Prosecution" <|
-            \_ ->
-                BallotAssembly.rosterSideToSide Api.Prosecution
-                    |> Expect.equal Side.Prosecution
-        , test "Defense maps to Defense" <|
-            \_ ->
-                BallotAssembly.rosterSideToSide Api.Defense
-                    |> Expect.equal Side.Defense
         ]
 
 
@@ -210,15 +195,13 @@ assembleVerifiedBallotSuite =
                         Expect.fail "Could not assemble test ballot"
 
                     Ok original ->
-                        let
-                            verified =
-                                BallotAssembly.assembleVerifiedBallot
-                                    original
-                                    simpleBallotScores
-                                    []
-                        in
-                        VerifiedBallot.presentations verified
-                            |> Expect.equal (SubmittedBallot.presentations original)
+                        case BallotAssembly.assembleVerifiedBallot original simpleBallotScores [] of
+                            Err _ ->
+                                Expect.fail "Could not assemble verified ballot"
+
+                            Ok verified ->
+                                VerifiedBallot.presentations verified
+                                    |> Expect.equal (SubmittedBallot.presentations original)
         , test "with correction: corrected points replace original" <|
             \_ ->
                 case BallotAssembly.assembleSubmittedBallot simpleBallotScores of
@@ -236,27 +219,24 @@ assembleVerifiedBallotSuite =
                             correction =
                                 { id = "corr1"
                                 , ballot = "ballot1"
-                                , originalScore = firstScore.id
+                                , originalScoreId = firstScore.id
                                 , correctedPoints = 3
                                 , reason = Just "Entry error"
                                 , correctedAt = "2026-01-01"
                                 , created = "2026-01-01"
                                 , updated = "2026-01-01"
                                 }
+                        in
+                        case BallotAssembly.assembleVerifiedBallot original simpleBallotScores [ correction ] of
+                            Err _ ->
+                                Expect.fail "Could not assemble verified ballot"
 
-                            verified =
-                                BallotAssembly.assembleVerifiedBallot
-                                    original
-                                    simpleBallotScores
-                                    [ correction ]
-
-                            correctedPts =
+                            Ok verified ->
                                 VerifiedBallot.presentations verified
                                     |> List.head
                                     |> Maybe.map SubmittedBallot.points
                                     |> Maybe.map SubmittedBallot.toInt
-                        in
-                        Expect.equal (Just 3) correctedPts
+                                    |> Expect.equal (Just 3)
         , test "original is preserved under corrections" <|
             \_ ->
                 case BallotAssembly.assembleSubmittedBallot simpleBallotScores of
@@ -274,23 +254,22 @@ assembleVerifiedBallotSuite =
                             correction =
                                 { id = "corr1"
                                 , ballot = "ballot1"
-                                , originalScore = firstScore.id
+                                , originalScoreId = firstScore.id
                                 , correctedPoints = 3
                                 , reason = Nothing
                                 , correctedAt = "2026-01-01"
                                 , created = "2026-01-01"
                                 , updated = "2026-01-01"
                                 }
-
-                            verified =
-                                BallotAssembly.assembleVerifiedBallot
-                                    original
-                                    simpleBallotScores
-                                    [ correction ]
                         in
-                        VerifiedBallot.original verified
-                            |> SubmittedBallot.presentations
-                            |> Expect.equal (SubmittedBallot.presentations original)
+                        case BallotAssembly.assembleVerifiedBallot original simpleBallotScores [ correction ] of
+                            Err _ ->
+                                Expect.fail "Could not assemble verified ballot"
+
+                            Ok verified ->
+                                VerifiedBallot.original verified
+                                    |> SubmittedBallot.presentations
+                                    |> Expect.equal (SubmittedBallot.presentations original)
         ]
 
 

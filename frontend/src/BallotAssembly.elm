@@ -3,7 +3,6 @@ module BallotAssembly exposing
     , assembleScoredPresentation
     , assembleSubmittedBallot
     , assembleVerifiedBallot
-    , rosterSideToSide
     )
 
 {-| Converts flat PocketBase API records into domain ballot types.
@@ -18,6 +17,11 @@ Limitations:
   to TheyThem (irrelevant for scoring calculations).
 - If a name cannot be parsed, the score is returned as an Error.
 
+Side handling for clerk/bailiff: `ClerkPerformance` and
+`BailiffPerformance` domain constructors hard-code their side
+(Prosecution and Defense respectively), so `score.side` is ignored
+when assembling those presentation types.
+
 -}
 
 import Api
@@ -28,6 +32,7 @@ import Api
         , PresentationType(..)
         , RosterSide
         )
+import Dict exposing (Dict)
 import Error exposing (Error(..))
 import PresiderBallot exposing (PresiderBallot)
 import Side exposing (Side)
@@ -67,22 +72,22 @@ irrelevant for scoring calculations.
 assembleStudent : String -> Result (List Error) Student
 assembleStudent fullName =
     let
-        trimmed =
-            String.trim fullName
-
         ( rawFirst, rawLast ) =
-            case String.indices " " trimmed of
-                [] ->
-                    ( "—", trimmed )
+            case String.trim fullName |> String.split " " |> List.reverse of
+                last :: rest ->
+                    ( String.join " " (List.reverse rest)
+                        |> (\s ->
+                                if String.isEmpty s then
+                                    "—"
 
-                indices ->
-                    let
-                        lastIndex =
-                            List.foldl max 0 indices
-                    in
-                    ( String.left lastIndex trimmed
-                    , String.dropLeft (lastIndex + 1) trimmed
+                                else
+                                    s
+                           )
+                    , last
                     )
+
+                [] ->
+                    ( "—", "" )
     in
     Student.nameFromStrings rawFirst rawLast Nothing
         |> Result.map (\name -> Student.create name TheyThem)
@@ -140,12 +145,9 @@ assembleScoredPresentation score =
                     Ok (WitnessExamination side student pts)
 
                 ClerkPerformancePresentation ->
-                    -- ClerkPerformance does not carry an explicit side in the
-                    -- domain type (it hard-codes Prosecution). Ignore score.side.
                     Ok (ClerkPerformance student pts)
 
                 BailiffPerformancePresentation ->
-                    -- BailiffPerformance hard-codes Defense in the domain type.
                     Ok (BailiffPerformance student pts)
 
 
@@ -200,43 +202,54 @@ assembleVerifiedBallot :
     SubmittedBallot
     -> List BallotScore
     -> List BallotCorrection
-    -> VerifiedBallot
+    -> Result (List Error) VerifiedBallot
 assembleVerifiedBallot original scores corrections =
     if List.isEmpty corrections then
-        VerifiedBallot.verify original
+        Ok (VerifiedBallot.verify original)
 
     else
         let
-            -- Build a lookup from original_score ID → corrected_points.
+            correctionMap : Dict String Int
             correctionMap =
                 List.foldl
-                    (\c acc ->
-                        ( c.originalScore, c.correctedPoints ) :: acc
-                    )
-                    []
+                    (\c acc -> Dict.insert c.originalScoreId c.correctedPoints acc)
+                    Dict.empty
                     corrections
 
             correctedScores =
                 List.map
                     (\score ->
-                        case List.filter (\( id, _ ) -> id == score.id) correctionMap of
-                            ( _, correctedPts ) :: _ ->
+                        case Dict.get score.id correctionMap of
+                            Just correctedPts ->
                                 { score | points = correctedPts }
 
-                            [] ->
+                            Nothing ->
                                 score
                     )
                     scores
 
-            correctedPresentations =
+            results =
                 List.sortBy .sortOrder correctedScores
-                    |> List.filterMap
-                        (\score ->
-                            assembleScoredPresentation score
-                                |> Result.toMaybe
-                        )
+                    |> List.map assembleScoredPresentation
+
+            ( errs, presentations ) =
+                List.foldl
+                    (\result ( accErrs, accOk ) ->
+                        case result of
+                            Err e ->
+                                ( accErrs ++ e, accOk )
+
+                            Ok p ->
+                                ( accErrs, accOk ++ [ p ] )
+                    )
+                    ( [], [] )
+                    results
         in
-        VerifiedBallot.verifyWithCorrections original correctedPresentations
+        if List.isEmpty errs then
+            Ok (VerifiedBallot.verifyWithCorrections original presentations)
+
+        else
+            Err errs
 
 
 {-| Converts an Api.PresiderBallotRecord into a domain PresiderBallot.
