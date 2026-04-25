@@ -1,7 +1,45 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-// When a coach registers, find the active registration tournament
-// and create the pending team record. Runs after the user record
+const REGISTRATION_STATUS = "registration";
+
+// Pre-commit: verify a registration-status tournament exists before
+// creating the user record. Throws BadRequestError if registration is
+// closed so the coach never becomes an orphaned account.
+onRecordCreateRequest((e) => {
+    const user = e.record;
+
+    if (user.get("role") !== "coach") {
+        return e.next();
+    }
+
+    const tournaments = $app.findRecordsByFilter(
+        "tournaments",
+        "status = {:status}",
+        "-created",
+        2,
+        0,
+        { status: REGISTRATION_STATUS }
+    );
+
+    if (tournaments.length === 0) {
+        throw new BadRequestError(
+            "Registration is not currently open. " +
+            "No active registration tournament found."
+        );
+    }
+
+    if (tournaments.length > 1) {
+        console.warn(
+            "[registration] More than one registration-status tournament found. " +
+            "Using the most recently created: " + tournaments[0].id
+        );
+    }
+
+    return e.next();
+}, "users");
+
+
+// Post-commit: create the pending team record after the user record
 // is committed so the coach relation resolves correctly.
 onRecordAfterCreateSuccess((e) => {
     const user = e.record;
@@ -12,22 +50,12 @@ onRecordAfterCreateSuccess((e) => {
 
     const tournaments = $app.findRecordsByFilter(
         "tournaments",
-        "status = 'registration'",
+        "status = {:status}",
         "-created",
         1,
-        0
+        0,
+        { status: REGISTRATION_STATUS }
     );
-
-    if (tournaments.length === 0) {
-        // Registration was closed between the frontend check and
-        // submission. Log and return — the user record is committed;
-        // RCOE will need to manually associate a team.
-        console.error(
-            "[registration] No registration-status tournament found "
-            + "while creating team for user " + user.id
-        );
-        return;
-    }
 
     const tournament = tournaments[0];
     const teamsCollection = $app.findCollectionByNameOrId("teams");
