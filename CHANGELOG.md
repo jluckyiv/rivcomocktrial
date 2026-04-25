@@ -6,6 +6,26 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.5.2 — Phase-Aware Admin Dashboard
+
+### Added (PR #107)
+- `/admin` dashboard page (`Pages/Admin.elm`) that reads the active
+  tournament's `status` field and renders a phase-appropriate view:
+  - **Registration**: stat cards for pending approvals, active teams,
+    and pending withdrawals; link to `/admin/registrations`
+  - **Active**: stat cards for pending eligibility requests and active
+    teams; links to `/admin/eligibility-requests` and `/admin/rounds`
+  - **Draft / no active tournament**: prompt to go to
+    `/admin/tournaments`
+  - **Completed**: "tournament concluded" message
+- `UI.statCard` helper renders a DaisyUI `stat` component with an
+  optional text-color variant (`"warning"`, `"success"`, etc.)
+- "Dashboard" added as first nav item in desktop and mobile admin nav
+- Post-login redirect changed from `/admin/tournaments` to `/admin`
+- Playwright e2e tests: login redirect, stat card visibility, and
+  pending-approval count increment
+- Closes #69
+
 ## v0.5.1 — Second-Team Badge + Registration Hook Fix
 
 ### Added (PR #105)
