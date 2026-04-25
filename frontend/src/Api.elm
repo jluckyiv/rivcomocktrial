@@ -35,6 +35,7 @@ module Api exposing
     , courtroomDecoder
     , eligibilityEntryDecoder
     , encodeAttorneyCoach
+    , encodeAttorneyTask
     , encodeCaseCharacter
     , encodeChangeRequest
     , encodeCoCoach
@@ -1145,6 +1146,42 @@ encodeRosterEntry e =
           , Maybe.map Encode.int e.sortOrder
                 |> Maybe.withDefault Encode.null
           )
+        ]
+
+
+
+encodeTaskType : TaskType -> Encode.Value
+encodeTaskType tt =
+    case tt of
+        OpeningTask ->
+            Encode.string "opening"
+
+        DirectTask ->
+            Encode.string "direct"
+
+        CrossTask ->
+            Encode.string "cross"
+
+        ClosingTask ->
+            Encode.string "closing"
+
+
+encodeAttorneyTask :
+    { rosterEntry : String
+    , taskType : TaskType
+    , character : Maybe String
+    , sortOrder : Int
+    }
+    -> Encode.Value
+encodeAttorneyTask t =
+    Encode.object
+        [ ( "roster_entry", Encode.string t.rosterEntry )
+        , ( "task_type", encodeTaskType t.taskType )
+        , ( "character"
+          , Maybe.map Encode.string t.character
+                |> Maybe.withDefault Encode.null
+          )
+        , ( "sort_order", Encode.int t.sortOrder )
         ]
 
 

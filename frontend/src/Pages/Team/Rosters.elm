@@ -44,6 +44,27 @@ type alias Model =
     { state : PageState }
 
 
+type TaskFormState
+    = TaskFormHidden
+    | TaskFormEditing TaskFormData (List String)
+    | TaskFormSaving TaskFormData
+
+
+type alias TaskFormData =
+    { rosterEntryId : String
+    , roundId : String
+    , side : Api.RosterSide
+    , rows : List TaskFormRow
+    }
+
+
+type alias TaskFormRow =
+    { id : Maybe String
+    , taskType : String
+    , character : String
+    }
+
+
 type alias TeamData =
     { team : Api.Team
     , rounds : RemoteData (List Api.Round)
@@ -57,6 +78,9 @@ type alias TeamData =
     , form : RosterForm.FormState
     , savesPending : Int
     , deletesPending : Int
+    , taskForm : TaskFormState
+    , taskSavesPending : Int
+    , taskDeletesPending : Int
     }
 
 
@@ -80,6 +104,9 @@ emptyTeamData team =
     , form = RosterForm.FormHidden
     , savesPending = 0
     , deletesPending = 0
+    , taskForm = TaskFormHidden
+    , taskSavesPending = 0
+    , taskDeletesPending = 0
     }
 
 
@@ -121,6 +148,13 @@ type Msg
     | UpdateRowCharacter Int String
     | SaveDraft
     | SubmitRoster
+    | EditTasks String String Api.RosterSide
+    | CancelTaskForm
+    | AddTaskRow
+    | RemoveTaskRow Int
+    | UpdateTaskType Int String
+    | UpdateTaskCharacter Int String
+    | SaveTasks
 
 
 update : Msg -> Model -> ( Model, Effect Msg )
@@ -235,31 +269,36 @@ updateTeamData msg data =
             ( { data | expandedRound = newExpanded }, Effect.none )
 
         EditRoster roundId side ->
-            let
-                existingEntries =
-                    entriesForRound roundId side data.entries
+            case data.taskForm of
+                TaskFormHidden ->
+                    let
+                        existingEntries =
+                            entriesForRound roundId side data.entries
 
-                rows =
-                    if List.isEmpty existingEntries then
-                        [ RosterForm.emptyRow ]
+                        rows =
+                            if List.isEmpty existingEntries then
+                                [ RosterForm.emptyRow ]
 
-                    else
-                        List.map RosterForm.entryToFormRow existingEntries
-            in
-            ( { data
-                | form =
-                    RosterForm.FormEditing
-                        { teamId = data.team.id
-                        , roundId = roundId
-                        , side = side
-                        , rows = rows
-                        , submitting = False
-                        }
-                        []
-                , expandedRound = Just roundId
-              }
-            , Effect.none
-            )
+                            else
+                                List.map RosterForm.entryToFormRow existingEntries
+                    in
+                    ( { data
+                        | form =
+                            RosterForm.FormEditing
+                                { teamId = data.team.id
+                                , roundId = roundId
+                                , side = side
+                                , rows = rows
+                                , submitting = False
+                                }
+                                []
+                        , expandedRound = Just roundId
+                      }
+                    , Effect.none
+                    )
+
+                _ ->
+                    ( data, Effect.none )
 
         CancelRosterForm ->
             ( { data | form = RosterForm.FormHidden }, Effect.none )
@@ -314,6 +353,86 @@ updateTeamData msg data =
 
         SubmitRoster ->
             handleSave True data
+
+        EditTasks entryId roundId side ->
+            case data.form of
+                RosterForm.FormHidden ->
+                    let
+                        existingTasks =
+                            tasksForEntry entryId data.tasks
+
+                        rows =
+                            if List.isEmpty existingTasks then
+                                [ emptyTaskRow ]
+
+                            else
+                                List.map taskToFormRow existingTasks
+                    in
+                    ( { data
+                        | taskForm =
+                            TaskFormEditing
+                                { rosterEntryId = entryId
+                                , roundId = roundId
+                                , side = side
+                                , rows = rows
+                                }
+                                []
+                        , expandedRound = Just roundId
+                      }
+                    , Effect.none
+                    )
+
+                _ ->
+                    ( data, Effect.none )
+
+        CancelTaskForm ->
+            ( { data | taskForm = TaskFormHidden }, Effect.none )
+
+        AddTaskRow ->
+            ( { data | taskForm = updateTaskFormRows (\rows -> rows ++ [ emptyTaskRow ]) data.taskForm }
+            , Effect.none
+            )
+
+        RemoveTaskRow idx ->
+            ( { data
+                | taskForm =
+                    updateTaskFormRows
+                        (\rows ->
+                            List.indexedMap Tuple.pair rows
+                                |> List.filterMap
+                                    (\( i, r ) ->
+                                        if i == idx then
+                                            Nothing
+
+                                        else
+                                            Just r
+                                    )
+                        )
+                        data.taskForm
+              }
+            , Effect.none
+            )
+
+        UpdateTaskType idx val ->
+            let
+                clearCharIfNeeded r =
+                    if val == "opening" || val == "closing" then
+                        { r | taskType = val, character = "" }
+
+                    else
+                        { r | taskType = val }
+            in
+            ( { data | taskForm = updateTaskRow idx clearCharIfNeeded data.taskForm }
+            , Effect.none
+            )
+
+        UpdateTaskCharacter idx val ->
+            ( { data | taskForm = updateTaskRow idx (\r -> { r | character = val }) data.taskForm }
+            , Effect.none
+            )
+
+        SaveTasks ->
+            handleSaveTasks data
 
 
 handleSave : Bool -> TeamData -> ( TeamData, Effect Msg )
@@ -605,6 +724,53 @@ handleTeamPbMsg value data =
                 Err _ ->
                     handleSaveError "Failed to save submission." data
 
+        Just "save-task" ->
+            case Pb.decodeRecord Api.attorneyTaskDecoder value of
+                Ok task ->
+                    let
+                        updatedTasks =
+                            if List.any (\t -> t.id == task.id) data.tasks then
+                                List.map
+                                    (\t ->
+                                        if t.id == task.id then
+                                            task
+
+                                        else
+                                            t
+                                    )
+                                    data.tasks
+
+                            else
+                                data.tasks ++ [ task ]
+
+                        newPending =
+                            data.taskSavesPending - 1
+                    in
+                    checkTaskSaveComplete
+                        { data
+                            | tasks = updatedTasks
+                            , taskSavesPending = newPending
+                        }
+
+                Err _ ->
+                    handleTaskSaveError "Failed to save task." data
+
+        Just "delete-task" ->
+            case Pb.decodeDelete value of
+                Ok id ->
+                    let
+                        newPending =
+                            data.taskDeletesPending - 1
+                    in
+                    checkTaskSaveComplete
+                        { data
+                            | tasks = List.filter (\t -> t.id /= id) data.tasks
+                            , taskDeletesPending = newPending
+                        }
+
+                Err _ ->
+                    handleTaskSaveError "Failed to delete task." data
+
         _ ->
             ( data, Effect.none )
 
@@ -626,6 +792,128 @@ handleSaveError err data =
                 | form = RosterForm.FormEditing formData [ err ]
                 , savesPending = 0
                 , deletesPending = 0
+              }
+            , Effect.none
+            )
+
+        _ ->
+            ( data, Effect.none )
+
+
+handleSaveTasks : TeamData -> ( TeamData, Effect Msg )
+handleSaveTasks data =
+    case data.taskForm of
+        TaskFormEditing taskFormData _ ->
+            case validateTasks taskFormData of
+                Err errors ->
+                    ( { data | taskForm = TaskFormEditing taskFormData errors }, Effect.none )
+
+                Ok validRows ->
+                    let
+                        entryId =
+                            taskFormData.rosterEntryId
+
+                        existingTasks =
+                            tasksForEntry entryId data.tasks
+
+                        existingIds =
+                            List.filterMap .id validRows
+
+                        toDelete =
+                            List.filter
+                                (\t -> not (List.member t.id existingIds))
+                                existingTasks
+
+                        toCreate =
+                            List.filter (\r -> r.id == Nothing) validRows
+
+                        toUpdate =
+                            List.filter (\r -> r.id /= Nothing) validRows
+
+                        encodeRow idx row =
+                            Api.encodeAttorneyTask
+                                { rosterEntry = entryId
+                                , taskType = parseTaskType row.taskType
+                                , character =
+                                    if row.character == "" then
+                                        Nothing
+
+                                    else
+                                        Just row.character
+                                , sortOrder = idx
+                                }
+
+                        createEffects =
+                            List.indexedMap
+                                (\idx row ->
+                                    Pb.publicCreate
+                                        { collection = "attorney_tasks"
+                                        , tag = "save-task"
+                                        , body = encodeRow idx row
+                                        }
+                                )
+                                toCreate
+
+                        updateEffects =
+                            List.indexedMap
+                                (\idx row ->
+                                    row.id
+                                        |> Maybe.map
+                                            (\id ->
+                                                Pb.publicUpdate
+                                                    { collection = "attorney_tasks"
+                                                    , id = id
+                                                    , tag = "save-task"
+                                                    , body = encodeRow idx row
+                                                    }
+                                            )
+                                )
+                                toUpdate
+                                |> List.filterMap identity
+
+                        deleteEffects =
+                            List.map
+                                (\task ->
+                                    Pb.publicDelete
+                                        { collection = "attorney_tasks"
+                                        , id = task.id
+                                        , tag = "delete-task"
+                                        }
+                                )
+                                toDelete
+
+                        allEffects =
+                            createEffects ++ updateEffects ++ deleteEffects
+                    in
+                    ( { data
+                        | taskForm = TaskFormSaving taskFormData
+                        , taskSavesPending = List.length createEffects + List.length updateEffects
+                        , taskDeletesPending = List.length deleteEffects
+                      }
+                    , Effect.batch allEffects
+                    )
+
+        _ ->
+            ( data, Effect.none )
+
+
+checkTaskSaveComplete : TeamData -> ( TeamData, Effect Msg )
+checkTaskSaveComplete data =
+    if data.taskSavesPending <= 0 && data.taskDeletesPending <= 0 then
+        ( { data | taskForm = TaskFormHidden, taskSavesPending = 0, taskDeletesPending = 0 }, Effect.none )
+
+    else
+        ( data, Effect.none )
+
+
+handleTaskSaveError : String -> TeamData -> ( TeamData, Effect Msg )
+handleTaskSaveError err data =
+    case data.taskForm of
+        TaskFormSaving taskFormData ->
+            ( { data
+                | taskForm = TaskFormEditing taskFormData [ err ]
+                , taskSavesPending = 0
+                , taskDeletesPending = 0
               }
             , Effect.none
             )
@@ -764,6 +1052,145 @@ taskTypeName tt =
             "Closing"
 
 
+emptyTaskRow : TaskFormRow
+emptyTaskRow =
+    { id = Nothing
+    , taskType = ""
+    , character = ""
+    }
+
+
+taskToFormRow : Api.AttorneyTask -> TaskFormRow
+taskToFormRow task =
+    { id = Just task.id
+    , taskType = taskTypeToString task.taskType
+    , character = Maybe.withDefault "" task.character
+    }
+
+
+taskTypeToString : Api.TaskType -> String
+taskTypeToString tt =
+    case tt of
+        Api.OpeningTask ->
+            "opening"
+
+        Api.DirectTask ->
+            "direct"
+
+        Api.CrossTask ->
+            "cross"
+
+        Api.ClosingTask ->
+            "closing"
+
+
+parseTaskType : String -> Api.TaskType
+parseTaskType s =
+    case s of
+        "direct" ->
+            Api.DirectTask
+
+        "cross" ->
+            Api.CrossTask
+
+        "closing" ->
+            Api.ClosingTask
+
+        _ ->
+            Api.OpeningTask
+
+
+updateTaskFormRows : (List TaskFormRow -> List TaskFormRow) -> TaskFormState -> TaskFormState
+updateTaskFormRows transform state =
+    case state of
+        TaskFormEditing taskFormData _ ->
+            TaskFormEditing { taskFormData | rows = transform taskFormData.rows } []
+
+        _ ->
+            state
+
+
+updateTaskRow : Int -> (TaskFormRow -> TaskFormRow) -> TaskFormState -> TaskFormState
+updateTaskRow idx transform state =
+    updateTaskFormRows
+        (List.indexedMap
+            (\i r ->
+                if i == idx then
+                    transform r
+
+                else
+                    r
+            )
+        )
+        state
+
+
+validateTasks : TaskFormData -> Result (List String) (List TaskFormRow)
+validateTasks taskFormData =
+    let
+        nonEmptyRows =
+            List.filter (\r -> r.taskType /= "") taskFormData.rows
+
+        rowErrors =
+            nonEmptyRows
+                |> List.indexedMap
+                    (\i r ->
+                        []
+                            |> addTaskErrorIf (r.taskType == "")
+                                ("Row " ++ String.fromInt (i + 1) ++ ": task type is required.")
+                            |> addTaskErrorIf
+                                ((r.taskType == "direct" || r.taskType == "cross") && r.character == "")
+                                ("Row " ++ String.fromInt (i + 1) ++ ": character is required for direct/cross.")
+                    )
+                |> List.concat
+
+        duplicateErrors =
+            let
+                keys =
+                    List.map (\r -> ( r.taskType, r.character )) nonEmptyRows
+
+                hasDups =
+                    List.length keys /= List.length (uniquePairs keys)
+            in
+            if hasDups then
+                [ "Duplicate tasks are not allowed." ]
+
+            else
+                []
+    in
+    if List.isEmpty nonEmptyRows then
+        Err [ "Add at least one task." ]
+
+    else if List.isEmpty rowErrors && List.isEmpty duplicateErrors then
+        Ok nonEmptyRows
+
+    else
+        Err (rowErrors ++ duplicateErrors)
+
+
+addTaskErrorIf : Bool -> String -> List String -> List String
+addTaskErrorIf condition err errors =
+    if condition then
+        errors ++ [ err ]
+
+    else
+        errors
+
+
+uniquePairs : List ( String, String ) -> List ( String, String )
+uniquePairs list =
+    List.foldl
+        (\item acc ->
+            if List.member item acc then
+                acc
+
+            else
+                acc ++ [ item ]
+        )
+        []
+        list
+
+
 
 -- SUBSCRIPTIONS
 
@@ -899,6 +1326,7 @@ viewRosterReadOnly : TeamData -> List Api.RosterEntry -> Api.RosterSide -> Maybe
 viewRosterReadOnly data entries side maybeSub roundId =
     div []
         [ viewRosterEntries data entries
+        , viewTaskFormSection data
         , if not (isSubmitted maybeSub) then
             div [ Attr.class "mt-4" ]
                 [ button
@@ -973,18 +1401,46 @@ viewEntryRow data entry =
     let
         entryTasks =
             tasksForEntry entry.id data.tasks
+
+        isTrialAttorney =
+            entry.role == Just Api.TrialAttorneyRole
+
+        isTaskFormOpenForThisEntry =
+            case data.taskForm of
+                TaskFormEditing taskFormData _ ->
+                    taskFormData.rosterEntryId == entry.id
+
+                TaskFormSaving taskFormData ->
+                    taskFormData.rosterEntryId == entry.id
+
+                TaskFormHidden ->
+                    False
+
+        isAnyFormOpen =
+            data.form /= RosterForm.FormHidden || data.taskForm /= TaskFormHidden
     in
     tr []
         [ td [] [ text (studentName data.students entry.student) ]
         , td [] [ text (RosterForm.roleName entry.role) ]
         , td [] [ text (characterName data.caseCharacters entry.character) ]
         , td []
-            [ if List.isEmpty entryTasks then
-                text ""
+            [ div [ Attr.class "flex flex-wrap items-center gap-1" ]
+                (List.map viewTaskBadge entryTasks
+                    ++ (if isTrialAttorney && not isAnyFormOpen then
+                            [ button
+                                [ Attr.class "btn btn-ghost btn-xs"
+                                , Events.onClick (EditTasks entry.id entry.round entry.side)
+                                ]
+                                [ text "Edit Tasks" ]
+                            ]
 
-              else
-                div [ Attr.class "flex flex-wrap gap-1" ]
-                    (List.map viewTaskBadge entryTasks)
+                        else if isTrialAttorney && isTaskFormOpenForThisEntry then
+                            [ span [ Attr.class "text-sm text-base-content/50" ] [ text "editing..." ] ]
+
+                        else
+                            []
+                       )
+                )
             ]
         ]
 
@@ -993,6 +1449,165 @@ viewTaskBadge : Api.AttorneyTask -> Html Msg
 viewTaskBadge task =
     span [ Attr.class "badge badge-ghost badge-sm" ]
         [ text (taskTypeName task.taskType) ]
+
+
+viewTaskFormSection : TeamData -> Html Msg
+viewTaskFormSection data =
+    case data.taskForm of
+        TaskFormHidden ->
+            text ""
+
+        TaskFormEditing taskFormData errors ->
+            viewTaskFormContent data taskFormData errors False
+
+        TaskFormSaving taskFormData ->
+            viewTaskFormContent data taskFormData [] True
+
+
+viewTaskFormContent : TeamData -> TaskFormData -> List String -> Bool -> Html Msg
+viewTaskFormContent data taskFormData errors saving =
+    let
+        attorneyName =
+            data.entries
+                |> List.filter (\e -> e.id == taskFormData.rosterEntryId)
+                |> List.head
+                |> Maybe.map (\e -> studentName data.students e.student)
+                |> Maybe.withDefault "Trial Attorney"
+
+        ownSideChars =
+            data.caseCharacters
+                |> List.filter (\c -> c.side == taskFormData.side)
+
+        opposingSide =
+            case taskFormData.side of
+                Api.Prosecution ->
+                    Api.Defense
+
+                Api.Defense ->
+                    Api.Prosecution
+
+        opposingChars =
+            data.caseCharacters
+                |> List.filter (\c -> c.side == opposingSide)
+    in
+    div [ Attr.class "mt-4 p-4 bg-base-200 rounded-lg" ]
+        [ h4 [ Attr.class "font-semibold mb-2" ]
+            [ text ("Task Assignments — " ++ attorneyName) ]
+        , UI.errorList errors
+        , table [ Attr.class "table table-sm w-full" ]
+            [ thead []
+                [ tr []
+                    [ th [] [ text "Task" ]
+                    , th [] [ text "Character" ]
+                    , th [] []
+                    ]
+                ]
+            , tbody []
+                (List.indexedMap
+                    (viewTaskFormRow ownSideChars opposingChars saving)
+                    taskFormData.rows
+                )
+            ]
+        , div [ Attr.class "flex gap-2 mt-3" ]
+            [ button
+                [ Attr.class "btn btn-ghost btn-sm"
+                , Events.onClick AddTaskRow
+                , Attr.disabled saving
+                ]
+                [ text "+ Add Task" ]
+            ]
+        , div [ Attr.class "flex gap-2 mt-3" ]
+            [ button
+                [ Attr.class "btn btn-primary btn-sm"
+                , Events.onClick SaveTasks
+                , Attr.disabled saving
+                ]
+                (if saving then
+                    [ span [ Attr.class "loading loading-spinner loading-sm" ] []
+                    , text "Saving..."
+                    ]
+
+                 else
+                    [ text "Save Tasks" ]
+                )
+            , button
+                [ Attr.class "btn btn-ghost btn-sm"
+                , Events.onClick CancelTaskForm
+                , Attr.disabled saving
+                ]
+                [ text "Cancel" ]
+            ]
+        ]
+
+
+viewTaskFormRow :
+    List Api.CaseCharacter
+    -> List Api.CaseCharacter
+    -> Bool
+    -> Int
+    -> TaskFormRow
+    -> Html Msg
+viewTaskFormRow ownSideChars opposingChars saving idx row =
+    let
+        taskTypeOptions =
+            [ { value = "", label = "Select task..." }
+            , { value = "opening", label = "Opening Statement" }
+            , { value = "direct", label = "Direct Examination" }
+            , { value = "cross", label = "Cross Examination" }
+            , { value = "closing", label = "Closing Argument" }
+            ]
+
+        characterOptions =
+            case row.taskType of
+                "direct" ->
+                    { value = "", label = "Select witness..." }
+                        :: List.map (\c -> { value = c.id, label = c.characterName }) ownSideChars
+
+                "cross" ->
+                    { value = "", label = "Select witness..." }
+                        :: List.map (\c -> { value = c.id, label = c.characterName }) opposingChars
+
+                _ ->
+                    []
+    in
+    tr []
+        [ td []
+            [ select
+                [ Attr.class "select select-sm select-bordered"
+                , Events.onInput (UpdateTaskType idx)
+                , Attr.value row.taskType
+                , Attr.disabled saving
+                ]
+                (List.map
+                    (\o -> option [ Attr.value o.value, Attr.selected (o.value == row.taskType) ] [ text o.label ])
+                    taskTypeOptions
+                )
+            ]
+        , td []
+            [ if row.taskType == "direct" || row.taskType == "cross" then
+                select
+                    [ Attr.class "select select-sm select-bordered"
+                    , Events.onInput (UpdateTaskCharacter idx)
+                    , Attr.value row.character
+                    , Attr.disabled saving
+                    ]
+                    (List.map
+                        (\o -> option [ Attr.value o.value, Attr.selected (o.value == row.character) ] [ text o.label ])
+                        characterOptions
+                    )
+
+              else
+                text "—"
+            ]
+        , td []
+            [ button
+                [ Attr.class "btn btn-ghost btn-sm btn-square text-error"
+                , Events.onClick (RemoveTaskRow idx)
+                , Attr.disabled saving
+                ]
+                [ text "×" ]
+            ]
+        ]
 
 
 
