@@ -363,8 +363,8 @@ type alias AttorneyTask =
 
 
 type ScorerRole
-    = ScorerRole
-    | PresiderRole
+    = Scorer
+    | Presider
 
 
 type TokenStatus
@@ -441,7 +441,7 @@ type alias PresiderBallotRecord =
 type alias BallotCorrection =
     { id : String
     , ballot : String
-    , originalScore : String
+    , originalScoreId : String
     , correctedPoints : Int
     , reason : Maybe String
     , correctedAt : String
@@ -932,10 +932,10 @@ scorerRoleDecoder =
             (\s ->
                 case s of
                     "scorer" ->
-                        Decode.succeed ScorerRole
+                        Decode.succeed Scorer
 
                     "presider" ->
-                        Decode.succeed PresiderRole
+                        Decode.succeed Presider
 
                     _ ->
                         Decode.fail ("Unknown scorer role: " ++ s)
@@ -973,7 +973,7 @@ scorerTokenDecoder =
                 (Decode.nullable Decode.string)
                 Nothing
             )
-        |> andMap (fieldWithDefault "scorer_role" scorerRoleDecoder ScorerRole)
+        |> andMap (fieldWithDefault "scorer_role" scorerRoleDecoder Scorer)
         |> andMap (fieldWithDefault "status" tokenStatusDecoder TokenActive)
         |> andMap (Decode.field "created" Decode.string)
         |> andMap (Decode.field "updated" Decode.string)
@@ -1051,15 +1051,15 @@ ballotScoreDecoder =
     Decode.succeed BallotScore
         |> andMap (Decode.field "id" Decode.string)
         |> andMap (Decode.field "ballot" Decode.string)
-        |> andMap (fieldWithDefault "presentation" presentationTypeDecoder PretrialPresentation)
-        |> andMap (fieldWithDefault "side" rosterSideDecoder Prosecution)
+        |> andMap (Decode.field "presentation" presentationTypeDecoder)
+        |> andMap (Decode.field "side" rosterSideDecoder)
         |> andMap (fieldWithDefault "student_name" Decode.string "")
         |> andMap
             (fieldWithDefault "roster_entry"
                 (Decode.nullable Decode.string)
                 Nothing
             )
-        |> andMap (fieldWithDefault "points" Decode.int 5)
+        |> andMap (Decode.field "points" Decode.int)
         |> andMap (fieldWithDefault "sort_order" Decode.int 0)
         |> andMap (Decode.field "created" Decode.string)
         |> andMap (Decode.field "updated" Decode.string)
@@ -1083,7 +1083,7 @@ ballotCorrectionDecoder =
         |> andMap (Decode.field "id" Decode.string)
         |> andMap (Decode.field "ballot" Decode.string)
         |> andMap (Decode.field "original_score" Decode.string)
-        |> andMap (fieldWithDefault "corrected_points" Decode.int 5)
+        |> andMap (Decode.field "corrected_points" Decode.int)
         |> andMap
             (fieldWithDefault "reason"
                 (Decode.nullable Decode.string)
@@ -1518,10 +1518,10 @@ encodeAttorneyTask t =
 encodeScorerRole : ScorerRole -> Encode.Value
 encodeScorerRole r =
     case r of
-        ScorerRole ->
+        Scorer ->
             Encode.string "scorer"
 
-        PresiderRole ->
+        Presider ->
             Encode.string "presider"
 
 
