@@ -6,6 +6,27 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.5.9 — Pairings FormState + BulkState refactor (#126)
+
+### Changed
+
+- `Pages/Admin/Pairings.elm`: replaced 6 interacting primitive state fields
+  (`formSaving`, `editingId`, `formErrors`, `showBulkPreview`, `bulkSaving`,
+  `bulkText`/`bulkParsed`/`bulkErrors`) with `FormState` and `BulkState` sum
+  types, mirroring the pattern in `Pages/Admin/Schools.elm`
+
+### Fixed
+
+- Bulk-save and delete failures no longer leak into `formErrors`; bulk errors
+  route to `BulkFailed`, delete errors are discarded silently
+
+### Tests
+
+- 11 Playwright e2e tests added for the Admin Pairings page (dropdown form,
+  bulk text, edit/delete, validation)
+- Shared `adminLogin` helper extracted to `tests/e2e/helpers/auth.ts`
+- PB credentials cached to `.pocketbase/` to avoid repeated 1Password lookups
+
 ## v0.5.8 — Elm Correctness (#118)
 
 ### Fixed
