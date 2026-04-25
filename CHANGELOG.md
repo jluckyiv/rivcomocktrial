@@ -6,6 +6,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.5.0 — Attorney Tasks + Type Cleanup + Withdrawal Requests
+
 ### Added (PR #103)
 - Team withdrawal requests: coaches submit a withdrawal request with
   an optional reason via "Request Withdrawal" on `/team/manage`;
