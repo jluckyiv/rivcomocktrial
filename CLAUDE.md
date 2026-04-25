@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # rivcomocktrial
 
 Admin-side competition management tool + public-facing site for Riverside County Mock Trial.
@@ -33,6 +37,9 @@ Admin-side competition management tool + public-facing site for Riverside County
 - `npm run pb:kill` — kill watch process and stop PocketBase
 - `npm run fe:dev` — start elm-land dev server
 - `npm run fe:build` — build frontend for production
+- `npm run fe:test` — run Elm unit tests (elm-test)
+- `npm run fe:review` — run elm-review linter
+- `npm run e2e` — run Playwright end-to-end tests (requires local PocketBase running, uses 1Password for credentials)
 
 ## Development Workflow
 
@@ -52,7 +59,62 @@ This is mandatory — do not write view code without consulting it first.
 
 ## Testing
 
-- Integration tests use the real local PocketBase instance; dev data is local only
+- Unit tests: `npm run fe:test` — targets `frontend/tests/`; run a single file with `cd frontend && npx elm-test tests/MyTest.elm`
+- E2E tests: `npm run e2e` — Playwright, targets port 8090 (production build). Dev server (port 1234) does not work with Playwright.
+- No mocks. Integration tests hit real local PocketBase.
+
+## Frontend Architecture
+
+### Port-based PocketBase client (ADR-010, ADR-011)
+
+All PocketBase operations go through Elm ports to JS, never direct HTTP from Elm.
+
+- `frontend/src/Pb.elm` — port helpers (`adminList`, `adminCreate`, `publicList`, etc.)
+- `frontend/src/Api.elm` — types, decoders, encoders only (no HTTP, no ports)
+- `frontend/src/Effect.elm` — `portSend`, `incoming`, `saveCoachToken`
+- `frontend/src/interop.js` — two SDK instances: `pbAdmin` (superuser) and `pb` (coach/public)
+
+Auth tokens are in-memory only (no SDK auto-persistence); manually saved to `localStorage` under `adminToken`, `coachToken`, `coachUser`. Both are restored in `flags` on page load.
+
+### Page module pattern
+
+Every page follows this structure:
+
+```elm
+page : Auth.User -> Shared.Model -> Route () -> Page Model Msg
+
+-- Model has RemoteData for fetched collections, form state as a sum type
+-- Msg has PbMsg Json.Decode.Value as the single port response handler
+-- update routes on Pb.responseTag value, then decodes with Pb.decodeList/decodeRecord
+-- subscriptions = Pb.subscribe PbMsg
+```
+
+`Pages/Admin/Tournaments.elm` is the canonical reference implementation.
+
+### UI helpers
+
+`frontend/src/UI.elm` is the sole view helper module. Use its helpers (`titleBar`, `dataTable`, `primaryButton`, `textField`, etc.) instead of writing raw DaisyUI/Tailwind class strings in pages. If a helper you need is missing, add it to `UI.elm` first.
+
+### Layouts
+
+- `Layouts.Admin` — admin pages (auth-gated to superuser)
+- `Layouts.Team` — coach pages (auth-gated to approved coach)
+- `Layouts.Public` — unauthenticated pages
+
+### Domain design
+
+Domain modules use opaque types with smart constructors returning `Result (List Error.Error) a`. Prefer sum types over booleans for state. See `docs/decisions.md` for ADRs and `docs/domain-audit.md` for the full inventory.
+
+## Backend Architecture
+
+PocketBase hooks in `backend/pb_hooks/` run on record lifecycle events:
+
+- `auth_guard.pb.js` — blocks coach login until status=approved
+- `registration.pb.js` — handles coach registration side effects
+- `eligibility.pb.js` — eligibility request logic
+- `withdrawal.pb.js` — team withdrawal logic
+
+Migrations in `backend/pb_migrations/` use JS format. Name new migrations with a Unix timestamp prefix (check the latest file for the current sequence).
 
 ## Key URLs (local dev)
 

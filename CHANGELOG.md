@@ -6,6 +6,27 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added (PR #110)
+
+- 5 PocketBase migrations for ballot collections:
+  `scorer_tokens` (token-based auth for scorer access),
+  `ballot_submissions`, `ballot_scores`,
+  `presider_ballots`, `ballot_corrections`
+- `ballot_guard.pb.js` hook: validates scorer tokens on
+  ballot_submissions / presider_ballots create (active,
+  correct trial, correct role), marks token used after
+  commit
+- `Api.elm`: `ScorerToken`, `BallotSubmission`,
+  `BallotScore`, `PresiderBallotRecord`,
+  `BallotCorrection` types with decoders and encoders
+- `BallotAssembly.elm`: converts flat API records ↔
+  domain types (`SubmittedBallot`, `VerifiedBallot`,
+  `PresiderBallot`); handles student name parsing for
+  round-tripping opaque domain types
+- 27 new `BallotAssemblyTest` tests (677 total)
+- `CLAUDE.md` updated with test commands, frontend
+  architecture section, and backend architecture section
+
 ## v0.5.2 — Phase-Aware Admin Dashboard
 
 ### Added (PR #107)

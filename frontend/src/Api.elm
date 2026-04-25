@@ -1,6 +1,10 @@
 module Api exposing
     ( AttorneyCoach
     , AttorneyTask
+    , BallotCorrection
+    , BallotScore
+    , BallotStatus(..)
+    , BallotSubmission
     , CaseCharacter
     , ChangeRequest
     , ChangeType(..)
@@ -11,6 +15,8 @@ module Api exposing
     , EligibilityEntry
     , EligibilityStatus
     , EntryType(..)
+    , PresiderBallotRecord
+    , PresentationType(..)
     , RequestStatus(..)
     , RosterEntry
     , RosterRole(..)
@@ -19,10 +25,13 @@ module Api exposing
     , Round
     , RoundType(..)
     , School
+    , ScorerRole(..)
+    , ScorerToken
     , Student
     , TaskType(..)
     , Team
     , TeamStatus(..)
+    , TokenStatus(..)
     , Tournament
     , TournamentStatus(..)
     , Trial
@@ -30,6 +39,9 @@ module Api exposing
     , withdrawalRequestDecoder
     , attorneyCoachDecoder
     , attorneyTaskDecoder
+    , ballotCorrectionDecoder
+    , ballotScoreDecoder
+    , ballotSubmissionDecoder
     , caseCharacterDecoder
     , changeRequestDecoder
     , coCoachDecoder
@@ -38,6 +50,9 @@ module Api exposing
     , eligibilityEntryDecoder
     , encodeAttorneyCoach
     , encodeAttorneyTask
+    , encodeBallotCorrection
+    , encodeBallotScore
+    , encodeBallotSubmission
     , encodeCaseCharacter
     , encodeChangeRequest
     , encodeCoCoach
@@ -45,10 +60,14 @@ module Api exposing
     , encodeCoachUserStatus
     , encodeCourtroom
     , encodeEligibilityEntry
+    , encodePresiderBallotRecord
+    , encodePresentationType
     , encodeRequestStatus
     , encodeRosterEntry
     , encodeRosterSubmission
     , encodeRound
+    , encodeScorerRole
+    , encodeScorerToken
     , encodeSchool
     , encodeStudent
     , encodeTeam
@@ -56,12 +75,14 @@ module Api exposing
     , encodeTournament
     , encodeTrial
     , encodeWithdrawalRequest
+    , presiderBallotRecordDecoder
     , rosterEntryDecoder
     , rosterSideToString
     , rosterSubmissionDecoder
     , roundDecoder
     , roundTypeToString
     , schoolDecoder
+    , scorerTokenDecoder
     , studentDecoder
     , teamDecoder
     , tournamentDecoder
@@ -336,6 +357,94 @@ type alias AttorneyTask =
     , taskType : TaskType
     , character : Maybe String
     , sortOrder : Int
+    , created : String
+    , updated : String
+    }
+
+
+type ScorerRole
+    = ScorerRole
+    | PresiderRole
+
+
+type TokenStatus
+    = TokenActive
+    | TokenUsed
+    | TokenRevoked
+
+
+type alias ScorerToken =
+    { id : String
+    , trial : String
+    , token : String
+    , scorerName : Maybe String
+    , scorerRole : ScorerRole
+    , status : TokenStatus
+    , created : String
+    , updated : String
+    }
+
+
+type BallotStatus
+    = BallotSubmitted
+    | BallotVerified
+    | BallotCorrected
+
+
+type alias BallotSubmission =
+    { id : String
+    , scorerToken : String
+    , trial : String
+    , status : BallotStatus
+    , submittedAt : String
+    , created : String
+    , updated : String
+    }
+
+
+type PresentationType
+    = PretrialPresentation
+    | OpeningPresentation
+    | DirectExaminationPresentation
+    | CrossExaminationPresentation
+    | ClosingPresentation
+    | WitnessExaminationPresentation
+    | ClerkPerformancePresentation
+    | BailiffPerformancePresentation
+
+
+type alias BallotScore =
+    { id : String
+    , ballot : String
+    , presentation : PresentationType
+    , side : RosterSide
+    , studentName : String
+    , rosterEntry : Maybe String
+    , points : Int
+    , sortOrder : Int
+    , created : String
+    , updated : String
+    }
+
+
+type alias PresiderBallotRecord =
+    { id : String
+    , scorerToken : String
+    , trial : String
+    , winnerSide : RosterSide
+    , submittedAt : String
+    , created : String
+    , updated : String
+    }
+
+
+type alias BallotCorrection =
+    { id : String
+    , ballot : String
+    , originalScore : String
+    , correctedPoints : Int
+    , reason : Maybe String
+    , correctedAt : String
     , created : String
     , updated : String
     }
@@ -816,6 +925,175 @@ attorneyTaskDecoder =
         |> andMap (Decode.field "updated" Decode.string)
 
 
+scorerRoleDecoder : Decoder ScorerRole
+scorerRoleDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "scorer" ->
+                        Decode.succeed ScorerRole
+
+                    "presider" ->
+                        Decode.succeed PresiderRole
+
+                    _ ->
+                        Decode.fail ("Unknown scorer role: " ++ s)
+            )
+
+
+tokenStatusDecoder : Decoder TokenStatus
+tokenStatusDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "active" ->
+                        Decode.succeed TokenActive
+
+                    "used" ->
+                        Decode.succeed TokenUsed
+
+                    "revoked" ->
+                        Decode.succeed TokenRevoked
+
+                    _ ->
+                        Decode.fail ("Unknown token status: " ++ s)
+            )
+
+
+scorerTokenDecoder : Decoder ScorerToken
+scorerTokenDecoder =
+    Decode.succeed ScorerToken
+        |> andMap (Decode.field "id" Decode.string)
+        |> andMap (Decode.field "trial" Decode.string)
+        |> andMap (Decode.field "token" Decode.string)
+        |> andMap
+            (fieldWithDefault "scorer_name"
+                (Decode.nullable Decode.string)
+                Nothing
+            )
+        |> andMap (fieldWithDefault "scorer_role" scorerRoleDecoder ScorerRole)
+        |> andMap (fieldWithDefault "status" tokenStatusDecoder TokenActive)
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
+
+
+ballotStatusDecoder : Decoder BallotStatus
+ballotStatusDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "submitted" ->
+                        Decode.succeed BallotSubmitted
+
+                    "verified" ->
+                        Decode.succeed BallotVerified
+
+                    "corrected" ->
+                        Decode.succeed BallotCorrected
+
+                    _ ->
+                        Decode.fail ("Unknown ballot status: " ++ s)
+            )
+
+
+ballotSubmissionDecoder : Decoder BallotSubmission
+ballotSubmissionDecoder =
+    Decode.succeed BallotSubmission
+        |> andMap (Decode.field "id" Decode.string)
+        |> andMap (Decode.field "scorer_token" Decode.string)
+        |> andMap (Decode.field "trial" Decode.string)
+        |> andMap (fieldWithDefault "status" ballotStatusDecoder BallotSubmitted)
+        |> andMap (fieldWithDefault "submitted_at" Decode.string "")
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
+
+
+presentationTypeDecoder : Decoder PresentationType
+presentationTypeDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "pretrial" ->
+                        Decode.succeed PretrialPresentation
+
+                    "opening" ->
+                        Decode.succeed OpeningPresentation
+
+                    "direct_examination" ->
+                        Decode.succeed DirectExaminationPresentation
+
+                    "cross_examination" ->
+                        Decode.succeed CrossExaminationPresentation
+
+                    "closing" ->
+                        Decode.succeed ClosingPresentation
+
+                    "witness_examination" ->
+                        Decode.succeed WitnessExaminationPresentation
+
+                    "clerk_performance" ->
+                        Decode.succeed ClerkPerformancePresentation
+
+                    "bailiff_performance" ->
+                        Decode.succeed BailiffPerformancePresentation
+
+                    _ ->
+                        Decode.fail ("Unknown presentation type: " ++ s)
+            )
+
+
+ballotScoreDecoder : Decoder BallotScore
+ballotScoreDecoder =
+    Decode.succeed BallotScore
+        |> andMap (Decode.field "id" Decode.string)
+        |> andMap (Decode.field "ballot" Decode.string)
+        |> andMap (fieldWithDefault "presentation" presentationTypeDecoder PretrialPresentation)
+        |> andMap (fieldWithDefault "side" rosterSideDecoder Prosecution)
+        |> andMap (fieldWithDefault "student_name" Decode.string "")
+        |> andMap
+            (fieldWithDefault "roster_entry"
+                (Decode.nullable Decode.string)
+                Nothing
+            )
+        |> andMap (fieldWithDefault "points" Decode.int 5)
+        |> andMap (fieldWithDefault "sort_order" Decode.int 0)
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
+
+
+presiderBallotRecordDecoder : Decoder PresiderBallotRecord
+presiderBallotRecordDecoder =
+    Decode.succeed PresiderBallotRecord
+        |> andMap (Decode.field "id" Decode.string)
+        |> andMap (Decode.field "scorer_token" Decode.string)
+        |> andMap (Decode.field "trial" Decode.string)
+        |> andMap (fieldWithDefault "winner_side" rosterSideDecoder Prosecution)
+        |> andMap (fieldWithDefault "submitted_at" Decode.string "")
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
+
+
+ballotCorrectionDecoder : Decoder BallotCorrection
+ballotCorrectionDecoder =
+    Decode.succeed BallotCorrection
+        |> andMap (Decode.field "id" Decode.string)
+        |> andMap (Decode.field "ballot" Decode.string)
+        |> andMap (Decode.field "original_score" Decode.string)
+        |> andMap (fieldWithDefault "corrected_points" Decode.int 5)
+        |> andMap
+            (fieldWithDefault "reason"
+                (Decode.nullable Decode.string)
+                Nothing
+            )
+        |> andMap (fieldWithDefault "corrected_at" Decode.string "")
+        |> andMap (Decode.field "created" Decode.string)
+        |> andMap (Decode.field "updated" Decode.string)
+
+
 
 -- ENCODERS
 
@@ -1234,6 +1512,162 @@ encodeAttorneyTask t =
                 |> Maybe.withDefault Encode.null
           )
         , ( "sort_order", Encode.int t.sortOrder )
+        ]
+
+
+encodeScorerRole : ScorerRole -> Encode.Value
+encodeScorerRole r =
+    case r of
+        ScorerRole ->
+            Encode.string "scorer"
+
+        PresiderRole ->
+            Encode.string "presider"
+
+
+encodeTokenStatus : TokenStatus -> Encode.Value
+encodeTokenStatus s =
+    case s of
+        TokenActive ->
+            Encode.string "active"
+
+        TokenUsed ->
+            Encode.string "used"
+
+        TokenRevoked ->
+            Encode.string "revoked"
+
+
+encodeScorerToken :
+    { trial : String
+    , token : String
+    , scorerRole : ScorerRole
+    }
+    -> Encode.Value
+encodeScorerToken t =
+    Encode.object
+        [ ( "trial", Encode.string t.trial )
+        , ( "token", Encode.string t.token )
+        , ( "scorer_role", encodeScorerRole t.scorerRole )
+        , ( "status", encodeTokenStatus TokenActive )
+        ]
+
+
+encodeBallotStatus : BallotStatus -> Encode.Value
+encodeBallotStatus s =
+    case s of
+        BallotSubmitted ->
+            Encode.string "submitted"
+
+        BallotVerified ->
+            Encode.string "verified"
+
+        BallotCorrected ->
+            Encode.string "corrected"
+
+
+encodeBallotSubmission :
+    { scorerToken : String
+    , trial : String
+    , submittedAt : String
+    }
+    -> Encode.Value
+encodeBallotSubmission b =
+    Encode.object
+        [ ( "scorer_token", Encode.string b.scorerToken )
+        , ( "trial", Encode.string b.trial )
+        , ( "status", encodeBallotStatus BallotSubmitted )
+        , ( "submitted_at", Encode.string b.submittedAt )
+        ]
+
+
+encodePresentationType : PresentationType -> Encode.Value
+encodePresentationType p =
+    case p of
+        PretrialPresentation ->
+            Encode.string "pretrial"
+
+        OpeningPresentation ->
+            Encode.string "opening"
+
+        DirectExaminationPresentation ->
+            Encode.string "direct_examination"
+
+        CrossExaminationPresentation ->
+            Encode.string "cross_examination"
+
+        ClosingPresentation ->
+            Encode.string "closing"
+
+        WitnessExaminationPresentation ->
+            Encode.string "witness_examination"
+
+        ClerkPerformancePresentation ->
+            Encode.string "clerk_performance"
+
+        BailiffPerformancePresentation ->
+            Encode.string "bailiff_performance"
+
+
+encodeBallotScore :
+    { ballot : String
+    , presentation : PresentationType
+    , side : RosterSide
+    , studentName : String
+    , rosterEntry : Maybe String
+    , points : Int
+    , sortOrder : Int
+    }
+    -> Encode.Value
+encodeBallotScore s =
+    Encode.object
+        [ ( "ballot", Encode.string s.ballot )
+        , ( "presentation", encodePresentationType s.presentation )
+        , ( "side", encodeRosterSide s.side )
+        , ( "student_name", Encode.string s.studentName )
+        , ( "roster_entry"
+          , Maybe.map Encode.string s.rosterEntry
+                |> Maybe.withDefault Encode.null
+          )
+        , ( "points", Encode.int s.points )
+        , ( "sort_order", Encode.int s.sortOrder )
+        ]
+
+
+encodePresiderBallotRecord :
+    { scorerToken : String
+    , trial : String
+    , winnerSide : RosterSide
+    , submittedAt : String
+    }
+    -> Encode.Value
+encodePresiderBallotRecord b =
+    Encode.object
+        [ ( "scorer_token", Encode.string b.scorerToken )
+        , ( "trial", Encode.string b.trial )
+        , ( "winner_side", encodeRosterSide b.winnerSide )
+        , ( "submitted_at", Encode.string b.submittedAt )
+        ]
+
+
+encodeBallotCorrection :
+    { ballot : String
+    , originalScore : String
+    , correctedPoints : Int
+    , reason : Maybe String
+    , correctedAt : String
+    }
+    -> Encode.Value
+encodeBallotCorrection c =
+    Encode.object
+        [ ( "ballot", Encode.string c.ballot )
+        , ( "original_score", Encode.string c.originalScore )
+        , ( "corrected_points", Encode.int c.correctedPoints )
+        , ( "reason"
+          , Maybe.map Encode.string c.reason
+                |> Maybe.withDefault Encode.null
+          )
+        , ( "corrected_at", Encode.string c.correctedAt )
         ]
 
 
