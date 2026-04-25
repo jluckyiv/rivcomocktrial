@@ -1,4 +1,4 @@
-module Pages.Admin.Trials exposing (Model, Msg, page)
+module Pages.Admin.Trials exposing (AssignmentField(..), Model, Msg, applyFieldValue, fieldValue, page)
 
 import Api exposing (Courtroom, Judge, Round, RoundStatus(..), Team, Trial)
 import Auth
