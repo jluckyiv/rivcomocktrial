@@ -5,9 +5,13 @@ on:
     branches: [main]
     paths:
       - "frontend/**"
+      - "backend/pb_hooks/**"
+      - "backend/pb_migrations/**"
   pull_request:
     paths:
       - "frontend/**"
+      - "backend/pb_hooks/**"
+      - "backend/pb_migrations/**"
 
 jobs:
   test:
@@ -57,3 +61,77 @@ jobs:
       - name: Run elm-review
         run: npx elm-review
         working-directory: frontend
+
+  domain-tdd:
+    # Backstop for the in-session TDD hook + lefthook. Verifies every
+    # top-level domain module in frontend/src/ has a sibling test file
+    # in frontend/tests/. See docs/refactor-process.md.
+    name: domain-tdd
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Every domain module has a sibling test
+        run: |
+          missing=0
+          # Framework files are not domain modules; skip them.
+          framework_re='^(Api|Pb|Effect|Shared|Auth|UI|RemoteData)\.elm$'
+          for f in $(find frontend/src -maxdepth 1 -name '*.elm' | sort); do
+            base=$(basename "$f")
+            if echo "$base" | grep -qE "$framework_re"; then
+              continue
+            fi
+            test="frontend/tests/${base%.elm}Test.elm"
+            if [ ! -f "$test" ]; then
+              echo "::error file=$f::missing paired test file: $test"
+              missing=1
+            fi
+          done
+          exit $missing
+
+  persistence-freeze:
+    # Backstop for lefthook + Claude Code deny rules. Fails the PR if a
+    # frozen path was modified without an explicit override marker in
+    # the commit message. ADR-013.
+    name: persistence-freeze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: No frozen-path edits without authorization
+        run: |
+          # Determine the diff range. PRs compare against the base branch;
+          # pushes compare against the previous commit.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.event.after }}"
+          fi
+          # Skip if base is empty (e.g. initial commit or force-push).
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "Skipping freeze check (no base ref)."
+            exit 0
+          fi
+          frozen=$(git diff --name-only "$base" "$head" \
+            | grep -E '^(backend/pb_hooks/|backend/pb_migrations/|frontend/src/Api\.elm$|frontend/src/Pb\.elm$)' \
+            || true)
+          if [ -z "$frozen" ]; then
+            echo "No frozen-path edits."
+            exit 0
+          fi
+          # Check whether any commit in the range carries the override
+          # marker. The marker is "ALLOW_FROZEN_EDIT" in the commit message
+          # body or trailer.
+          if git log --format='%B' "$base..$head" | grep -q 'ALLOW_FROZEN_EDIT'; then
+            echo "Frozen-path edits authorized by ALLOW_FROZEN_EDIT marker."
+            echo "$frozen" | sed 's/^/  /'
+            exit 0
+          fi
+          echo "::error::Frozen-path edits without authorization (ADR-013):"
+          echo "$frozen" | sed 's/^/  /'
+          echo ""
+          echo "If a thaw is justified, document it as an ADR and add"
+          echo "'ALLOW_FROZEN_EDIT' to the commit message body."
+          exit 1

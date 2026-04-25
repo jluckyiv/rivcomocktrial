@@ -60,6 +60,10 @@ workflow.
 
 - Node.js v18+
 - Docker
+- [lefthook](https://github.com/evilmartians/lefthook) (`brew install lefthook`)
+  — pre-commit hooks for the active domain refactor (see
+  `docs/refactor-process.md`). After cloning, run `lefthook install`
+  once in the repo root to activate.
 
 ### Running
 
