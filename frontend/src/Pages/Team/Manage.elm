@@ -10,6 +10,7 @@ import Json.Decode
 import Layouts
 import Page exposing (Page)
 import Pb
+import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Shared
 import Shared.Model exposing (CoachAuth(..))
@@ -57,12 +58,6 @@ type alias TeamData =
     , attorneyForm : AttorneyFormState
     , withdrawalForm : WithdrawalFormState
     }
-
-
-type RemoteData a
-    = Loading
-    | Succeeded a
-    | Failed String
 
 
 type StudentFormState
@@ -956,13 +951,8 @@ handleTeamPbMsg value data =
 
 
 mapSucceeded : (a -> a) -> RemoteData a -> RemoteData a
-mapSucceeded f rd =
-    case rd of
-        Succeeded a ->
-            Succeeded (f a)
-
-        other ->
-            other
+mapSucceeded =
+    RemoteData.map
 
 
 

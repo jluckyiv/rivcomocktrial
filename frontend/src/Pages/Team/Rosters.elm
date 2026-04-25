@@ -10,6 +10,7 @@ import Json.Decode
 import Layouts
 import Page exposing (Page)
 import Pb
+import RemoteData exposing (RemoteData(..))
 import RosterForm
 import Route exposing (Route)
 import Shared
@@ -82,12 +83,6 @@ type alias TeamData =
     , taskSavesPending : Int
     , taskDeletesPending : Int
     }
-
-
-type RemoteData a
-    = Loading
-    | Succeeded a
-    | Failed String
 
 
 emptyTeamData : Api.Team -> TeamData
