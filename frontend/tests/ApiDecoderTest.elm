@@ -74,12 +74,11 @@ roundStatusDecoderSuite =
                     |> Decode.decodeString Api.roundDecoder
                     |> Result.map .status
                     |> Expect.equal (Ok Locked)
-        , test "defaults to Upcoming when status absent" <|
+        , test "fails when status is absent" <|
             \_ ->
                 roundJsonNoStatus
                     |> Decode.decodeString Api.roundDecoder
-                    |> Result.map .status
-                    |> Expect.equal (Ok Upcoming)
+                    |> Expect.err
         , test "decodes ranking_min when present" <|
             \_ ->
                 roundJsonWithRankings "3" "5"

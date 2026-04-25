@@ -819,7 +819,7 @@ roundDecoder =
         |> andMap (Decode.field "type" roundTypeDecoder)
         |> andMap (fieldWithDefault "published" Decode.bool False)
         |> andMap (Decode.field "tournament" Decode.string)
-        |> andMap (fieldWithDefault "status" roundStatusDecoder Upcoming)
+        |> andMap (Decode.field "status" roundStatusDecoder)
         |> andMap (fieldWithDefault "ranking_min" (Decode.nullable Decode.int) Nothing)
         |> andMap (fieldWithDefault "ranking_max" (Decode.nullable Decode.int) Nothing)
         |> andMap (Decode.field "created" Decode.string)

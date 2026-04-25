@@ -36,6 +36,13 @@ migrate(
     );
 
     app.save(collection);
+
+    // Backfill existing rounds — all pre-existing rounds are upcoming.
+    const existing = app.findAllRecords("rounds");
+    for (const round of existing) {
+      round.set("status", "upcoming");
+      app.save(round);
+    }
   },
   (app) => {
     const collection = app.findCollectionByNameOrId("rounds");
