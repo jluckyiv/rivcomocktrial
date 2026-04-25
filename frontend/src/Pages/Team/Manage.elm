@@ -1073,25 +1073,18 @@ viewUnlockedEligibilityList readOnly data =
                         UI.emptyState "No students added yet."
 
                       else
-                        div [ Attr.class "overflow-x-auto mt-4" ]
-                            [ table [ Attr.class "table table-zebra w-full" ]
-                                [ thead []
-                                    [ tr []
-                                        [ th [] [ text "Name" ]
-                                        , th [] []
-                                        ]
-                                    ]
-                                , tbody []
-                                    (List.map (viewEditableEntryRow readOnly) entries)
-                                ]
-                            ]
+                        UI.dataTable
+                            { columns = [ "Name", "" ]
+                            , rows = entries
+                            , rowView = viewEditableEntryRow readOnly
+                            }
                     , if not readOnly && data.studentForm == StudentFormHidden then
-                        div [ Attr.class "mt-4" ]
-                            [ button
-                                [ Attr.class "btn btn-sm btn-outline"
-                                , Events.onClick ShowStudentForm
-                                ]
-                                [ text "+ Add Student" ]
+                        UI.actionRow
+                            [ UI.smallOutlineButton
+                                { label = "+ Add Student"
+                                , variant = ""
+                                , msg = ShowStudentForm
+                                }
                             ]
 
                       else
@@ -1112,41 +1105,25 @@ viewStudentForm formState =
                 , Attr.class "mt-4"
                 ]
                 [ UI.errorList errors
-                , div [ Attr.class "flex gap-2 items-end" ]
-                    [ label [ Attr.class "form-control flex-1" ]
-                        [ div [ Attr.class "label" ]
-                            [ span [ Attr.class "label-text" ]
-                                [ text "Student Name" ]
-                            ]
-                        , input
-                            [ Attr.class "input input-bordered w-full"
-                            , Attr.type_ "text"
-                            , Attr.value name
-                            , Attr.placeholder "Full name"
-                            , Events.onInput UpdateStudentName
-                            , Attr.autofocus True
-                            ]
-                            []
+                , UI.formField "Student Name"
+                    [ input
+                        [ Attr.class "input input-bordered w-full"
+                        , Attr.type_ "text"
+                        , Attr.value name
+                        , Attr.placeholder "Full name"
+                        , Events.onInput UpdateStudentName
+                        , Attr.autofocus True
                         ]
-                    , button
-                        [ Attr.class "btn btn-primary"
-                        , Attr.type_ "submit"
-                        ]
-                        [ text "Add" ]
-                    , button
-                        [ Attr.class "btn btn-ghost"
-                        , Attr.type_ "button"
-                        , Events.onClick CancelStudentForm
-                        ]
-                        [ text "Cancel" ]
+                        []
+                    ]
+                , UI.actionRow
+                    [ UI.primaryButton { label = "Add", loading = False }
+                    , UI.cancelButton CancelStudentForm
                     ]
                 ]
 
         StudentFormSaving _ ->
-            div [ Attr.class "mt-4 flex items-center gap-2" ]
-                [ span [ Attr.class "loading loading-spinner loading-sm" ] []
-                , text "Saving..."
-                ]
+            UI.inlineLoading "Saving..."
 
 
 viewEditableEntryRow : Bool -> Api.EligibilityEntry -> Html Msg
@@ -1158,11 +1135,7 @@ viewEditableEntryRow readOnly entry =
                 UI.empty
 
               else
-                button
-                    [ Attr.class "btn btn-sm btn-ghost"
-                    , Events.onClick (RemoveEntry entry.id)
-                    ]
-                    [ text "Remove" ]
+                UI.smallButton { label = "Remove", variant = "ghost", msg = RemoveEntry entry.id }
             ]
         ]
 
@@ -1184,7 +1157,7 @@ viewLockedEligibilityList readOnly data =
                             ++ String.fromInt (List.length entries)
                             ++ " students)"
                         )
-                    , div [ Attr.class "alert alert-info mb-4" ]
+                    , UI.alert { variant = "info" }
                         [ text
                             ("The eligibility list is locked. "
                                 ++ "To request a change, use the buttons below."
@@ -1199,25 +1172,18 @@ viewLockedEligibilityList readOnly data =
                         UI.emptyState "No students on the eligibility list."
 
                       else
-                        div [ Attr.class "overflow-x-auto mt-4" ]
-                            [ table [ Attr.class "table table-zebra w-full" ]
-                                [ thead []
-                                    [ tr []
-                                        [ th [] [ text "Name" ]
-                                        , th [] []
-                                        ]
-                                    ]
-                                , tbody []
-                                    (List.map (viewLockedEntryRow readOnly) entries)
-                                ]
-                            ]
+                        UI.dataTable
+                            { columns = [ "Name", "" ]
+                            , rows = entries
+                            , rowView = viewLockedEntryRow readOnly
+                            }
                     , if not readOnly && data.changeRequestForm == ChangeRequestFormHidden then
-                        div [ Attr.class "mt-4 flex gap-2" ]
-                            [ button
-                                [ Attr.class "btn btn-sm btn-outline"
-                                , Events.onClick ShowAddChangeRequestForm
-                                ]
-                                [ text "+ Request: Add Student" ]
+                        UI.actionRow
+                            [ UI.smallOutlineButton
+                                { label = "+ Request: Add Student"
+                                , variant = ""
+                                , msg = ShowAddChangeRequestForm
+                                }
                             ]
 
                       else
@@ -1235,12 +1201,11 @@ viewLockedEntryRow readOnly entry =
                 UI.empty
 
               else
-                button
-                    [ Attr.class "btn btn-sm btn-ghost"
-                    , Events.onClick
-                        (ShowChangeRequestForm entry.name Api.RemoveStudent)
-                    ]
-                    [ text "Request Remove" ]
+                UI.smallButton
+                    { label = "Request Remove"
+                    , variant = "ghost"
+                    , msg = ShowChangeRequestForm entry.name Api.RemoveStudent
+                    }
             ]
         ]
 
@@ -1258,26 +1223,15 @@ viewChangeRequestForm formState =
                 ]
                 [ UI.cardTitle "Request Change"
                 , UI.errorList errors
-                , div [ Attr.class "grid grid-cols-1 md:grid-cols-2 gap-4" ]
-                    [ label [ Attr.class "form-control w-full" ]
-                        [ div [ Attr.class "label" ]
-                            [ span [ Attr.class "label-text" ]
-                                [ text "Student Name" ]
-                            ]
-                        , input
-                            [ Attr.class "input input-bordered w-full"
-                            , Attr.type_ "text"
-                            , Attr.value fields.studentName
-                            , Events.onInput UpdateChangeRequestStudentName
-                            ]
-                            []
-                        ]
-                    , label [ Attr.class "form-control w-full" ]
-                        [ div [ Attr.class "label" ]
-                            [ span [ Attr.class "label-text" ]
-                                [ text "Request Type" ]
-                            ]
-                        , select
+                , UI.formColumns
+                    [ UI.textField
+                        { label = "Student Name"
+                        , value = fields.studentName
+                        , onInput = UpdateChangeRequestStudentName
+                        , required = False
+                        }
+                    , UI.formField "Request Type"
+                        [ select
                             [ Attr.class "select select-bordered w-full"
                             , Events.onInput
                                 (changeTypeFromString
@@ -1299,39 +1253,21 @@ viewChangeRequestForm formState =
                             ]
                         ]
                     ]
-                , label [ Attr.class "form-control w-full mt-4" ]
-                    [ div [ Attr.class "label" ]
-                        [ span [ Attr.class "label-text" ]
-                            [ text "Notes (optional)" ]
-                        ]
-                    , textarea
-                        [ Attr.class "textarea textarea-bordered w-full"
-                        , Attr.value fields.notes
-                        , Attr.placeholder "Reason for the request"
-                        , Events.onInput UpdateChangeRequestNotes
-                        ]
-                        []
-                    ]
-                , div [ Attr.class "mt-4 flex gap-2" ]
-                    [ button
-                        [ Attr.class "btn btn-primary"
-                        , Attr.type_ "submit"
-                        ]
-                        [ text "Submit Request" ]
-                    , button
-                        [ Attr.class "btn btn-ghost"
-                        , Attr.type_ "button"
-                        , Events.onClick CancelChangeRequestForm
-                        ]
-                        [ text "Cancel" ]
+                , UI.textareaField
+                    { label = "Notes (optional)"
+                    , value = fields.notes
+                    , onInput = UpdateChangeRequestNotes
+                    , rows = 3
+                    , placeholder = "Reason for the request"
+                    }
+                , UI.actionRow
+                    [ UI.primaryButton { label = "Submit Request", loading = False }
+                    , UI.cancelButton CancelChangeRequestForm
                     ]
                 ]
 
         ChangeRequestFormSaving _ ->
-            div [ Attr.class "mt-4 flex items-center gap-2" ]
-                [ span [ Attr.class "loading loading-spinner loading-sm" ] []
-                , text "Submitting..."
-                ]
+            UI.inlineLoading "Submitting..."
 
 
 viewChangeRequests : TeamData -> Html Msg
@@ -1350,20 +1286,11 @@ viewChangeRequests data =
             UI.card
                 [ UI.cardBody
                     [ UI.cardTitle "Change Requests"
-                    , div [ Attr.class "overflow-x-auto" ]
-                        [ table [ Attr.class "table table-zebra w-full" ]
-                            [ thead []
-                                [ tr []
-                                    [ th [] [ text "Student" ]
-                                    , th [] [ text "Type" ]
-                                    , th [] [ text "Notes" ]
-                                    , th [] [ text "Status" ]
-                                    ]
-                                ]
-                            , tbody []
-                                (List.map viewChangeRequestRow requests)
-                            ]
-                        ]
+                    , UI.dataTable
+                        { columns = [ "Student", "Type", "Notes", "Status" ]
+                        , rows = requests
+                        , rowView = viewChangeRequestRow
+                        }
                     ]
                 ]
 
@@ -1402,7 +1329,7 @@ viewChangeRequestBadge status =
 
 viewCoachesSection : Bool -> TeamData -> Html Msg
 viewCoachesSection readOnly data =
-    div [ Attr.class "grid grid-cols-1 md:grid-cols-2 gap-4 mt-4" ]
+    UI.formColumns
         [ viewCoCoachesCard readOnly data
         , viewAttorneyCoachesCard readOnly data
         ]
@@ -1429,26 +1356,18 @@ viewCoCoachesCard readOnly data =
                     UI.emptyState "No co-coaches added."
 
                 Succeeded coaches ->
-                    div [ Attr.class "overflow-x-auto mt-2" ]
-                        [ table [ Attr.class "table table-zebra w-full" ]
-                            [ thead []
-                                [ tr []
-                                    [ th [] [ text "Name" ]
-                                    , th [] [ text "Email" ]
-                                    , th [] []
-                                    ]
-                                ]
-                            , tbody []
-                                (List.map (viewCoCoachRow readOnly) coaches)
-                            ]
-                        ]
+                    UI.dataTable
+                        { columns = [ "Name", "Email", "" ]
+                        , rows = coaches
+                        , rowView = viewCoCoachRow readOnly
+                        }
             , if not readOnly && data.coCoachForm == CoCoachFormHidden then
-                div [ Attr.class "mt-4" ]
-                    [ button
-                        [ Attr.class "btn btn-sm btn-outline"
-                        , Events.onClick ShowCoCoachForm
-                        ]
-                        [ text "+ Add Co-Coach" ]
+                UI.actionRow
+                    [ UI.smallOutlineButton
+                        { label = "+ Add Co-Coach"
+                        , variant = ""
+                        , msg = ShowCoCoachForm
+                        }
                     ]
 
               else
@@ -1467,52 +1386,26 @@ viewCoCoachForm formState =
             Html.form
                 [ Events.onSubmit SaveCoCoach, Attr.class "mt-4" ]
                 [ UI.errorList errors
-                , div [ Attr.class "grid grid-cols-1 gap-2" ]
-                    [ label [ Attr.class "form-control w-full" ]
-                        [ div [ Attr.class "label" ]
-                            [ span [ Attr.class "label-text" ] [ text "Name" ] ]
-                        , input
-                            [ Attr.class "input input-bordered w-full"
-                            , Attr.type_ "text"
-                            , Attr.value fields.name
-                            , Events.onInput UpdateCoCoachName
-                            ]
-                            []
-                        ]
-                    , label [ Attr.class "form-control w-full" ]
-                        [ div [ Attr.class "label" ]
-                            [ span [ Attr.class "label-text" ]
-                                [ text "Email (optional)" ]
-                            ]
-                        , input
-                            [ Attr.class "input input-bordered w-full"
-                            , Attr.type_ "email"
-                            , Attr.value fields.email
-                            , Events.onInput UpdateCoCoachEmail
-                            ]
-                            []
-                        ]
-                    ]
-                , div [ Attr.class "mt-2 flex gap-2" ]
-                    [ button
-                        [ Attr.class "btn btn-sm btn-primary"
-                        , Attr.type_ "submit"
-                        ]
-                        [ text "Add" ]
-                    , button
-                        [ Attr.class "btn btn-sm btn-ghost"
-                        , Attr.type_ "button"
-                        , Events.onClick CancelCoCoachForm
-                        ]
-                        [ text "Cancel" ]
+                , UI.textField
+                    { label = "Name"
+                    , value = fields.name
+                    , onInput = UpdateCoCoachName
+                    , required = True
+                    }
+                , UI.textField
+                    { label = "Email (optional)"
+                    , value = fields.email
+                    , onInput = UpdateCoCoachEmail
+                    , required = False
+                    }
+                , UI.actionRow
+                    [ UI.smallPrimarySubmit "Add"
+                    , UI.smallCancelButton CancelCoCoachForm
                     ]
                 ]
 
         CoCoachFormSaving _ ->
-            div [ Attr.class "mt-4 flex items-center gap-2" ]
-                [ span [ Attr.class "loading loading-spinner loading-sm" ] []
-                , text "Saving..."
-                ]
+            UI.inlineLoading "Saving..."
 
 
 viewCoCoachRow : Bool -> Api.CoCoach -> Html Msg
@@ -1525,11 +1418,7 @@ viewCoCoachRow readOnly c =
                 UI.empty
 
               else
-                button
-                    [ Attr.class "btn btn-sm btn-ghost"
-                    , Events.onClick (RemoveCoCoach c.id)
-                    ]
-                    [ text "Remove" ]
+                UI.smallButton { label = "Remove", variant = "ghost", msg = RemoveCoCoach c.id }
             ]
         ]
 
@@ -1555,26 +1444,18 @@ viewAttorneyCoachesCard readOnly data =
                     UI.emptyState "No attorney coaches added."
 
                 Succeeded coaches ->
-                    div [ Attr.class "overflow-x-auto mt-2" ]
-                        [ table [ Attr.class "table table-zebra w-full" ]
-                            [ thead []
-                                [ tr []
-                                    [ th [] [ text "Name" ]
-                                    , th [] [ text "Contact" ]
-                                    , th [] []
-                                    ]
-                                ]
-                            , tbody []
-                                (List.map (viewAttorneyRow readOnly) coaches)
-                            ]
-                        ]
+                    UI.dataTable
+                        { columns = [ "Name", "Contact", "" ]
+                        , rows = coaches
+                        , rowView = viewAttorneyRow readOnly
+                        }
             , if not readOnly && data.attorneyForm == AttorneyFormHidden then
-                div [ Attr.class "mt-4" ]
-                    [ button
-                        [ Attr.class "btn btn-sm btn-outline"
-                        , Events.onClick ShowAttorneyForm
-                        ]
-                        [ text "+ Add Attorney Coach" ]
+                UI.actionRow
+                    [ UI.smallOutlineButton
+                        { label = "+ Add Attorney Coach"
+                        , variant = ""
+                        , msg = ShowAttorneyForm
+                        }
                     ]
 
               else
@@ -1593,53 +1474,30 @@ viewAttorneyForm formState =
             Html.form
                 [ Events.onSubmit SaveAttorney, Attr.class "mt-4" ]
                 [ UI.errorList errors
-                , div [ Attr.class "grid grid-cols-1 gap-2" ]
-                    [ label [ Attr.class "form-control w-full" ]
-                        [ div [ Attr.class "label" ]
-                            [ span [ Attr.class "label-text" ] [ text "Name" ] ]
-                        , input
-                            [ Attr.class "input input-bordered w-full"
-                            , Attr.type_ "text"
-                            , Attr.value fields.name
-                            , Events.onInput UpdateAttorneyName
-                            ]
-                            []
+                , UI.textField
+                    { label = "Name"
+                    , value = fields.name
+                    , onInput = UpdateAttorneyName
+                    , required = True
+                    }
+                , UI.formField "Contact (optional)"
+                    [ input
+                        [ Attr.class "input input-bordered w-full"
+                        , Attr.type_ "text"
+                        , Attr.value fields.contact
+                        , Attr.placeholder "Phone or email"
+                        , Events.onInput UpdateAttorneyContact
                         ]
-                    , label [ Attr.class "form-control w-full" ]
-                        [ div [ Attr.class "label" ]
-                            [ span [ Attr.class "label-text" ]
-                                [ text "Contact (optional)" ]
-                            ]
-                        , input
-                            [ Attr.class "input input-bordered w-full"
-                            , Attr.type_ "text"
-                            , Attr.value fields.contact
-                            , Attr.placeholder "Phone or email"
-                            , Events.onInput UpdateAttorneyContact
-                            ]
-                            []
-                        ]
+                        []
                     ]
-                , div [ Attr.class "mt-2 flex gap-2" ]
-                    [ button
-                        [ Attr.class "btn btn-sm btn-primary"
-                        , Attr.type_ "submit"
-                        ]
-                        [ text "Add" ]
-                    , button
-                        [ Attr.class "btn btn-sm btn-ghost"
-                        , Attr.type_ "button"
-                        , Events.onClick CancelAttorneyForm
-                        ]
-                        [ text "Cancel" ]
+                , UI.actionRow
+                    [ UI.smallPrimarySubmit "Add"
+                    , UI.smallCancelButton CancelAttorneyForm
                     ]
                 ]
 
         AttorneyFormSaving _ ->
-            div [ Attr.class "mt-4 flex items-center gap-2" ]
-                [ span [ Attr.class "loading loading-spinner loading-sm" ] []
-                , text "Saving..."
-                ]
+            UI.inlineLoading "Saving..."
 
 
 viewAttorneyRow : Bool -> Api.AttorneyCoach -> Html Msg
@@ -1652,11 +1510,7 @@ viewAttorneyRow readOnly c =
                 UI.empty
 
               else
-                button
-                    [ Attr.class "btn btn-sm btn-ghost"
-                    , Events.onClick (RemoveAttorney c.id)
-                    ]
-                    [ text "Remove" ]
+                UI.smallButton { label = "Remove", variant = "ghost", msg = RemoveAttorney c.id }
             ]
         ]
 
@@ -1664,7 +1518,7 @@ viewAttorneyRow readOnly c =
 viewWithdrawalSection : TeamData -> Html Msg
 viewWithdrawalSection data =
     if data.team.status == Api.TeamWithdrawn then
-        div [ Attr.class "alert alert-error mt-4" ]
+        UI.alert { variant = "error" }
             [ text "This team has withdrawn from the competition." ]
 
     else
@@ -1676,28 +1530,25 @@ viewWithdrawalSection data =
                 UI.empty
 
             Succeeded (Just _) ->
-                div [ Attr.class "alert alert-warning mt-4" ]
+                UI.alert { variant = "warning" }
                     [ text "A withdrawal request is pending admin review." ]
 
             Succeeded Nothing ->
                 case data.withdrawalForm of
                     WithdrawalFormHidden ->
-                        div [ Attr.class "mt-4" ]
-                            [ button
-                                [ Attr.class "btn btn-sm btn-outline btn-error"
-                                , Events.onClick ShowWithdrawalForm
-                                ]
-                                [ text "Request Withdrawal" ]
+                        UI.actionRow
+                            [ UI.smallOutlineButton
+                                { label = "Request Withdrawal"
+                                , variant = "error"
+                                , msg = ShowWithdrawalForm
+                                }
                             ]
 
                     WithdrawalFormOpen fields ->
                         viewWithdrawalForm fields
 
                     WithdrawalFormSaving _ ->
-                        div [ Attr.class "mt-4 flex items-center gap-2" ]
-                            [ span [ Attr.class "loading loading-spinner loading-sm" ] []
-                            , text "Submitting..."
-                            ]
+                        UI.inlineLoading "Submitting..."
 
 
 viewWithdrawalForm : { reason : String } -> Html Msg
@@ -1709,37 +1560,22 @@ viewWithdrawalForm fields =
         [ UI.card
             [ UI.cardBody
                 [ UI.cardTitle "Request Withdrawal"
-                , div [ Attr.class "alert alert-warning mb-4" ]
+                , UI.alert { variant = "warning" }
                     [ text
                         ("Submitting this request will notify RCOE. "
                             ++ "Your team will remain active until an admin confirms."
                         )
                     ]
-                , label [ Attr.class "form-control w-full" ]
-                    [ div [ Attr.class "label" ]
-                        [ span [ Attr.class "label-text" ]
-                            [ text "Reason (optional)" ]
-                        ]
-                    , textarea
-                        [ Attr.class "textarea textarea-bordered w-full"
-                        , Attr.value fields.reason
-                        , Attr.placeholder "Briefly explain why you need to withdraw"
-                        , Events.onInput UpdateWithdrawalReason
-                        ]
-                        []
-                    ]
-                , div [ Attr.class "mt-4 flex gap-2" ]
-                    [ button
-                        [ Attr.class "btn btn-error"
-                        , Attr.type_ "submit"
-                        ]
-                        [ text "Confirm Withdrawal" ]
-                    , button
-                        [ Attr.class "btn btn-ghost"
-                        , Attr.type_ "button"
-                        , Events.onClick CancelWithdrawalForm
-                        ]
-                        [ text "Cancel" ]
+                , UI.textareaField
+                    { label = "Reason (optional)"
+                    , value = fields.reason
+                    , onInput = UpdateWithdrawalReason
+                    , rows = 4
+                    , placeholder = "Briefly explain why you need to withdraw"
+                    }
+                , UI.actionRow
+                    [ UI.errorSubmitButton "Confirm Withdrawal"
+                    , UI.cancelButton CancelWithdrawalForm
                     ]
                 ]
             ]

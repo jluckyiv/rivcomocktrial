@@ -3,7 +3,6 @@ module Pages.Admin.Login exposing (Model, Msg, page)
 import Dict
 import Effect exposing (Effect)
 import Html exposing (..)
-import Html.Attributes as Attr
 import Html.Events as Events
 import Json.Decode
 import Page exposing (Page)
@@ -137,19 +136,17 @@ view : Model -> View Msg
 view model =
     { title = "Admin Login"
     , body =
-        [ div [ Attr.class "min-h-screen flex items-center justify-center" ]
-            [ div [ Attr.class "w-full max-w-sm" ]
-                [ UI.card
-                    [ UI.cardBody
-                        [ UI.cardTitle "Admin Login"
-                        , case model.loginState of
-                            Failed err ->
-                                UI.error err
+        [ UI.centeredPage
+            [ UI.card
+                [ UI.cardBody
+                    [ UI.cardTitle "Admin Login"
+                    , case model.loginState of
+                        Failed err ->
+                            UI.error err
 
-                            _ ->
-                                UI.empty
-                        , viewLoginForm model
-                        ]
+                        _ ->
+                            UI.empty
+                    , viewLoginForm model
                     ]
                 ]
             ]
@@ -171,7 +168,7 @@ viewLoginForm model =
             , value = model.password
             , onInput = PasswordChanged
             }
-        , div [ Attr.class "mt-4" ]
+        , UI.actionRow
             [ UI.primaryButton
                 { label = "Login", loading = model.loginState == Loading }
             ]

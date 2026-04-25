@@ -4,8 +4,6 @@ import Api
 import Auth
 import Effect exposing (Effect)
 import Html exposing (..)
-import Html.Attributes as Attr
-import Html.Events as Events
 import Json.Decode
 import Json.Encode
 import Layouts
@@ -449,13 +447,11 @@ viewPendingWithdrawals model =
             UI.card
                 [ UI.cardBody
                     [ UI.cardTitle "Pending Withdrawals"
-                    , div [ Attr.class "overflow-x-auto" ]
-                        [ UI.dataTable
-                            { columns = [ "Team ID", "Reason", "Actions" ]
-                            , rows = requests
-                            , rowView = viewWithdrawalRow model.teams
-                            }
-                        ]
+                    , UI.dataTable
+                        { columns = [ "Team ID", "Reason", "Actions" ]
+                        , rows = requests
+                        , rowView = viewWithdrawalRow model.teams
+                        }
                     ]
                 ]
 
@@ -482,17 +478,9 @@ viewWithdrawalRow teamsData req =
         [ td [] [ text teamName ]
         , td [] [ text req.reason ]
         , td []
-            [ div [ Attr.class "flex gap-2" ]
-                [ button
-                    [ Attr.class "btn btn-sm btn-error"
-                    , Events.onClick (ApproveWithdrawal req.id)
-                    ]
-                    [ text "Confirm" ]
-                , button
-                    [ Attr.class "btn btn-sm btn-ghost"
-                    , Events.onClick (RejectWithdrawal req.id)
-                    ]
-                    [ text "Dismiss" ]
+            [ UI.buttonRow
+                [ UI.smallButton { label = "Confirm", variant = "error", msg = ApproveWithdrawal req.id }
+                , UI.smallButton { label = "Dismiss", variant = "ghost", msg = RejectWithdrawal req.id }
                 ]
             ]
         ]
@@ -638,37 +626,21 @@ viewActions : String -> Api.CoachUserStatus -> Maybe Api.Team -> Html Msg
 viewActions coachId status maybeTeam =
     let
         deleteButton =
-            button
-                [ Attr.class "btn btn-sm btn-ghost"
-                , Events.onClick (DeleteCoach coachId)
-                ]
-                [ text "Delete" ]
+            UI.smallButton { label = "Delete", variant = "ghost", msg = DeleteCoach coachId }
 
         reactivateButton teamId =
-            button
-                [ Attr.class "btn btn-sm btn-outline"
-                , Events.onClick (ReactivateTeam teamId)
-                ]
-                [ text "Reactivate" ]
+            UI.smallOutlineButton { label = "Reactivate", variant = "", msg = ReactivateTeam teamId }
     in
     case status of
         Api.CoachPending ->
-            div [ Attr.class "flex gap-2" ]
-                [ button
-                    [ Attr.class "btn btn-sm btn-success"
-                    , Events.onClick (ApproveCoach coachId)
-                    ]
-                    [ text "Approve" ]
-                , button
-                    [ Attr.class "btn btn-sm btn-error"
-                    , Events.onClick (RejectCoach coachId)
-                    ]
-                    [ text "Reject" ]
+            UI.buttonRow
+                [ UI.smallButton { label = "Approve", variant = "success", msg = ApproveCoach coachId }
+                , UI.smallButton { label = "Reject", variant = "error", msg = RejectCoach coachId }
                 , deleteButton
                 ]
 
         _ ->
-            div [ Attr.class "flex gap-2" ]
+            UI.buttonRow
                 (List.filterMap identity
                     [ case maybeTeam of
                         Just t ->

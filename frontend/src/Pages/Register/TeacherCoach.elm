@@ -365,9 +365,8 @@ view : Model -> View Msg
 view model =
     { title = "Teacher Coach Registration"
     , body =
-        [ div [ Attr.class "max-w-lg mx-auto" ]
-            [ h1 [ Attr.class "text-2xl font-bold mb-4" ]
-                [ text "Teacher Coach Registration" ]
+        [ UI.narrowPage
+            [ UI.pageHeading "Teacher Coach Registration"
             , viewAvailability model
             ]
         ]
@@ -381,10 +380,9 @@ viewAvailability model =
             UI.loading
 
         RegistrationClosed ->
-            div [ Attr.class "alert alert-info" ]
+            UI.alert { variant = "info" }
                 [ p [] [ text "Registration is not currently open." ]
-                , p [ Attr.class "text-sm" ]
-                    [ text "Contact the organizer if you believe this is an error." ]
+                , p [] [ text "Contact the organizer if you believe this is an error." ]
                 ]
 
         LoadFailed err ->
@@ -392,7 +390,7 @@ viewAvailability model =
 
         RegistrationOpen tournament ->
             div []
-                [ div [ Attr.class "alert alert-success mb-4" ]
+                [ UI.alert { variant = "success" }
                     [ text
                         ("Registration is open for "
                             ++ tournament.name
@@ -415,8 +413,8 @@ viewForm model =
             model.step == Submitting
     in
     Html.form [ Events.onSubmit Submit, Attr.class "flex flex-col gap-4" ]
-        [ div [ Attr.class "grid grid-cols-1 md:grid-cols-2 gap-4" ]
-            [ formField "First Name"
+        [ UI.formColumns
+            [ UI.formField "First Name"
                 [ input
                     [ Attr.class "input input-bordered w-full"
                     , Attr.type_ "text"
@@ -427,7 +425,7 @@ viewForm model =
                     ]
                     []
                 ]
-            , formField "Last Name"
+            , UI.formField "Last Name"
                 [ input
                     [ Attr.class "input input-bordered w-full"
                     , Attr.type_ "text"
@@ -439,7 +437,7 @@ viewForm model =
                     []
                 ]
             ]
-        , formField "Email"
+        , UI.formField "Email"
             [ input
                 [ Attr.class "input input-bordered w-full"
                 , Attr.type_ "email"
@@ -450,8 +448,8 @@ viewForm model =
                 ]
                 []
             ]
-        , div [ Attr.class "grid grid-cols-1 md:grid-cols-2 gap-4" ]
-            [ formField "Password"
+        , UI.formColumns
+            [ UI.formField "Password"
                 [ input
                     [ Attr.class "input input-bordered w-full"
                     , Attr.type_ "password"
@@ -462,7 +460,7 @@ viewForm model =
                     ]
                     []
                 ]
-            , formField "Confirm Password"
+            , UI.formField "Confirm Password"
                 [ input
                     [ Attr.class "input input-bordered w-full"
                     , Attr.type_ "password"
@@ -474,7 +472,7 @@ viewForm model =
                     []
                 ]
             ]
-        , formField "School"
+        , UI.formField "School"
             [ select
                 [ Attr.class "select select-bordered w-full"
                 , Events.onInput SelectSchool
@@ -492,7 +490,7 @@ viewForm model =
                         model.schools
                 )
             ]
-        , formField "Team Name"
+        , UI.formField "Team Name"
             [ input
                 [ Attr.class "input input-bordered w-full"
                 , Attr.type_ "text"
@@ -502,34 +500,13 @@ viewForm model =
                 , Attr.disabled submitting
                 ]
                 []
-            , p [ Attr.class "text-sm text-base-content/60 mt-1" ]
-                [ text "Defaults to school name. Change if registering a second team." ]
+            , UI.note "Defaults to school name. Change if registering a second team."
             ]
-        , button
-            [ Attr.class "btn btn-primary w-full"
-            , Attr.type_ "submit"
-            , Attr.disabled submitting
-            ]
-            (if submitting then
-                [ span [ Attr.class "loading loading-spinner loading-sm" ] []
-                , text "Submitting..."
-                ]
-
-             else
-                [ text "Submit Registration" ]
-            )
-        , p [ Attr.class "text-center text-sm" ]
+        , UI.primaryButton { label = "Submit Registration", loading = submitting }
+        , UI.centeredNote
             [ text "Already have an account? "
-            , a [ Route.Path.href Route.Path.Team_Login, Attr.class "link" ]
-                [ text "Login here" ]
+            , UI.inlineLink "Login here" (Route.Path.href Route.Path.Team_Login)
             ]
         ]
 
 
-formField : String -> List (Html msg) -> Html msg
-formField labelText children =
-    label [ Attr.class "form-control w-full" ]
-        (div [ Attr.class "label" ]
-            [ span [ Attr.class "label-text" ] [ text labelText ] ]
-            :: children
-        )

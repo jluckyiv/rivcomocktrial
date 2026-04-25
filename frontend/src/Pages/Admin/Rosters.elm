@@ -5,7 +5,6 @@ import Auth
 import Effect exposing (Effect)
 import Html exposing (..)
 import Html.Attributes as Attr
-import Html.Events as Events
 import Json.Decode
 import Layouts
 import Page exposing (Page)
@@ -633,7 +632,7 @@ view model =
 
 viewFilters : Model -> Html Msg
 viewFilters model =
-    div [ Attr.class "flex gap-4 mb-4" ]
+    UI.filtersRow
         [ UI.filterSelect
             { label = "Tournament:"
             , value = model.filterTournament
@@ -725,8 +724,8 @@ viewDashboard model =
 
 viewMatrix : List Team -> List Round -> List RosterSubmission -> Maybe SelectedCell -> Html Msg
 viewMatrix teams rounds submissions selectedCell =
-    div [ Attr.class "overflow-x-auto" ]
-        [ table [ Attr.class "table table-sm table-zebra w-full" ]
+    UI.tableWrap
+        (table [ Attr.class "table table-sm table-zebra w-full" ]
             [ thead []
                 [ tr []
                     (th [] [ text "Team" ]
@@ -750,7 +749,7 @@ viewMatrix teams rounds submissions selectedCell =
             , tbody []
                 (List.map (viewTeamRow rounds submissions selectedCell) teams)
             ]
-        ]
+        )
 
 
 viewTeamRow : List Round -> List RosterSubmission -> Maybe SelectedCell -> Team -> Html Msg
@@ -783,12 +782,7 @@ viewCellButton teamId roundId side submissions selectedCell =
                 Nothing ->
                     False
     in
-    td
-        [ Attr.class "text-center cursor-pointer hover:bg-base-300"
-        , Attr.classList [ ( "bg-base-300 ring-2 ring-primary", isSelected ) ]
-        , Events.onClick (SelectCell teamId roundId side)
-        ]
-        [ statusBadge maybeSub ]
+    UI.interactiveCell isSelected (SelectCell teamId roundId side) (statusBadge maybeSub)
 
 
 viewSelectedCell : Model -> Html Msg
@@ -828,7 +822,7 @@ viewSelectedCell model =
             in
             UI.card
                 [ UI.cardBody
-                    [ div [ Attr.class "flex items-center justify-between" ]
+                    [ UI.cardHeader
                         [ UI.cardTitle
                             (cellTeamName
                                 ++ " — "
@@ -836,11 +830,7 @@ viewSelectedCell model =
                                 ++ " — "
                                 ++ RosterForm.sideLabel cell.side
                             )
-                        , button
-                            [ Attr.class "btn btn-ghost btn-sm btn-square"
-                            , Events.onClick CloseCell
-                            ]
-                            [ text "×" ]
+                        , UI.iconButton CloseCell (text "×")
                         ]
                     , case model.form of
                         RosterForm.FormHidden ->
@@ -876,13 +866,8 @@ viewCellReadOnly entries model =
                 , tbody []
                     (List.map (viewReadOnlyRow model) entries)
                 ]
-        , div [ Attr.class "flex gap-2 mt-4" ]
-            [ button
-                [ Attr.class "btn btn-primary btn-sm"
-                , Events.onClick EditRoster
-                ]
-                [ text "Edit Roster" ]
-            ]
+        , UI.actionRow
+            [ UI.smallButton { label = "Edit Roster", variant = "primary", msg = EditRoster } ]
         ]
 
 

@@ -3,6 +3,7 @@ module Pages.Register exposing (page)
 import Html exposing (..)
 import Html.Attributes as Attr
 import Route.Path
+import UI
 import View exposing (View)
 
 
@@ -10,8 +11,8 @@ page : View msg
 page =
     { title = "Register"
     , body =
-        [ h1 [ Attr.class "text-2xl font-bold mb-6" ] [ text "Register" ]
-        , div [ Attr.class "grid grid-cols-1 md:grid-cols-3 gap-4" ]
+        [ UI.pageHeading "Register"
+        , UI.cardGrid
             [ roleCard
                 { title = "Teacher Coach"
                 , description =
@@ -45,18 +46,14 @@ roleCard :
     }
     -> Html msg
 roleCard config =
-    div [ Attr.class "card bg-base-100 shadow-sm" ]
-        [ div [ Attr.class "card-body" ]
-            [ h2 [ Attr.class "card-title" ] [ text config.title ]
+    UI.card
+        [ UI.cardBody
+            [ UI.cardTitle config.title
             , p [] [ text config.description ]
-            , div [ Attr.class "card-actions justify-end mt-2" ]
+            , UI.cardActions
                 [ case config.path of
                     Just path ->
-                        a
-                            [ Attr.class "btn btn-primary btn-sm"
-                            , Route.Path.href path
-                            ]
-                            [ text "Register" ]
+                        UI.smallPrimaryLink "Register" (Route.Path.href path)
 
                     Nothing ->
                         span [ Attr.class "text-sm text-base-content/50" ]

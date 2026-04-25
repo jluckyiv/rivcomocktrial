@@ -887,7 +887,7 @@ view model =
     { title = "Pairings"
     , body =
         if model.roundId == "" then
-            [ div [ Attr.class "alert alert-warning mb-4" ]
+            [ UI.alert { variant = "warning" }
                 [ text "No round selected. "
                 , a [ Attr.href "/admin/rounds" ] [ text "Go to Rounds" ]
                 , text " and click \"Pairings\" on a round."
@@ -927,38 +927,24 @@ viewHeader model =
                 Nothing ->
                     "Pairings"
     in
-    div [ Attr.class "flex justify-between items-center mb-6" ]
-        [ h1 [ Attr.class "text-2xl font-bold" ] [ text roundLabel ]
-        , a [ Attr.class "btn btn-ghost", Attr.href "/admin/rounds" ]
-            [ text "Back to Rounds" ]
-        ]
+    UI.backLinkTitleBar
+        { title = roundLabel
+        , backLabel = "Back to Rounds"
+        , backHref = "/admin/rounds"
+        }
 
 
 viewModeToggle : Model -> Html Msg
 viewModeToggle model =
-    div [ Attr.class "tabs tabs-border mb-4" ]
-        [ a
-            [ Attr.class
-                (if model.inputMode == DropdownMode then
-                    "tab tab-active"
-
-                 else
-                    "tab"
-                )
-            , Events.onClick (SwitchMode DropdownMode)
-            ]
-            [ text "Dropdown" ]
-        , a
-            [ Attr.class
-                (if model.inputMode == BulkTextMode then
-                    "tab tab-active"
-
-                 else
-                    "tab"
-                )
-            , Events.onClick (SwitchMode BulkTextMode)
-            ]
-            [ text "Bulk Text" ]
+    UI.tabs
+        [ { label = "Dropdown"
+          , active = model.inputMode == DropdownMode
+          , msg = SwitchMode DropdownMode
+          }
+        , { label = "Bulk Text"
+          , active = model.inputMode == BulkTextMode
+          , msg = SwitchMode BulkTextMode
+          }
         ]
 
 
@@ -1063,7 +1049,7 @@ viewDropdownForm model =
                                 :: List.map (\c -> { value = c.id, label = c.name }) availableCourtrooms
                         }
                     ]
-                , div [ Attr.class "flex gap-2 mt-4" ]
+                , UI.actionRow
                     [ UI.primaryButton { label = "Save", loading = saving }
                     , case ctx of
                         Editing _ ->
@@ -1083,12 +1069,11 @@ viewPowerMatchSection model =
         roundNumber =
             model.round |> Maybe.map .number |> Maybe.withDefault 1
     in
-    div [ Attr.class "mb-6" ]
-        ([ div [ Attr.class "flex items-center gap-3 flex-wrap" ]
+    section [ Attr.class "mb-6" ]
+        ([ UI.buttonRow
             [ if roundNumber >= 2 then
-                div [ Attr.class "flex items-center gap-2" ]
-                    [ button [ Attr.class "btn btn-info", Events.onClick GeneratePowerMatch ]
-                        [ text "Generate Power Match" ]
+                UI.buttonRow
+                    [ UI.actionButton { label = "Generate Power Match", variant = "info", msg = GeneratePowerMatch }
                     , select
                         [ Attr.class "select select-bordered select-sm"
                         , Events.onInput
@@ -1111,13 +1096,11 @@ viewPowerMatchSection model =
                             ]
                             [ text "High-Low" ]
                         ]
-                    , span [ Attr.class "text-sm text-base-content/70" ]
-                        [ text "Cross-bracket strategy" ]
+                    , UI.hint "Cross-bracket strategy"
                     ]
 
               else
-                button [ Attr.class "btn btn-info", Events.onClick GeneratePowerMatch ]
-                    [ text "Generate Random Pairing" ]
+                UI.actionButton { label = "Generate Random Pairing", variant = "info", msg = GeneratePowerMatch }
             ]
          ]
             ++ (case model.powerMatchResult of
@@ -1126,33 +1109,21 @@ viewPowerMatchSection model =
                             [ UI.cardBody
                                 ([ UI.cardTitle "Proposed Pairings" ]
                                     ++ List.map
-                                        (\w -> div [ Attr.class "alert alert-warning mb-2" ] [ text w ])
+                                        (\w -> UI.alert { variant = "warning" } [ text w ])
                                         result.warnings
-                                    ++ [ div [ Attr.class "overflow-x-auto" ]
-                                            [ table [ Attr.class "table table-zebra w-full" ]
-                                                [ thead []
-                                                    [ tr []
-                                                        [ th [] [ text "Prosecution" ]
-                                                        , th [] [ text "Defense" ]
+                                    ++ [ UI.dataTable
+                                            { columns = [ "Prosecution", "Defense" ]
+                                            , rows = result.pairings
+                                            , rowView =
+                                                \p ->
+                                                    tr []
+                                                        [ td [] [ text (proposedPairingLabel p.prosecutionTeam) ]
+                                                        , td [] [ text (proposedPairingLabel p.defenseTeam) ]
                                                         ]
-                                                    ]
-                                                , tbody []
-                                                    (List.map
-                                                        (\p ->
-                                                            tr []
-                                                                [ td [] [ text (proposedPairingLabel p.prosecutionTeam) ]
-                                                                , td [] [ text (proposedPairingLabel p.defenseTeam) ]
-                                                                ]
-                                                        )
-                                                        result.pairings
-                                                    )
-                                                ]
-                                            ]
-                                       , div [ Attr.class "flex gap-2 mt-4" ]
-                                            [ button [ Attr.class "btn btn-success", Events.onClick AcceptPowerMatch ]
-                                                [ text "Accept & Create" ]
-                                            , button [ Attr.class "btn btn-ghost", Events.onClick ClearPowerMatch ]
-                                                [ text "Discard" ]
+                                            }
+                                       , UI.actionRow
+                                            [ UI.actionButton { label = "Accept & Create", variant = "success", msg = AcceptPowerMatch }
+                                            , UI.actionButton { label = "Discard", variant = "ghost", msg = ClearPowerMatch }
                                             ]
                                        ]
                                 )
@@ -1193,11 +1164,11 @@ viewBulkTextSection model =
     UI.card
         [ UI.cardBody
             [ UI.cardTitle "Bulk Text Entry"
-            , p [ Attr.class "text-sm text-base-content/70 mb-3" ]
-                [ Html.text "Format: "
+            , p []
+                [ UI.hint "Format: "
                 , code [] [ Html.text "{team_number} v {team_number} [{courtroom_name}]" ]
                 , br [] []
-                , Html.text "One pairing per line. Courtroom is optional."
+                , UI.hint "One pairing per line. Courtroom is optional."
                 ]
             , UI.textareaField
                 { label = ""
@@ -1211,10 +1182,7 @@ viewBulkTextSection model =
                 viewBulkPreview model
 
               else
-                div [ Attr.class "mt-4" ]
-                    [ button [ Attr.class "btn btn-info", Events.onClick ParseBulkText ]
-                        [ Html.text "Preview" ]
-                    ]
+                UI.actionRow [ UI.actionButton { label = "Preview", variant = "info", msg = ParseBulkText } ]
             ]
         ]
 
@@ -1233,51 +1201,34 @@ viewBulkPreview model =
                 _ ->
                     ( [], False )
     in
-    div [ Attr.class "mt-4" ]
-        [ h3 [ Attr.class "font-semibold mb-2" ] [ text "Preview" ]
-        , div [ Attr.class "overflow-x-auto" ]
-            [ table [ Attr.class "table table-zebra w-full" ]
-                [ thead []
-                    [ tr []
-                        [ th [] [ text "Prosecution" ]
-                        , th [] [ text "Defense" ]
-                        , th [] [ text "Courtroom" ]
+    section [ Attr.class "mt-4" ]
+        [ UI.sectionTitle "Preview"
+        , UI.dataTable
+            { columns = [ "Prosecution", "Defense", "Courtroom" ]
+            , rows = bulkParsed
+            , rowView =
+                \p ->
+                    let
+                        pTeam =
+                            findTeamByNumber model.teams p.prosecutionTeamNumber
+
+                        dTeam =
+                            findTeamByNumber model.teams p.defenseTeamNumber
+                    in
+                    tr []
+                        [ td [] [ text (teamLabelFromMaybe pTeam p.prosecutionTeamNumber) ]
+                        , td [] [ text (teamLabelFromMaybe dTeam p.defenseTeamNumber) ]
+                        , td [] [ text p.courtroomName ]
                         ]
-                    ]
-                , tbody []
-                    (List.map
-                        (\p ->
-                            let
-                                pTeam =
-                                    findTeamByNumber model.teams p.prosecutionTeamNumber
-
-                                dTeam =
-                                    findTeamByNumber model.teams p.defenseTeamNumber
-                            in
-                            tr []
-                                [ td [] [ text (teamLabelFromMaybe pTeam p.prosecutionTeamNumber) ]
-                                , td [] [ text (teamLabelFromMaybe dTeam p.defenseTeamNumber) ]
-                                , td [] [ text p.courtroomName ]
-                                ]
-                        )
-                        bulkParsed
-                    )
-                ]
-            ]
-        , div [ Attr.class "flex gap-2 mt-4" ]
-            [ button
-                [ Attr.class "btn btn-success"
-                , Events.onClick ConfirmBulkCreate
-                , Attr.disabled saving
-                ]
-                (if saving then
-                    [ span [ Attr.class "loading loading-spinner loading-sm" ] []
-                    , text "Creating..."
-                    ]
-
-                 else
-                    [ text "Create All" ]
-                )
+            }
+        , UI.actionRow
+            [ UI.loadingActionButton
+                { label = "Create All"
+                , variant = "success"
+                , loading = saving
+                , disabled = False
+                , msg = ConfirmBulkCreate
+                }
             , UI.cancelButton CancelBulkPreview
             ]
         ]
@@ -1289,10 +1240,10 @@ viewTrialsTable model =
         UI.emptyState "No pairings yet for this round."
 
     else
-        div [ Attr.class "mt-6" ]
-            [ h2 [ Attr.class "text-lg font-semibold mb-3" ] [ text "Current Pairings" ]
-            , div [ Attr.class "overflow-x-auto" ]
-                [ table [ Attr.class "table table-zebra w-full" ]
+        section [ Attr.class "mt-6" ]
+            [ UI.sectionTitle "Current Pairings"
+            , UI.tableWrap
+                (table [ Attr.class "table table-zebra w-full" ]
                     [ thead []
                         [ tr []
                             [ th [] [ text "Prosecution" ]
@@ -1340,38 +1291,16 @@ viewTrialsTable model =
                                             _ ->
                                                 False
                                 in
-                                tr
-                                    [ Attr.class
-                                        (if rematch then
-                                            "bg-warning/20"
-
-                                         else
-                                            ""
-                                        )
-                                    ]
+                                tr [ Attr.classList [ ( "bg-warning/20", rematch ) ] ]
                                     [ td [] [ text (teamLabel model.teams trial.prosecutionTeam) ]
                                     , td [] [ text ("P:" ++ String.fromInt pSides.prosecution ++ " D:" ++ String.fromInt pSides.defense) ]
                                     , td [] [ text (teamLabel model.teams trial.defenseTeam) ]
                                     , td [] [ text ("P:" ++ String.fromInt dSides.prosecution ++ " D:" ++ String.fromInt dSides.defense) ]
                                     , td [] [ text (courtroomLabel model.courtrooms trial.courtroom) ]
                                     , td []
-                                        [ div [ Attr.class "flex gap-2" ]
-                                            [ button
-                                                [ Attr.class "btn btn-sm btn-outline btn-info"
-                                                , Events.onClick (EditTrial trial)
-                                                ]
-                                                [ text "Edit" ]
-                                            , button
-                                                [ Attr.class "btn btn-sm btn-outline btn-error"
-                                                , Events.onClick (DeleteTrial trial.id)
-                                                , Attr.disabled (model.deleting == Just trial.id)
-                                                ]
-                                                (if model.deleting == Just trial.id then
-                                                    [ span [ Attr.class "loading loading-spinner loading-sm" ] [] ]
-
-                                                 else
-                                                    [ text "Delete" ]
-                                                )
+                                        [ UI.buttonRow
+                                            [ UI.rowActionButton { label = "Edit", variant = "info", loading = False, msg = EditTrial trial }
+                                            , UI.rowActionButton { label = "Delete", variant = "error", loading = model.deleting == Just trial.id, msg = DeleteTrial trial.id }
                                             ]
                                         ]
                                     ]
@@ -1379,7 +1308,7 @@ viewTrialsTable model =
                             model.trials
                         )
                     ]
-                ]
+                )
             ]
 
 
