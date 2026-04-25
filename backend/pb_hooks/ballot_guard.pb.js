@@ -38,10 +38,11 @@ onRecordCreateRequest((e) => {
     // relation field on scorer_token also enforces this at the DB level).
     const existing = $app.findRecordsByFilter(
         "ballot_submissions",
-        "scorer_token = '" + tokenId + "'",
+        "scorer_token = {:tokenId}",
         "",
         1,
-        0
+        0,
+        { tokenId }
     );
     if (existing.length > 0) {
         throw new BadRequestError(
@@ -110,10 +111,11 @@ onRecordCreateRequest((e) => {
 
     const existing = $app.findRecordsByFilter(
         "presider_ballots",
-        "scorer_token = '" + tokenId + "'",
+        "scorer_token = {:tokenId}",
         "",
         1,
-        0
+        0,
+        { tokenId }
     );
     if (existing.length > 0) {
         throw new BadRequestError(

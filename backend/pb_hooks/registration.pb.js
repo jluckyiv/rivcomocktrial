@@ -39,7 +39,13 @@ onRecordAfterCreateSuccess((e) => {
     team.set("coach", user.id);
     team.set("status", "pending");
 
-    $app.save(team);
+    try {
+        $app.save(team);
+    } catch (err) {
+        console.error(
+            "[registration] Failed to save team for user " + user.id + " — " + err
+        );
+    }
 }, "users");
 
 
@@ -53,14 +59,21 @@ onRecordAfterDeleteSuccess((e) => {
 
     const teams = $app.findRecordsByFilter(
         "teams",
-        "coach = '" + user.id + "'",
+        "coach = {:coachId}",
         "",
         100,
-        0
+        0,
+        { coachId: user.id }
     );
 
     for (const team of teams) {
-        $app.delete(team);
+        try {
+            $app.delete(team);
+        } catch (err) {
+            console.error(
+                "[registration] Failed to delete team " + team.id + " — " + err
+            );
+        }
     }
 }, "users");
 
@@ -89,14 +102,21 @@ onRecordAfterUpdateSuccess((e) => {
     // must not be touched if the coach record is updated later.
     const teams = $app.findRecordsByFilter(
         "teams",
-        "coach = '" + user.id + "' && status = 'pending'",
+        "coach = {:coachId} && status = 'pending'",
         "",
         100,
-        0
+        0,
+        { coachId: user.id }
     );
 
     for (const team of teams) {
         team.set("status", teamStatus);
-        $app.save(team);
+        try {
+            $app.save(team);
+        } catch (err) {
+            console.error(
+                "[registration] Failed to save team status " + team.id + " — " + err
+            );
+        }
     }
 }, "users");
