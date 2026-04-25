@@ -6,6 +6,27 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.5.5 — M4 Phase 1 Audit Fixes (#112)
+
+### Fixed
+
+- `BallotAssembly.assembleVerifiedBallot`: return type changed from
+  `VerifiedBallot` to `Result (List Error) VerifiedBallot`; errors
+  from corrected presentations are now propagated, not silently dropped
+- `Api.ballotScoreDecoder`: `presentation`, `side`, `points` now use
+  `Decode.field` (hard failure) instead of `fieldWithDefault`
+- `Api.ballotCorrectionDecoder`: `corrected_points` now uses
+  `Decode.field`
+- `Api.ScorerRole` constructors renamed `ScorerRole`/`PresiderRole` →
+  `Scorer`/`Presider` to eliminate ambiguity with the type name
+- `BallotCorrection.originalScore` renamed to `originalScoreId`
+- `assembleStudent`: simplified last-space split using
+  `String.split`/`List.reverse`
+- `assembleVerifiedBallot`: `correctionMap` uses `Dict String Int`
+  instead of `List (String, Int)`
+- `rosterSideToSide` removed from `BallotAssembly` exposed list;
+  internal-implementation test removed (675 tests)
+
 ## v0.5.4 — Codebase Cleanup (#113)
 
 ### Fixed
