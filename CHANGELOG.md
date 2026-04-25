@@ -6,6 +6,32 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.5.8 — Elm Correctness (#118)
+
+### Fixed
+
+- `Api.elm`: required enum fields (`scorer_role`, `status`, `winner_side`,
+  `submitted_at`, `corrected_at`) changed from `fieldWithDefault` to
+  `Decode.field` — missing values now fail hard instead of silently defaulting
+- `Pages/Team/Rosters.elm` + `Pages/Team/Manage.elm`: removed local
+  `RemoteData` type definitions; now import shared `RemoteData` module
+- `Pages/Admin/Login.elm`: replaced `loading : Bool` + `error : Maybe String`
+  with `loginState : LoginState` sum type (`Idle | Loading | Failed String`)
+
+## v0.5.7 — JS Audit Fixes (#117)
+
+### Fixed
+
+- All pb_hooks: replaced string-concatenated filters with `{:param}`
+  parameterized syntax
+- `eligibility.pb.js` + `withdrawal.pb.js`: use `findRecordById` for PK
+  lookups instead of `findRecordsByFilter`
+- `withdrawal.pb.js`, `registration.pb.js`, `eligibility.pb.js`: wrapped
+  `$app.save` / `$app.delete` in try/catch with error logging
+- `interop.js`: added `default` cases to both port switches; removed
+  `localStorage.setItem` from login handlers; `SaveCoachToken` now calls
+  `pb.authStore.save`; fixed fake `{ id: "admin" }` model → `null`
+
 ## v0.5.6 — JS Linting Setup (#116)
 
 ### Added
