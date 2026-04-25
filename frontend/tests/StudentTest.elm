@@ -1,18 +1,27 @@
-module NameTest exposing (..)
+module StudentTest exposing (suite)
 
 import Expect
-import Student exposing (Name)
+import Student exposing (Pronouns(..))
 import Test exposing (Test, describe, test)
 
 
-unsafeName : String -> String -> Maybe String -> Name
-unsafeName f l p =
-    case Student.nameFromStrings f l p of
-        Ok n ->
-            n
+suite : Test
+suite =
+    describe "Student"
+        [ nameSuite
+        , pronounsSuite
+        , studentSuite
+        ]
 
-        Err _ ->
-            Debug.todo ("Invalid name: " ++ f ++ " " ++ l)
+
+nameSuite : Test
+nameSuite =
+    describe "Name"
+        [ nameFromStringsSuite
+        , displayNameTests
+        , fullNameTests
+        , accessorTests
+        ]
 
 
 nameFromStringsSuite : Test
@@ -117,6 +126,75 @@ accessorTests =
                     |> Student.preferred
                     |> Expect.equal (Just "Bob")
         ]
+
+
+pronounsSuite : Test
+pronounsSuite =
+    describe "Pronouns"
+        [ toStringTests
+        ]
+
+
+toStringTests : Test
+toStringTests =
+    describe "pronounsToString"
+        [ test "HeHim" <|
+            \_ ->
+                HeHim
+                    |> Student.pronounsToString
+                    |> Expect.equal "he/him"
+        , test "SheHer" <|
+            \_ ->
+                SheHer
+                    |> Student.pronounsToString
+                    |> Expect.equal "she/her"
+        , test "TheyThem" <|
+            \_ ->
+                TheyThem
+                    |> Student.pronounsToString
+                    |> Expect.equal "they/them"
+        , test "Other with custom string" <|
+            \_ ->
+                Other "ze/zir"
+                    |> Student.pronounsToString
+                    |> Expect.equal "ze/zir"
+        ]
+
+
+studentSuite : Test
+studentSuite =
+    describe "create + studentName"
+        [ test "studentName round-trips the name" <|
+            \_ ->
+                let
+                    name =
+                        unsafeName "Robert" "Smith" Nothing
+                in
+                Student.create name HeHim
+                    |> Student.studentName
+                    |> Student.fullName
+                    |> Expect.equal "Robert Smith"
+        , test "studentName reflects preferred name" <|
+            \_ ->
+                let
+                    name =
+                        unsafeName "Robert" "Smith" (Just "Bob")
+                in
+                Student.create name SheHer
+                    |> Student.studentName
+                    |> Student.displayName
+                    |> Expect.equal "Bob"
+        ]
+
+
+unsafeName : String -> String -> Maybe String -> Student.Name
+unsafeName f l p =
+    case Student.nameFromStrings f l p of
+        Ok n ->
+            n
+
+        Err _ ->
+            Debug.todo ("Invalid name: " ++ f ++ " " ++ l)
 
 
 isOk : Result e a -> Bool
