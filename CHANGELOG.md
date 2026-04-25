@@ -6,6 +6,24 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.5.4 — Codebase Cleanup (#113)
+
+### Fixed
+
+- `Pages/Admin/EligibilityRequests.elm`,
+  `Pages/Admin/Registrations.elm`: removed local `RemoteData`
+  re-declarations; now import canonical `RemoteData` module
+- `Pages/Admin/Login.elm`: rewrote view from Bulma to DaisyUI
+  (card layout, `UI.elm` helpers throughout)
+- `Pages/Team/Login.elm`: finished DaisyUI migration; removed
+  remaining Bulma `columns`/`field`/`notification` classes
+
+### Added
+
+- `UI.passwordField`: `textField` variant with `type="password"`
+
+## v0.5.3 — M4 Phase 1: Ballot Entry Backend
+
 ### Added (PR #110)
 
 - 5 PocketBase migrations for ballot collections:
