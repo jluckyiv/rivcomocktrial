@@ -41,6 +41,7 @@ type RemoteData a
 type alias Model =
     { coaches : RemoteData (List Api.CoachUser)
     , teams : RemoteData (List Api.Team)
+    , withdrawalRequests : RemoteData (List Api.WithdrawalRequest)
     , error : Maybe String
     }
 
@@ -49,6 +50,7 @@ init : () -> ( Model, Effect Msg )
 init _ =
     ( { coaches = Loading
       , teams = Loading
+      , withdrawalRequests = Loading
       , error = Nothing
       }
     , Effect.batch
@@ -64,6 +66,12 @@ init _ =
             , filter = "coach != ''"
             , sort = "created"
             }
+        , Pb.adminList
+            { collection = "withdrawal_requests"
+            , tag = "withdrawal-requests"
+            , filter = "status = 'pending'"
+            , sort = "-created"
+            }
         ]
     )
 
@@ -76,6 +84,9 @@ type Msg
     = ApproveCoach String
     | RejectCoach String
     | DeleteCoach String
+    | ApproveWithdrawal String
+    | RejectWithdrawal String
+    | ReactivateTeam String
     | PbMsg Json.Decode.Value
 
 
@@ -115,6 +126,42 @@ update msg model =
                 { collection = "users"
                 , id = id
                 , tag = "delete-user"
+                }
+            )
+
+        ApproveWithdrawal withdrawalId ->
+            ( model
+            , Pb.adminUpdate
+                { collection = "withdrawal_requests"
+                , id = withdrawalId
+                , tag = "update-withdrawal"
+                , body =
+                    Json.Encode.object
+                        [ ( "status", Api.encodeRequestStatus Api.Approved ) ]
+                }
+            )
+
+        RejectWithdrawal withdrawalId ->
+            ( model
+            , Pb.adminUpdate
+                { collection = "withdrawal_requests"
+                , id = withdrawalId
+                , tag = "update-withdrawal"
+                , body =
+                    Json.Encode.object
+                        [ ( "status", Api.encodeRequestStatus Api.Rejected ) ]
+                }
+            )
+
+        ReactivateTeam teamId ->
+            ( model
+            , Pb.adminUpdate
+                { collection = "teams"
+                , id = teamId
+                , tag = "reactivate-team"
+                , body =
+                    Json.Encode.object
+                        [ ( "status", Api.encodeTeamStatus Api.TeamActive ) ]
                 }
             )
 
@@ -265,6 +312,107 @@ update msg model =
                             , Effect.none
                             )
 
+                Just "withdrawal-requests" ->
+                    case Pb.decodeList Api.withdrawalRequestDecoder value of
+                        Ok requests ->
+                            ( { model | withdrawalRequests = Succeeded requests }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            ( { model
+                                | withdrawalRequests =
+                                    Failed "Failed to load withdrawal requests."
+                              }
+                            , Effect.none
+                            )
+
+                Just "update-withdrawal" ->
+                    case Pb.decodeRecord Api.withdrawalRequestDecoder value of
+                        Ok updated ->
+                            let
+                                -- Remove from pending list (approved or rejected).
+                                newWithdrawals =
+                                    case model.withdrawalRequests of
+                                        Succeeded reqs ->
+                                            Succeeded
+                                                (List.filter
+                                                    (\r -> r.id /= updated.id)
+                                                    reqs
+                                                )
+
+                                        other ->
+                                            other
+
+                                -- If approved, optimistically mark team as
+                                -- withdrawn (hook does this server-side too).
+                                newTeams =
+                                    if updated.status == Api.Approved then
+                                        case model.teams of
+                                            Succeeded teams ->
+                                                Succeeded
+                                                    (List.map
+                                                        (\t ->
+                                                            if t.id == updated.team then
+                                                                { t | status = Api.TeamWithdrawn }
+
+                                                            else
+                                                                t
+                                                        )
+                                                        teams
+                                                    )
+
+                                            other ->
+                                                other
+
+                                    else
+                                        model.teams
+                            in
+                            ( { model
+                                | withdrawalRequests = newWithdrawals
+                                , teams = newTeams
+                              }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            ( { model
+                                | error = Just "Failed to update withdrawal request."
+                              }
+                            , Effect.none
+                            )
+
+                Just "reactivate-team" ->
+                    case Pb.decodeRecord Api.teamDecoder value of
+                        Ok updated ->
+                            let
+                                newTeams =
+                                    case model.teams of
+                                        Succeeded teams ->
+                                            Succeeded
+                                                (List.map
+                                                    (\t ->
+                                                        if t.id == updated.id then
+                                                            updated
+
+                                                        else
+                                                            t
+                                                    )
+                                                    teams
+                                                )
+
+                                        other ->
+                                            other
+                            in
+                            ( { model | teams = newTeams }, Effect.none )
+
+                        Err _ ->
+                            ( { model
+                                | error = Just "Failed to reactivate team."
+                              }
+                            , Effect.none
+                            )
+
                 _ ->
                     ( model, Effect.none )
 
@@ -293,9 +441,66 @@ view model =
 
             Nothing ->
                 UI.empty
+        , viewPendingWithdrawals model
         , viewContent model
         ]
     }
+
+
+viewPendingWithdrawals : Model -> Html Msg
+viewPendingWithdrawals model =
+    case model.withdrawalRequests of
+        Succeeded ((_ :: _) as requests) ->
+            UI.card
+                [ UI.cardBody
+                    [ UI.cardTitle "Pending Withdrawals"
+                    , div [ Attr.class "overflow-x-auto" ]
+                        [ UI.dataTable
+                            { columns = [ "Team ID", "Reason", "Actions" ]
+                            , rows = requests
+                            , rowView = viewWithdrawalRow model.teams
+                            }
+                        ]
+                    ]
+                ]
+
+        _ ->
+            UI.empty
+
+
+viewWithdrawalRow : RemoteData (List Api.Team) -> Api.WithdrawalRequest -> Html Msg
+viewWithdrawalRow teamsData req =
+    let
+        teamName =
+            case teamsData of
+                Succeeded teams ->
+                    teams
+                        |> List.filter (\t -> t.id == req.team)
+                        |> List.head
+                        |> Maybe.map .name
+                        |> Maybe.withDefault req.team
+
+                _ ->
+                    req.team
+    in
+    tr []
+        [ td [] [ text teamName ]
+        , td [] [ text req.reason ]
+        , td []
+            [ div [ Attr.class "flex gap-2" ]
+                [ button
+                    [ Attr.class "btn btn-sm btn-error"
+                    , Events.onClick (ApproveWithdrawal req.id)
+                    ]
+                    [ text "Confirm" ]
+                , button
+                    [ Attr.class "btn btn-sm btn-ghost"
+                    , Events.onClick (RejectWithdrawal req.id)
+                    ]
+                    [ text "Dismiss" ]
+                ]
+            ]
+        ]
 
 
 viewContent : Model -> Html Msg
@@ -354,7 +559,7 @@ viewCoachRow teams coach =
         , td [] [ text teamName ]
         , td [] [ viewUserStatusBadge coach.status ]
         , td [] [ viewTeamStatusBadge teamStatus ]
-        , td [] [ viewActions coach.id coach.status ]
+        , td [] [ viewActions coach.id coach.status maybeTeam ]
         ]
 
 
@@ -390,8 +595,8 @@ viewTeamStatusBadge maybeStatus =
             UI.badge { label = "Rejected", variant = "error" }
 
 
-viewActions : String -> Api.CoachUserStatus -> Html Msg
-viewActions coachId status =
+viewActions : String -> Api.CoachUserStatus -> Maybe Api.Team -> Html Msg
+viewActions coachId status maybeTeam =
     let
         deleteButton =
             button
@@ -399,6 +604,13 @@ viewActions coachId status =
                 , Events.onClick (DeleteCoach coachId)
                 ]
                 [ text "Delete" ]
+
+        reactivateButton teamId =
+            button
+                [ Attr.class "btn btn-sm btn-outline"
+                , Events.onClick (ReactivateTeam teamId)
+                ]
+                [ text "Reactivate" ]
     in
     case status of
         Api.CoachPending ->
@@ -418,4 +630,17 @@ viewActions coachId status =
 
         _ ->
             div [ Attr.class "flex gap-2" ]
-                [ deleteButton ]
+                (List.filterMap identity
+                    [ case maybeTeam of
+                        Just t ->
+                            if t.status == Api.TeamWithdrawn then
+                                Just (reactivateButton t.id)
+
+                            else
+                                Nothing
+
+                        Nothing ->
+                            Nothing
+                    , Just deleteButton
+                    ]
+                )

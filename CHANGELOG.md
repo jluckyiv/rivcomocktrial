@@ -6,6 +6,22 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added (PR #103)
+- Team withdrawal requests: coaches submit a withdrawal request with
+  an optional reason via "Request Withdrawal" on `/team/manage`;
+  RCOE admins confirm or dismiss pending requests on
+  `/admin/registrations`; PocketBase hook sets team status to
+  "withdrawn" on approval
+- `WithdrawalRequest` type, decoder, `encodeWithdrawalRequest`, and
+  `encodeTeamStatus` in `Api.elm`
+- PocketBase migration `1776301400` adds `withdrawal_requests`
+  collection (team, reason, status); `withdrawal.pb.js` hook applies
+  status change on approval
+- Withdrawn teams show a read-only banner and suppress all action
+  buttons on `/team/manage`; "Reactivate" button on
+  `/admin/registrations` restores a team to active
+- Closes #72
+
 ### Changed (PR #102)
 - `FormState`: `FormSaving FormData` split into `FormSavingDraft
   FormData` and `FormSubmitting FormData` — saving kind is now in
