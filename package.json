@@ -1,6 +1,7 @@
 {
   "name": "rivcomocktrial",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "echo 'Run in separate terminals:\n  npm run pb:dev\n  npm run fe:dev'",
     "pb:start": "docker compose up -d",
@@ -11,9 +12,15 @@
     "fe:build": "cd frontend && PATH=\"./node_modules/.bin:$PATH\" elm-land build",
     "fe:review": "cd frontend && npx elm-review",
     "fe:test": "cd frontend && npx elm-test",
-    "e2e": "PB_ADMIN_EMAIL=$(op read 'op://Private/localhost dev pocketbase admin user/Email') PB_ADMIN_PASSWORD=$(op read 'op://Private/localhost dev pocketbase admin user/Password') npx playwright test"
+    "e2e": "PB_ADMIN_EMAIL=$(op read 'op://Private/localhost dev pocketbase admin user/Email') PB_ADMIN_PASSWORD=$(op read 'op://Private/localhost dev pocketbase admin user/Password') npx playwright test",
+    "lint:js": "eslint frontend/src/interop.js backend/pb_hooks/",
+    "lint": "npm run lint:js && npm run fe:review"
   },
   "devDependencies": {
-    "@playwright/test": "^1.59.1"
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.59.1",
+    "eslint": "^10.2.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.3"
   }
 }
