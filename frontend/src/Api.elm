@@ -51,6 +51,7 @@ module Api exposing
     , encodeRound
     , encodeSchool
     , encodeStudent
+    , encodeSecondTeam
     , encodeTeam
     , encodeTeamStatus
     , encodeTournament
@@ -944,6 +945,30 @@ encodeTeam t =
         , ( "school", Encode.string t.school )
         , ( "team_number", Encode.int t.teamNumber )
         , ( "name", Encode.string t.name )
+        ]
+
+
+{-| Encode a second-team registration from a coach's own account.
+
+Status is hardcoded to "pending" (coach cannot self-approve).
+team_number defaults to 0; admin assigns the real number on approval.
+
+-}
+encodeSecondTeam :
+    { tournament : String
+    , school : String
+    , name : String
+    , coach : String
+    }
+    -> Encode.Value
+encodeSecondTeam t =
+    Encode.object
+        [ ( "tournament", Encode.string t.tournament )
+        , ( "school", Encode.string t.school )
+        , ( "team_number", Encode.int 0 )
+        , ( "name", Encode.string t.name )
+        , ( "coach", Encode.string t.coach )
+        , ( "status", Encode.string "pending" )
         ]
 
 

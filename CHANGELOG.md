@@ -6,6 +6,25 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added (PR #104)
+- Second-team registration: approved coaches can register an additional
+  team from `/team/manage` without creating a new account; form
+  requires only a team name (school and tournament inherited)
+- Team selector on `/team/manage` when a coach has multiple teams;
+  switching loads the selected team's full data
+- "Pending Second Teams" section on `/admin/registrations`; admins
+  can approve or reject pending teams from approved coaches directly
+- PocketBase migration `1776301500` — allows approved coaches to
+  create pending teams for themselves via `publicCreate`
+- `encodeSecondTeam` in `Api.elm`
+
+### Fixed (PR #104)
+- `registration.pb.js` hook now only promotes/rejects *pending* teams
+  when a coach user is approved/rejected — prevents accidentally
+  activating a second team added later if the coach record is
+  re-saved for any reason
+- Closes #73
+
 ## v0.5.0 — Attorney Tasks + Type Cleanup + Withdrawal Requests
 
 ### Added (PR #103)

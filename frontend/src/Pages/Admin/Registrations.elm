@@ -87,6 +87,8 @@ type Msg
     | ApproveWithdrawal String
     | RejectWithdrawal String
     | ReactivateTeam String
+    | ApproveTeam String
+    | RejectTeam String
     | PbMsg Json.Decode.Value
 
 
@@ -162,6 +164,30 @@ update msg model =
                 , body =
                     Json.Encode.object
                         [ ( "status", Api.encodeTeamStatus Api.TeamActive ) ]
+                }
+            )
+
+        ApproveTeam teamId ->
+            ( model
+            , Pb.adminUpdate
+                { collection = "teams"
+                , id = teamId
+                , tag = "approve-team"
+                , body =
+                    Json.Encode.object
+                        [ ( "status", Api.encodeTeamStatus Api.TeamActive ) ]
+                }
+            )
+
+        RejectTeam teamId ->
+            ( model
+            , Pb.adminUpdate
+                { collection = "teams"
+                , id = teamId
+                , tag = "reject-team"
+                , body =
+                    Json.Encode.object
+                        [ ( "status", Api.encodeTeamStatus Api.TeamRejected ) ]
                 }
             )
 
@@ -385,31 +411,36 @@ update msg model =
                 Just "reactivate-team" ->
                     case Pb.decodeRecord Api.teamDecoder value of
                         Ok updated ->
-                            let
-                                newTeams =
-                                    case model.teams of
-                                        Succeeded teams ->
-                                            Succeeded
-                                                (List.map
-                                                    (\t ->
-                                                        if t.id == updated.id then
-                                                            updated
-
-                                                        else
-                                                            t
-                                                    )
-                                                    teams
-                                                )
-
-                                        other ->
-                                            other
-                            in
-                            ( { model | teams = newTeams }, Effect.none )
+                            ( { model | teams = updateTeamInModel updated model.teams }
+                            , Effect.none
+                            )
 
                         Err _ ->
-                            ( { model
-                                | error = Just "Failed to reactivate team."
-                              }
+                            ( { model | error = Just "Failed to reactivate team." }
+                            , Effect.none
+                            )
+
+                Just "approve-team" ->
+                    case Pb.decodeRecord Api.teamDecoder value of
+                        Ok updated ->
+                            ( { model | teams = updateTeamInModel updated model.teams }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            ( { model | error = Just "Failed to approve team." }
+                            , Effect.none
+                            )
+
+                Just "reject-team" ->
+                    case Pb.decodeRecord Api.teamDecoder value of
+                        Ok updated ->
+                            ( { model | teams = updateTeamInModel updated model.teams }
+                            , Effect.none
+                            )
+
+                        Err _ ->
+                            ( { model | error = Just "Failed to reject team." }
                             , Effect.none
                             )
 
@@ -441,10 +472,121 @@ view model =
 
             Nothing ->
                 UI.empty
+        , viewPendingSecondTeams model
         , viewPendingWithdrawals model
         , viewContent model
         ]
     }
+
+
+updateTeamInModel : Api.Team -> RemoteData (List Api.Team) -> RemoteData (List Api.Team)
+updateTeamInModel updated teamsData =
+    case teamsData of
+        Succeeded teams ->
+            Succeeded
+                (List.map
+                    (\t ->
+                        if t.id == updated.id then
+                            updated
+
+                        else
+                            t
+                    )
+                    teams
+                )
+
+        other ->
+            other
+
+
+viewPendingSecondTeams : Model -> Html Msg
+viewPendingSecondTeams model =
+    case model.teams of
+        Succeeded teams ->
+            let
+                -- Second-team registrations: pending teams whose coach
+                -- is already approved (not a first-time registrant).
+                approvedCoachIds =
+                    case model.coaches of
+                        Succeeded coaches ->
+                            coaches
+                                |> List.filter
+                                    (\c -> c.status == Api.CoachApproved)
+                                |> List.map .id
+
+                        _ ->
+                            []
+
+                pendingSecondTeams =
+                    teams
+                        |> List.filter
+                            (\t ->
+                                t.status == Api.TeamPending
+                                    && List.member t.coach approvedCoachIds
+                            )
+            in
+            if List.isEmpty pendingSecondTeams then
+                UI.empty
+
+            else
+                UI.card
+                    [ UI.cardBody
+                        [ UI.cardTitle "Pending Second Teams"
+                        , div [ Attr.class "overflow-x-auto" ]
+                            [ UI.dataTable
+                                { columns =
+                                    [ "Team Name"
+                                    , "Coach"
+                                    , "Actions"
+                                    ]
+                                , rows = pendingSecondTeams
+                                , rowView =
+                                    viewSecondTeamRow model.coaches
+                                }
+                            ]
+                        ]
+                    ]
+
+        _ ->
+            UI.empty
+
+
+viewSecondTeamRow :
+    RemoteData (List Api.CoachUser)
+    -> Api.Team
+    -> Html Msg
+viewSecondTeamRow coachesData team =
+    let
+        coachName =
+            case coachesData of
+                Succeeded coaches ->
+                    coaches
+                        |> List.filter (\c -> c.id == team.coach)
+                        |> List.head
+                        |> Maybe.map .name
+                        |> Maybe.withDefault "—"
+
+                _ ->
+                    "—"
+    in
+    tr []
+        [ td [] [ text team.name ]
+        , td [] [ text coachName ]
+        , td []
+            [ div [ Attr.class "flex gap-2" ]
+                [ button
+                    [ Attr.class "btn btn-sm btn-success"
+                    , Events.onClick (ApproveTeam team.id)
+                    ]
+                    [ text "Approve" ]
+                , button
+                    [ Attr.class "btn btn-sm btn-error"
+                    , Events.onClick (RejectTeam team.id)
+                    ]
+                    [ text "Reject" ]
+                ]
+            ]
+        ]
 
 
 viewPendingWithdrawals : Model -> Html Msg

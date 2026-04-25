@@ -85,9 +85,11 @@ onRecordAfterUpdateSuccess((e) => {
         return;
     }
 
+    // Only promote/reject pending teams. Active or withdrawn teams
+    // should not be touched if the coach record is updated later.
     const teams = $app.findRecordsByFilter(
         "teams",
-        "coach = '" + user.id + "'",
+        "coach = '" + user.id + "' && status = 'pending'",
         "",
         100,
         0

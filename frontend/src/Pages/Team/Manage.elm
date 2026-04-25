@@ -36,7 +36,7 @@ type PageState
     = LoadingTeam
     | TeamNotFound
     | LoadFailed String
-    | TeamReady TeamData
+    | TeamReady (List Api.Team) TeamData
 
 
 type alias Model =
@@ -56,6 +56,7 @@ type alias TeamData =
     , coCoachForm : CoCoachFormState
     , attorneyForm : AttorneyFormState
     , withdrawalForm : WithdrawalFormState
+    , secondTeamForm : SecondTeamFormState
     }
 
 
@@ -104,6 +105,12 @@ type WithdrawalFormState
     | WithdrawalFormSaving { reason : String }
 
 
+type SecondTeamFormState
+    = SecondTeamFormHidden
+    | SecondTeamFormOpen { name : String } (List String)
+    | SecondTeamFormSaving { name : String }
+
+
 emptyTeamData : Api.Team -> TeamData
 emptyTeamData team =
     { team = team
@@ -118,6 +125,7 @@ emptyTeamData team =
     , coCoachForm = CoCoachFormHidden
     , attorneyForm = AttorneyFormHidden
     , withdrawalForm = WithdrawalFormHidden
+    , secondTeamForm = SecondTeamFormHidden
     }
 
 
@@ -175,18 +183,40 @@ type Msg
     | UpdateWithdrawalReason String
     | ConfirmWithdrawal
     | CancelWithdrawalForm
+    | SelectTeam String
+    | ShowSecondTeamForm
+    | UpdateSecondTeamName String
+    | SaveSecondTeam
+    | CancelSecondTeamForm
     | PbMsg Json.Decode.Value
 
 
 update : Msg -> Model -> ( Model, Effect Msg )
 update msg model =
     case model.state of
-        TeamReady data ->
-            let
-                ( newData, effect ) =
-                    updateTeamData msg data
-            in
-            ( { model | state = TeamReady newData }, effect )
+        TeamReady allTeams data ->
+            case msg of
+                SelectTeam teamId ->
+                    handleSelectTeam teamId allTeams model
+
+                PbMsg value ->
+                    case Pb.responseTag value of
+                        Just "save-second-team" ->
+                            handleSaveSecondTeamResponse value allTeams data model
+
+                        _ ->
+                            let
+                                ( newData, effect ) =
+                                    updateTeamData msg data
+                            in
+                            ( { model | state = TeamReady allTeams newData }, effect )
+
+                _ ->
+                    let
+                        ( newData, effect ) =
+                            updateTeamData msg data
+                    in
+                    ( { model | state = TeamReady allTeams newData }, effect )
 
         _ ->
             case msg of
@@ -202,62 +232,21 @@ handleInitialPbMsg value model =
     case Pb.responseTag value of
         Just "my-team" ->
             case Pb.decodeList Api.teamDecoder value of
-                Ok (team :: _) ->
+                Ok ((firstTeam :: _) as allTeams) ->
                     let
+                        -- Default to first active team, else first team.
+                        team =
+                            allTeams
+                                |> List.filter
+                                    (\t -> t.status == Api.TeamActive)
+                                |> List.head
+                                |> Maybe.withDefault firstTeam
+
                         data =
                             emptyTeamData team
-
-                        teamId =
-                            team.id
-
-                        tournamentId =
-                            team.tournament
                     in
-                    ( { model | state = TeamReady data }
-                    , Effect.batch
-                        [ Pb.publicList
-                            { collection = "tournaments"
-                            , tag = "tournament"
-                            , filter = "id = '" ++ tournamentId ++ "'"
-                            , sort = ""
-                            }
-                        , Pb.publicList
-                            { collection = "eligibility_list_entries"
-                            , tag = "entries"
-                            , filter =
-                                "team = '"
-                                    ++ teamId
-                                    ++ "' && status = 'active'"
-                            , sort = "name"
-                            }
-                        , Pb.publicList
-                            { collection = "eligibility_change_requests"
-                            , tag = "change-requests"
-                            , filter = "team = '" ++ teamId ++ "'"
-                            , sort = "-created"
-                            }
-                        , Pb.publicList
-                            { collection = "co_coaches"
-                            , tag = "co-coaches"
-                            , filter = "team = '" ++ teamId ++ "'"
-                            , sort = "name"
-                            }
-                        , Pb.publicList
-                            { collection = "attorney_coaches"
-                            , tag = "attorney-coaches"
-                            , filter = "team = '" ++ teamId ++ "'"
-                            , sort = "name"
-                            }
-                        , Pb.publicList
-                            { collection = "withdrawal_requests"
-                            , tag = "withdrawal-requests"
-                            , filter =
-                                "team = '"
-                                    ++ teamId
-                                    ++ "' && status = 'pending'"
-                            , sort = "-created"
-                            }
-                        ]
+                    ( { model | state = TeamReady allTeams data }
+                    , loadTeamData team.id team.tournament
                     )
 
                 Ok [] ->
@@ -270,6 +259,102 @@ handleInitialPbMsg value model =
 
         _ ->
             ( model, Effect.none )
+
+
+handleSelectTeam : String -> List Api.Team -> Model -> ( Model, Effect Msg )
+handleSelectTeam teamId allTeams model =
+    case List.filter (\t -> t.id == teamId) allTeams of
+        team :: _ ->
+            let
+                data =
+                    emptyTeamData team
+            in
+            ( { model | state = TeamReady allTeams data }
+            , loadTeamData team.id team.tournament
+            )
+
+        [] ->
+            ( model, Effect.none )
+
+
+handleSaveSecondTeamResponse :
+    Json.Decode.Value
+    -> List Api.Team
+    -> TeamData
+    -> Model
+    -> ( Model, Effect Msg )
+handleSaveSecondTeamResponse value allTeams data model =
+    case Pb.decodeRecord Api.teamDecoder value of
+        Ok newTeam ->
+            ( { model
+                | state =
+                    TeamReady
+                        (allTeams ++ [ newTeam ])
+                        { data | secondTeamForm = SecondTeamFormHidden }
+              }
+            , Effect.none
+            )
+
+        Err _ ->
+            ( { model
+                | state =
+                    TeamReady allTeams
+                        { data
+                            | secondTeamForm =
+                                case data.secondTeamForm of
+                                    SecondTeamFormSaving fields ->
+                                        SecondTeamFormOpen fields
+                                            [ "Failed to register second team." ]
+
+                                    other ->
+                                        other
+                        }
+              }
+            , Effect.none
+            )
+
+
+loadTeamData : String -> String -> Effect Msg
+loadTeamData teamId tournamentId =
+    Effect.batch
+        [ Pb.publicList
+            { collection = "tournaments"
+            , tag = "tournament"
+            , filter = "id = '" ++ tournamentId ++ "'"
+            , sort = ""
+            }
+        , Pb.publicList
+            { collection = "eligibility_list_entries"
+            , tag = "entries"
+            , filter = "team = '" ++ teamId ++ "' && status = 'active'"
+            , sort = "name"
+            }
+        , Pb.publicList
+            { collection = "eligibility_change_requests"
+            , tag = "change-requests"
+            , filter = "team = '" ++ teamId ++ "'"
+            , sort = "-created"
+            }
+        , Pb.publicList
+            { collection = "co_coaches"
+            , tag = "co-coaches"
+            , filter = "team = '" ++ teamId ++ "'"
+            , sort = "name"
+            }
+        , Pb.publicList
+            { collection = "attorney_coaches"
+            , tag = "attorney-coaches"
+            , filter = "team = '" ++ teamId ++ "'"
+            , sort = "name"
+            }
+        , Pb.publicList
+            { collection = "withdrawal_requests"
+            , tag = "withdrawal-requests"
+            , filter =
+                "team = '" ++ teamId ++ "' && status = 'pending'"
+            , sort = "-created"
+            }
+        ]
 
 
 updateTeamData : Msg -> TeamData -> ( TeamData, Effect Msg )
@@ -680,6 +765,68 @@ updateTeamData msg data =
         CancelWithdrawalForm ->
             ( { data | withdrawalForm = WithdrawalFormHidden }, Effect.none )
 
+        SelectTeam _ ->
+            -- Handled at update level before reaching updateTeamData.
+            ( data, Effect.none )
+
+        ShowSecondTeamForm ->
+            ( { data | secondTeamForm = SecondTeamFormOpen { name = "" } [] }
+            , Effect.none
+            )
+
+        UpdateSecondTeamName val ->
+            case data.secondTeamForm of
+                SecondTeamFormOpen _ _ ->
+                    ( { data
+                        | secondTeamForm = SecondTeamFormOpen { name = val } []
+                      }
+                    , Effect.none
+                    )
+
+                _ ->
+                    ( data, Effect.none )
+
+        SaveSecondTeam ->
+            case data.secondTeamForm of
+                SecondTeamFormOpen { name } _ ->
+                    let
+                        trimmed =
+                            String.trim name
+                    in
+                    if String.isEmpty trimmed then
+                        ( { data
+                            | secondTeamForm =
+                                SecondTeamFormOpen
+                                    { name = name }
+                                    [ "Team name is required." ]
+                          }
+                        , Effect.none
+                        )
+
+                    else
+                        ( { data
+                            | secondTeamForm =
+                                SecondTeamFormSaving { name = trimmed }
+                          }
+                        , Pb.publicCreate
+                            { collection = "teams"
+                            , tag = "save-second-team"
+                            , body =
+                                Api.encodeSecondTeam
+                                    { tournament = data.team.tournament
+                                    , school = data.team.school
+                                    , name = trimmed
+                                    , coach = data.team.coach
+                                    }
+                            }
+                        )
+
+                _ ->
+                    ( data, Effect.none )
+
+        CancelSecondTeamForm ->
+            ( { data | secondTeamForm = SecondTeamFormHidden }, Effect.none )
+
 
 handleTeamPbMsg : Json.Decode.Value -> TeamData -> ( TeamData, Effect Msg )
 handleTeamPbMsg value data =
@@ -992,13 +1139,13 @@ view model =
             LoadFailed err ->
                 [ UI.error err ]
 
-            TeamReady data ->
-                viewTeam data
+            TeamReady allTeams data ->
+                viewTeam allTeams data
     }
 
 
-viewTeam : TeamData -> List (Html Msg)
-viewTeam data =
+viewTeam : List Api.Team -> TeamData -> List (Html Msg)
+viewTeam allTeams data =
     let
         locked =
             case data.tournament of
@@ -1010,14 +1157,22 @@ viewTeam data =
 
         readOnly =
             data.team.status == Api.TeamWithdrawn
+
+        hasPendingTeam =
+            List.any (\t -> t.status == Api.TeamPending) allTeams
     in
     [ UI.titleBar
         { title = "Manage Team — " ++ data.team.name
         , actions = []
         }
+    , viewTeamSelector allTeams data.team
     , viewWithdrawalSection data
     , viewEligibilitySection locked readOnly data
     , viewCoachesSection readOnly data
+    , if not readOnly && not hasPendingTeam then
+        viewSecondTeamSection data
+      else
+        UI.empty
     ]
 
 
@@ -1752,5 +1907,121 @@ viewWithdrawalForm fields =
                         [ text "Cancel" ]
                     ]
                 ]
+            ]
+        ]
+
+
+viewTeamSelector : List Api.Team -> Api.Team -> Html Msg
+viewTeamSelector allTeams currentTeam =
+    if List.length allTeams <= 1 then
+        UI.empty
+
+    else
+        UI.card
+            [ UI.cardBody
+                [ UI.cardTitle "Your Teams"
+                , div [ Attr.class "flex flex-wrap gap-2" ]
+                    (List.map (viewTeamSelectorButton currentTeam.id) allTeams)
+                ]
+            ]
+
+
+viewTeamSelectorButton : String -> Api.Team -> Html Msg
+viewTeamSelectorButton currentId team =
+    let
+        isSelected =
+            team.id == currentId
+
+        statusBadge =
+            case team.status of
+                Api.TeamPending ->
+                    " (pending)"
+
+                Api.TeamWithdrawn ->
+                    " (withdrawn)"
+
+                Api.TeamRejected ->
+                    " (rejected)"
+
+                Api.TeamActive ->
+                    ""
+    in
+    button
+        [ Attr.class
+            (if isSelected then
+                "btn btn-sm btn-primary"
+
+             else
+                "btn btn-sm btn-outline"
+            )
+        , Events.onClick (SelectTeam team.id)
+        , Attr.disabled isSelected
+        ]
+        [ text (team.name ++ statusBadge) ]
+
+
+viewSecondTeamSection : TeamData -> Html Msg
+viewSecondTeamSection data =
+    UI.card
+        [ UI.cardBody
+            [ UI.cardTitle "Register Second Team"
+            , case data.secondTeamForm of
+                SecondTeamFormHidden ->
+                    div []
+                        [ p [ Attr.class "text-sm mb-4" ]
+                            [ text
+                                ("If RCOE has invited your school to register "
+                                    ++ "a second team, use this form to submit it."
+                                )
+                            ]
+                        , button
+                            [ Attr.class "btn btn-sm btn-outline"
+                            , Events.onClick ShowSecondTeamForm
+                            ]
+                            [ text "+ Register Second Team" ]
+                        ]
+
+                SecondTeamFormOpen fields errors ->
+                    Html.form
+                        [ Events.onSubmit SaveSecondTeam
+                        , Attr.class "mt-2"
+                        ]
+                        [ UI.errorList errors
+                        , label [ Attr.class "form-control w-full" ]
+                            [ div [ Attr.class "label" ]
+                                [ span [ Attr.class "label-text" ]
+                                    [ text "Team Name" ]
+                                ]
+                            , input
+                                [ Attr.class "input input-bordered w-full"
+                                , Attr.type_ "text"
+                                , Attr.value fields.name
+                                , Attr.placeholder
+                                    (data.team.name ++ " B")
+                                , Events.onInput UpdateSecondTeamName
+                                , Attr.autofocus True
+                                ]
+                                []
+                            ]
+                        , div [ Attr.class "mt-4 flex gap-2" ]
+                            [ button
+                                [ Attr.class "btn btn-primary"
+                                , Attr.type_ "submit"
+                                ]
+                                [ text "Submit" ]
+                            , button
+                                [ Attr.class "btn btn-ghost"
+                                , Attr.type_ "button"
+                                , Events.onClick CancelSecondTeamForm
+                                ]
+                                [ text "Cancel" ]
+                            ]
+                        ]
+
+                SecondTeamFormSaving _ ->
+                    div [ Attr.class "flex items-center gap-2" ]
+                        [ span [ Attr.class "loading loading-spinner loading-sm" ] []
+                        , text "Submitting..."
+                        ]
             ]
         ]
