@@ -12,6 +12,7 @@ import Route exposing (Route)
 import Route.Path
 import Shared
 import Shared.Msg
+import UI
 import View exposing (View)
 
 
@@ -134,20 +135,18 @@ view : Model -> View Msg
 view model =
     { title = "Admin Login"
     , body =
-        [ section [ Attr.class "hero is-fullheight" ]
-            [ div [ Attr.class "hero-body" ]
-                [ div [ Attr.class "container" ]
-                    [ div
-                        [ Attr.class "columns is-centered"
-                        ]
-                        [ div [ Attr.class "column is-4" ]
-                            [ h1
-                                [ Attr.class
-                                    "title has-text-centered"
-                                ]
-                                [ text "Admin Login" ]
-                            , viewLoginForm model
-                            ]
+        [ div [ Attr.class "min-h-screen flex items-center justify-center" ]
+            [ div [ Attr.class "w-full max-w-sm" ]
+                [ UI.card
+                    [ UI.cardBody
+                        [ UI.cardTitle "Admin Login"
+                        , case model.error of
+                            Just err ->
+                                UI.error err
+
+                            Nothing ->
+                                UI.empty
+                        , viewLoginForm model
                         ]
                     ]
                 ]
@@ -159,57 +158,19 @@ view model =
 viewLoginForm : Model -> Html Msg
 viewLoginForm model =
     Html.form [ Events.onSubmit SubmitLogin ]
-        [ case model.error of
-            Just err ->
-                div
-                    [ Attr.class "notification is-danger"
-                    ]
-                    [ text err ]
-
-            Nothing ->
-                text ""
-        , div [ Attr.class "field" ]
-            [ label [ Attr.class "label" ]
-                [ text "Email" ]
-            , div [ Attr.class "control" ]
-                [ input
-                    [ Attr.class "input"
-                    , Attr.type_ "email"
-                    , Attr.placeholder
-                        "admin@example.com"
-                    , Attr.value model.email
-                    , Events.onInput EmailChanged
-                    ]
-                    []
-                ]
-            ]
-        , div [ Attr.class "field" ]
-            [ label [ Attr.class "label" ]
-                [ text "Password" ]
-            , div [ Attr.class "control" ]
-                [ input
-                    [ Attr.class "input"
-                    , Attr.type_ "password"
-                    , Attr.value model.password
-                    , Events.onInput PasswordChanged
-                    ]
-                    []
-                ]
-            ]
-        , div [ Attr.class "field" ]
-            [ div [ Attr.class "control" ]
-                [ button
-                    [ Attr.class
-                        (if model.loading then
-                            "button is-primary is-fullwidth is-loading"
-
-                         else
-                            "button is-primary is-fullwidth"
-                        )
-                    , Attr.type_ "submit"
-                    , Attr.disabled model.loading
-                    ]
-                    [ text "Login" ]
-                ]
+        [ UI.textField
+            { label = "Email"
+            , value = model.email
+            , onInput = EmailChanged
+            , required = True
+            }
+        , UI.passwordField
+            { label = "Password"
+            , value = model.password
+            , onInput = PasswordChanged
+            }
+        , div [ Attr.class "mt-4" ]
+            [ UI.primaryButton
+                { label = "Login", loading = model.loading }
             ]
         ]

@@ -14,6 +14,7 @@ module UI exposing
     , loading
     , note
     , numberField
+    , passwordField
     , primaryButton
     , selectField
     , statCard
@@ -182,6 +183,35 @@ textField config =
             , Attr.value config.value
             , Events.onInput config.onInput
             , Attr.required config.required
+            ]
+            []
+        ]
+
+
+{-| Password input. Same as textField but always type="password".
+
+    UI.passwordField
+        { label = "Password"
+        , value = model.password
+        , onInput = PasswordChanged
+        }
+
+-}
+passwordField :
+    { label : String
+    , value : String
+    , onInput : String -> msg
+    }
+    -> Html msg
+passwordField config =
+    label [ Attr.class "form-control w-full" ]
+        [ div [ Attr.class "label" ]
+            [ span [ Attr.class "label-text" ] [ text config.label ] ]
+        , input
+            [ Attr.class "input input-bordered w-full"
+            , Attr.type_ "password"
+            , Attr.value config.value
+            , Events.onInput config.onInput
             ]
             []
         ]
