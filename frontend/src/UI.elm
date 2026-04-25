@@ -12,6 +12,7 @@ module UI exposing
     , filterSelect
     , formColumns
     , loading
+    , note
     , numberField
     , primaryButton
     , selectField
@@ -451,3 +452,8 @@ filterSelect config =
 badge : { label : String, variant : String } -> Html msg
 badge config =
     span [ Attr.class ("badge badge-" ++ config.variant) ] [ text config.label ]
+
+
+note : String -> Html msg
+note t =
+    p [ Attr.class "text-sm text-base-content/60 mt-1" ] [ text t ]

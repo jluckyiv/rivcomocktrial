@@ -10,6 +10,10 @@
     "fe:dev": "cd frontend && PATH=\"./node_modules/.bin:$PATH\" elm-land server",
     "fe:build": "cd frontend && PATH=\"./node_modules/.bin:$PATH\" elm-land build",
     "fe:review": "cd frontend && npx elm-review",
-    "fe:test": "cd frontend && npx elm-test"
+    "fe:test": "cd frontend && npx elm-test",
+    "e2e": "PB_ADMIN_EMAIL=$(op read 'op://Private/localhost dev pocketbase admin user/Email') PB_ADMIN_PASSWORD=$(op read 'op://Private/localhost dev pocketbase admin user/Password') npx playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1"
   }
 }

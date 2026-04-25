@@ -20,5 +20,9 @@ docker-compose.override.yml
 .env
 .env.local
 
+# Playwright
+test-results/
+playwright-report/
+
 # Reference data (RCOE scores, rosters, PDFs — local only)
 reference/
