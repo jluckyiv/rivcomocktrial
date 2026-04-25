@@ -107,7 +107,7 @@ update _ msg model =
                 , Effect.pushRoutePath
                     (redirect
                         |> Maybe.withDefault
-                            Route.Path.Admin_Tournaments
+                            Route.Path.Admin
                     )
                 ]
             )

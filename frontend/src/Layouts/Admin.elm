@@ -120,7 +120,8 @@ viewNavbar model route =
                     ]
                 , if model.burgerOpen then
                     ul [ Attr.class "menu menu-sm dropdown-content bg-neutral text-neutral-content mt-3 z-10 w-52 p-2 shadow-lg rounded-box" ]
-                        [ mobileNavItem route Route.Path.Admin_Tournaments "Tournaments"
+                        [ mobileNavItem route Route.Path.Admin "Dashboard"
+                        , mobileNavItem route Route.Path.Admin_Tournaments "Tournaments"
                         , mobileNavItem route Route.Path.Admin_Schools "Schools"
                         , mobileNavItem route Route.Path.Admin_Teams "Teams"
                         , mobileNavItem route Route.Path.Admin_Students "Students"
@@ -137,7 +138,8 @@ viewNavbar model route =
             ]
         , div [ Attr.class "navbar-center hidden lg:flex" ]
             [ ul [ Attr.class "menu menu-horizontal px-1" ]
-                [ navItem route Route.Path.Admin_Tournaments "Tournaments"
+                [ navItem route Route.Path.Admin "Dashboard"
+                , navItem route Route.Path.Admin_Tournaments "Tournaments"
                 , navItem route Route.Path.Admin_Schools "Schools"
                 , navItem route Route.Path.Admin_Teams "Teams"
                 , navItem route Route.Path.Admin_Students "Students"
