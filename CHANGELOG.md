@@ -6,6 +6,37 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.5.10 — Admin Trials page + ballot schema (#111, #129, #130, #137)
+
+### Added
+
+- `Pages/Admin/Trials.elm`: trial management per round — inline judge/scorer
+  assignment (setup mode), submission count monitoring, Open/Lock/Unlock
+  round status controls
+- "Manage Trials" button per round row on Rounds page
+- `judges` collection: name + email
+- `rounds`: `status` (upcoming/open/locked), `ranking_min`, `ranking_max`
+- `trials`: `judge`, `scorer_1`–`scorer_5` relation fields
+- `presider_ballots`: `motion_ruling`, `verdict` fields
+- `Api.elm`: `Judge`, `RoundStatus`, `MotionRuling`, `TrialVerdict` types
+  with decoders and encoders
+
+### Fixed
+
+- `Api.elm`: 13 `fieldWithDefault` calls on required schema fields converted
+  to `Decode.field` (fail loudly on missing data)
+- `registration.pb.js`: pre-commit guard rejects registration when no open
+  tournament exists, preventing orphaned accounts
+- `ballot_guard.pb.js`: extracted `validateScorerToken` and `markTokenUsed`
+  helpers, removing ~80 lines of duplicated scorer/presider logic
+- `interop.js`: corrupted `coachUser` localStorage now logs a warning and
+  cleans up instead of silently failing
+
+### Tests
+
+- `ApiDecoderTest`: 29 new decoder tests covering all new Api types
+- `TrialsHelperTest`: 14 new tests for `fieldValue` and `applyFieldValue`
+
 ## v0.5.9 — Pairings FormState + BulkState refactor (#126)
 
 ### Changed
