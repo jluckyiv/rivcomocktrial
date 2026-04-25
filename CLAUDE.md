@@ -6,6 +6,60 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Admin-side competition management tool + public-facing site for Riverside County Mock Trial.
 
+## Refactor in progress — read this before writing Elm
+
+The frontend is mid-refactor toward idiomatic Elm architecture
+(ADR-012, ADR-013). Past sessions drifted into a React-shaped design;
+we are correcting it. Before writing or reviewing any Elm code:
+
+1. **Read `docs/elm-conventions.md`** — what idiomatic Elm looks like
+   in this codebase. One module per domain concept, decoder/encoder
+   live with the type, no sidecar `Codec`/`Assembly`/`Form` modules,
+   no components-with-state, parse don't validate, single source of
+   truth via IDs+Dicts, **test business logic only** (the type system
+   handles validation; tests target rules and algorithms).
+2. **Read `docs/refactor-process.md`** — how we move the codebase
+   toward the conventions, slice by slice (one workflow step per
+   slice, four passes per slice).
+3. **Use the `/refactor-slice` skill** at the start of each slice. It
+   loads the checklist and walks the four passes as gated stages.
+
+### Persistence freeze (ADR-013)
+
+These paths are read-only for the duration of the refactor:
+
+- `backend/pb_hooks/**`
+- `backend/pb_migrations/**`
+- `frontend/src/Api.elm` (until deleted per ADR-012)
+- `frontend/src/Pb.elm` internals
+
+Default response when a slice wants a wire change is "work around in
+the entity's module." Override only when a domain-side workaround
+would introduce a lying type. In-session: `PERSISTENCE_UNFREEZE=1`.
+Commit-time: `ALLOW_FROZEN_EDIT=1 git commit ...`. Each thaw is
+documented as its own ADR.
+
+### TDD-first
+
+- New file in `frontend/src/<Entity>.elm` requires
+  `frontend/tests/<Entity>Test.elm` to exist with a failing test
+  first. Enforced by PreToolUse hook.
+- Modifying an existing domain module requires a paired edit to
+  its test file in the same commit. Enforced by lefthook.
+- All pre-existing tests stay green.
+- Override (scaffolding only): `TDD_BYPASS=1` for the in-session
+  hook, `ALLOW_UNPAIRED=1` for lefthook.
+
+### Architecture lock
+
+Pages migrated to the new architecture cannot import `Api` or `Pb`
+directly — they call typed network functions on the entity module
+(e.g. `School.list { onResponse = GotSchools }`).
+`frontend/review/src/NoPbOrApiInMigratedPages.elm` is an elm-review
+rule with a per-page allowlist that shrinks one entry per slice and
+reaches `[]` at refactor completion. At that point `Api.elm` has
+no callers and is deleted.
+
 ## Stack
 
 - **Frontend:** Elm (elm-land v0.20.1) — file-based routing SPA
@@ -78,18 +132,32 @@ Auth tokens are in-memory only (no SDK auto-persistence); manually saved to `loc
 
 ### Page module pattern
 
-Every page follows this structure:
+The Elm Land page surface is preserved (we do not change framework
+conventions):
 
 ```elm
 page : Auth.User -> Shared.Model -> Route () -> Page Model Msg
-
--- Model has RemoteData for fetched collections, form state as a sum type
--- Msg has PbMsg Json.Decode.Value as the single port response handler
--- update routes on Pb.responseTag value, then decodes with Pb.decodeList/decodeRecord
--- subscriptions = Pb.subscribe PbMsg
+page _ _ _ =
+    Page.new { init, update, view, subscriptions }
+        |> Page.withLayout (\_ -> Layouts.Admin {})
 ```
 
-`Pages/Admin/Tournaments.elm` is the canonical reference implementation.
+What changes per the refactor (see `docs/elm-conventions.md`):
+
+- `Model` holds **domain types**, not `Api.X` wire records.
+- The page imports the **entity module** (e.g. `School`), not
+  `Api` or `Pb`. It calls typed network functions like
+  `School.list { onResponse = GotSchools }`.
+- `Msg` and `update` route the response through the entity
+  module's `RemoteData` channel.
+- Form state lives in the page Model. Field-change messages run
+  smart constructors on input and store the `Result`.
+
+**Note:** `Pages/Admin/Tournaments.elm` and `Pages/Admin/Schools.elm`
+are the *current* reference implementations but follow the *old* (to
+be replaced) pattern of caching `Api.X` in `Model` and importing
+`Pb` directly. Do not copy them. Migrated pages are tracked by the
+`NoPbOrApiInMigratedPages` elm-review rule.
 
 ### UI helpers
 
@@ -103,7 +171,14 @@ page : Auth.User -> Shared.Model -> Route () -> Page Model Msg
 
 ### Domain design
 
-Domain modules use opaque types with smart constructors returning `Result (List Error.Error) a`. Prefer sum types over booleans for state. See `docs/decisions.md` for ADRs and `docs/domain-audit.md` for the full inventory.
+Domain modules use opaque types with smart constructors returning `Result (List Error.Error) a`. Prefer sum types over booleans for state.
+
+- **`docs/elm-conventions.md`** — the full set of Elm conventions
+  (mandatory reading before contributing).
+- **`docs/refactor-process.md`** — the slice-based protocol for
+  the active refactor.
+- **`docs/decisions.md`** — ADRs (especially ADR-009, ADR-012, ADR-013).
+- **`docs/domain-audit.md`** — inventory of existing domain modules.
 
 ## Backend Architecture
 

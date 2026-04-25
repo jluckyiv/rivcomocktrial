@@ -5,6 +5,269 @@ rationale. Newest first.
 
 ---
 
+## ADR-013: Persistence layer freeze during domain refactor
+
+**Date:** 2026-04-25
+
+**Context:** ADR-012 begins a workflow-driven rebuild
+of the frontend domain layer. The rebuild needs space
+to think domain-first without persistence concerns
+leaking back in. Past sessions have repeatedly resolved
+domain modeling tensions by reaching for the wire
+format — adding fields to PocketBase migrations,
+tweaking hooks, expanding `Api.elm` decoders — instead
+of solving the problem in the domain layer.
+
+**Decision:** Freeze the persistence layer for the
+duration of the refactor. The following paths are
+read-only:
+
+- `backend/pb_hooks/**`
+- `backend/pb_migrations/**`
+- `frontend/src/Api.elm`
+- `frontend/src/Pb.elm` (internals; the public surface
+  stays usable)
+
+Three-layer enforcement:
+
+1. **Claude Code hooks** — `permissions.deny` entries
+   in `.claude/settings.json` block `Edit`/`Write`/
+   `MultiEdit` against frozen paths. A `PreToolUse`
+   `Bash` hook (`freeze-bash-guard.sh`) blocks shell
+   write idioms (`>`, `tee`, `sed -i`, `mv`, `cp`,
+   `rm`) targeting frozen paths.
+2. **lefthook pre-commit** — blocks any commit that
+   stages a frozen path.
+3. **CI** — blocks any PR whose diff touches a frozen
+   path without an authorized override.
+
+When a slice wants a wire change, the default response
+is "work around it in the entity's module." The slice
+stops, surfaces the proposal (failing assumption,
+minimal repro, proposed change), and waits. Only if a
+domain-side workaround would introduce a lying type
+does the user thaw the freeze for that one commit.
+Approved changes are documented as their own ADR.
+Deferred changes accumulate in
+`docs/persistence-debt.md` and are addressed in a
+dedicated catch-up milestone after the prelim-round
+slices land.
+
+`frontend/src/Api.elm` is frozen until it has no
+remaining importers (per ADR-012), at which point it
+is deleted. After deletion, the deny rule for that
+specific path becomes moot and is removed.
+`frontend/src/Pb.elm` stays — it is the port-mechanics
+module used internally by domain modules — and its
+internals stay frozen.
+
+**Override mechanism:**
+
+- In-session: `PERSISTENCE_UNFREEZE=1` env var (the
+  Bash guard checks for this).
+- Commit-time: `ALLOW_FROZEN_EDIT=1 git commit ...`
+  (matches the existing `ALLOW_MAIN_COMMIT=1` idiom in
+  `.claude/settings.local.json`).
+
+Both are explicit, per-invocation, and leave a trail
+in the agent transcript or commit log.
+
+**Rationale:**
+
+- The hardest part of a domain rebuild is staying in
+  the domain. Removing the path of least resistance
+  (modifying the wire format) forces the work into the
+  right layer.
+- Defense in depth: Claude hooks block in-session,
+  lefthook catches manual `git commit`, CI catches
+  `--no-verify` bypasses on push.
+- Per-invocation overrides preserve the user's ability
+  to make legitimate persistence changes when they're
+  truly necessary, without leaving a persistent flag
+  that could silently disable the freeze.
+
+**Consequences:**
+
+- Some wire-format issues defer to a queue. The queue
+  is bounded (the catch-up milestone) so debt does not
+  accumulate forever.
+- New PocketBase migrations cannot be added during the
+  freeze. Schema changes wait for the catch-up milestone
+  or trigger a freeze thaw with an ADR.
+- The freeze applies to AI assistants and humans alike;
+  the user must opt in deliberately when overriding.
+
+---
+
+## ADR-012: One module per domain concept; pages talk only to domain modules
+
+**Date:** 2026-04-25
+
+**Context:** The frontend has 50+ top-level domain
+modules and 49 unit test files. The early domain work
+(opaque types, smart constructors,
+`Result (List Error.Error) a`,
+`Assignment a = NotAssigned | Assigned a`,
+`PowerMatch.elm`) is sound. The disease lives at the
+page boundary:
+
+- `frontend/src/Api.elm` is one giant flat module that
+  mirrors every PocketBase table. Pages import it and
+  cache `Api.X` records in their `Model`.
+- Pages call `Pb.adminList { collection = "schools" }`
+  and decode with `Api.schoolDecoder` inline. Pages
+  know about wire shapes, collection names, and
+  decoder mechanics.
+- Form state is raw `String`; validation runs only on
+  submit, duplicating logic that domain modules
+  already encode.
+
+The shape is React/TypeScript-style: a typed DTO layer
+(`Api.elm`) that pages consume directly. Idiomatic Elm
+does not work this way.
+
+**Reference:** elm-land's official realworld example
+(`github.com/elm-land/realworld-app`) and the official
+guide section "Web Apps - Structure"
+(`guide.elm-lang.org/webapps/structure`).
+
+**Decision:** Adopt the elm-land convention. Each
+domain concept is one module that owns everything
+related to that concept:
+
+- The type (and any related sum types).
+- Smart constructors returning `Result (List Error) a`.
+- Accessors.
+- `decoder : Decoder X` — produces a domain value
+  directly, calling the smart constructor inside and
+  failing the decoder on `Err`.
+- `encoder : NewX -> Encode.Value` (or equivalent for
+  whatever the write payload is).
+- Typed network functions:
+  `list : { onResponse : RemoteData (List X) -> msg } -> Effect msg`,
+  `create : { value : NewX, onResponse : ... } -> Effect msg`,
+  `update`, `delete`. These wrap the existing
+  `Pb.adminList`/`Pb.adminCreate`/etc. port helpers.
+
+A page imports only the domain modules it uses (e.g.
+`School`) and `Effect`. It does not import `Api` or
+`Pb`. It calls `School.list { onResponse = GotSchools }`
+and stores `RemoteData (List School)` in its `Model`.
+
+The flat `Api.elm` is the React-shaped artifact. It
+gets deleted, not isolated. As each page migrates, it
+stops importing `Api`. When no page imports `Api`, the
+module has no callers and we delete it.
+
+**Architecture lock:** A custom elm-review rule
+(`NoPbOrApiInMigratedPages`) maintains a per-page
+allowlist of pages still importing `Pb` or `Api`. The
+list shrinks one entry per migrated page and reaches
+`[]` at refactor completion.
+
+**Patterns we adopt (kept where they exist, added where they
+do not):**
+
+- **`Assignment a = NotAssigned | Assigned a`** for slot-like
+  fields. Already in `frontend/src/Assignment.elm`. Prefer to
+  `Maybe`.
+- **`RemoteData a` from the `krisajenkins/remotedata` package**
+  for request state. The current
+  `frontend/src/RemoteData.elm` is a homebrew knockoff with
+  fewer states (no `NotAsked`), a degraded error type
+  (`String`, not parameterized), and only `map` defined; it
+  will be replaced by the package and deleted as the first
+  concrete code change of this refactor.
+- **`New X` vs `X`** for unpersisted vs persisted entities
+  when an entity has identity. The page form holds field state
+  and runs smart constructors on input; the assembled `NewX`
+  is what the encoder receives.
+- **Typed IDs.** Phantom-typed `Id a` or per-entity opaque IDs
+  — either is fine, picked per case. The constraint is no raw
+  `String` IDs in persisted types, and the compiler must
+  reject mixing IDs from different entities. (Quenneville,
+  *What's in a Number?*)
+- **Single source of truth via immutable relational data.**
+  Going from JS objects to Elm records accidentally creates
+  multiple sources of truth — nested records become
+  independent copies. Store IDs in inner types and keep
+  entities in top-level `Dict`s on the `Model`. Compose with
+  `Dict.filter`/`Dict.intersect`/`Dict.get`. Treat the `Model`
+  like a relational database. Existing modules that embed
+  full records (e.g., `Pairing` carrying `Team`) will switch
+  to ID-based references during their respective slices.
+  (Feldman, *Immutable Relational Data*.)
+- **Test scope: business logic only.** Per
+  `docs/elm-conventions.md` §7. Tests target business rules
+  in smart constructors, pure algorithm functions, state
+  transitions, and decoder behavior on fixture JSON when the
+  decoder runs business validation. They do not target
+  decoder mechanics, accessors, type-system guarantees, or
+  trivially-impossible branches. (Feldman, *Elm in the Spring
+  2020* keynote; Kearns, *To test or not to test*.)
+
+**Anti-patterns this ADR rules out:**
+
+- Sidecar modules (`<Entity>Assembly.elm`,
+  `<Entity>Codec.elm`, `<Entity>Form.elm`) that split
+  what belongs in one module. Decoders/encoders/network
+  calls live with the type.
+- Components with their own `Model`/`Msg`/`update`. Per
+  the official guide: "actively trying to make
+  components is a recipe for disaster." View helpers
+  are pure functions, named `viewX`, taking a record
+  of inputs and returning `Html msg`. They live in
+  `UI.elm` (existing convention) or in a new
+  `Components/` directory if the helper earns its own
+  file.
+- Pre-splitting modules speculatively. The official
+  guide says "do not plan ahead." Files grow as
+  needed; we split when a sub-concept earns its own
+  file.
+- Mirroring PocketBase column shapes in Elm types
+  (e.g. `scorer1`/`scorer2`/.../`scorer5`). The domain
+  type uses `List Scorer`; the encoder writes the five
+  columns; the decoder reads them. The wire shape
+  stays in the encoder/decoder; it does not leak into
+  the domain type.
+
+**Rationale:**
+
+- This is what elm-land's framework author actually
+  does in the canonical example. Following the
+  framework's own conventions removes guesswork and
+  matches what the framework's tooling expects.
+- Aligns with ADR-009 (parse, don't validate; sum
+  types over booleans).
+- The official guide is explicit: build modules
+  around a central type; do not separate code into
+  Model/Update/View files; don't make components.
+- Eliminating `Api.elm` makes the bad pattern
+  structurally impossible. Future work cannot
+  regress to "pages cache wire-shaped records"
+  because the shapes don't exist.
+
+**Consequences:**
+
+- Each existing domain module grows new exports as
+  its slice is reached: `decoder`, `encoder`, `list`,
+  `create`, `update`, `delete`. All TDD'd.
+- Pages stop importing `Api` and `Pb`. The mechanical
+  knowledge (collection names, port tagging) moves
+  from each page into the entity's module, defined
+  once.
+- `Api.elm` shrinks per slice and is deleted at the
+  end of the refactor.
+- The `NoPbOrApiInMigratedPages` elm-review rule's
+  allowlist tracks migration progress in source.
+- ADR-013 freezes the wire format during this work,
+  so the refactor cannot resolve domain tensions by
+  changing PocketBase. Workarounds happen in the
+  domain module first; freeze thaws are explicit and
+  documented.
+
+---
+
 ## ADR-011: Dual auth store isolation
 
 **Date:** 2026-04-15
