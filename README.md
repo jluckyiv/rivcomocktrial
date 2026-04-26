@@ -303,16 +303,31 @@ fly secrets set SMTP_PASSWORD=re_xxxxxxxxxxxx \
   --app rivcomocktrial
 ```
 
-### Creating a superuser on a deployed env
+### Bootstrapping a superuser on a fresh deploy
+
+`backend/pb_hooks/bootstrap_superuser.pb.js` creates one baseline
+superuser at PocketBase startup if `BOOTSTRAP_SUPERUSER_EMAIL` and
+`BOOTSTRAP_SUPERUSER_PASSWORD` are set. Idempotent — skips if the
+email already exists.
+
+Push the credentials from 1Password to fly via the helper:
 
 ```bash
-fly ssh console --config fly.staging.toml -C \
-  "pocketbase superuser upsert \
-  admin@example.com yourpassword \
-  --dir=/pb/pb_data"
+# Staging
+scripts/seed-prod-bootstrap.sh rivcomocktrial-staging
+
+# Production
+scripts/seed-prod-bootstrap.sh rivcomocktrial
 ```
 
-(Use `--config fly.toml` for production.)
+The helper reads `op://Private/rivcomocktrial/{username,password}`
+and runs `fly secrets set`. Safe to re-run; the hook only creates
+the superuser if one with that email doesn't already exist.
+
+**Fallback** if you can't use the helper: `fly secrets set
+BOOTSTRAP_SUPERUSER_EMAIL=... BOOTSTRAP_SUPERUSER_PASSWORD=... --app
+<app>` directly, or SSH in and run
+`pocketbase superuser upsert email password --dir=/pb/pb_data`.
 
 ## Documentation
 
