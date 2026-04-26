@@ -57,7 +57,7 @@ type FormState
 
 
 type alias Model =
-    { characters : RemoteData (List CaseCharacter)
+    { characters : RemoteData String (List CaseCharacter)
     , tournaments : List Tournament
     , form : FormState
     , deleting : Maybe String
@@ -107,10 +107,10 @@ update msg model =
                 Just "case-characters" ->
                     case Pb.decodeList Api.caseCharacterDecoder value of
                         Ok items ->
-                            ( { model | characters = Succeeded items }, Effect.none )
+                            ( { model | characters = Success items }, Effect.none )
 
                         Err _ ->
-                            ( { model | characters = Failed "Failed to load case characters." }, Effect.none )
+                            ( { model | characters = Failure "Failed to load case characters." }, Effect.none )
 
                 Just "tournaments" ->
                     case Pb.decodeList Api.tournamentDecoder value of
@@ -368,13 +368,16 @@ view model =
 viewDataTable : Model -> Html Msg
 viewDataTable model =
     case model.characters of
+        NotAsked ->
+            UI.notAsked "Getting ready…"
+
         Loading ->
             UI.loading
 
-        Failed err ->
+        Failure err ->
             UI.error err
 
-        Succeeded characters ->
+        Success characters ->
             let
                 filtered =
                     if model.filterTournament == "" then

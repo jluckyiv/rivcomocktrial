@@ -41,9 +41,9 @@ type alias SelectedCell =
 
 type alias Model =
     { tournaments : List Tournament
-    , teams : RemoteData (List Team)
-    , rounds : RemoteData (List Round)
-    , submissions : RemoteData (List RosterSubmission)
+    , teams : RemoteData String (List Team)
+    , rounds : RemoteData String (List Round)
+    , submissions : RemoteData String (List RosterSubmission)
     , entries : List RosterEntry
     , caseCharacters : List CaseCharacter
     , students : List Student
@@ -365,26 +365,26 @@ handlePbMsg value model =
         Just "teams" ->
             case Pb.decodeList Api.teamDecoder value of
                 Ok items ->
-                    ( { model | teams = Succeeded items }, Effect.none )
+                    ( { model | teams = Success items }, Effect.none )
 
                 Err _ ->
-                    ( { model | teams = Failed "Failed to load teams." }, Effect.none )
+                    ( { model | teams = Failure "Failed to load teams." }, Effect.none )
 
         Just "rounds" ->
             case Pb.decodeList Api.roundDecoder value of
                 Ok items ->
-                    ( { model | rounds = Succeeded items }, Effect.none )
+                    ( { model | rounds = Success items }, Effect.none )
 
                 Err _ ->
-                    ( { model | rounds = Failed "Failed to load rounds." }, Effect.none )
+                    ( { model | rounds = Failure "Failed to load rounds." }, Effect.none )
 
         Just "submissions" ->
             case Pb.decodeList Api.rosterSubmissionDecoder value of
                 Ok items ->
-                    ( { model | submissions = Succeeded items }, Effect.none )
+                    ( { model | submissions = Success items }, Effect.none )
 
                 Err _ ->
-                    ( { model | submissions = Failed "Failed to load submissions." }, Effect.none )
+                    ( { model | submissions = Failure "Failed to load submissions." }, Effect.none )
 
         Just "entries" ->
             case Pb.decodeList Api.rosterEntryDecoder value of
@@ -463,9 +463,9 @@ handlePbMsg value model =
                     let
                         updatedSubs =
                             case model.submissions of
-                                Succeeded subs ->
+                                Success subs ->
                                     if List.any (\s -> s.id == sub.id) subs then
-                                        Succeeded
+                                        Success
                                             (List.map
                                                 (\s ->
                                                     if s.id == sub.id then
@@ -478,10 +478,10 @@ handlePbMsg value model =
                                             )
 
                                     else
-                                        Succeeded (subs ++ [ sub ])
+                                        Success (subs ++ [ sub ])
 
                                 _ ->
-                                    Succeeded [ sub ]
+                                    Success [ sub ]
 
                         newPending =
                             model.savesPending - 1
@@ -546,10 +546,10 @@ entriesForCell teamId roundId side entries =
             )
 
 
-submissionForCell : String -> String -> Api.RosterSide -> RemoteData (List RosterSubmission) -> Maybe RosterSubmission
+submissionForCell : String -> String -> Api.RosterSide -> RemoteData String (List RosterSubmission) -> Maybe RosterSubmission
 submissionForCell teamId roundId side submissions =
     case submissions of
-        Succeeded subs ->
+        Success subs ->
             subs
                 |> List.filter
                     (\s ->
@@ -642,7 +642,7 @@ viewFilters model =
                     :: List.map (\t -> { value = t.id, label = t.name }) model.tournaments
             }
         , case model.rounds of
-            Succeeded rounds ->
+            Success rounds ->
                 let
                     filteredRounds =
                         if model.filterTournament == "" then
@@ -674,7 +674,7 @@ viewFilters model =
 viewDashboard : Model -> Html Msg
 viewDashboard model =
     case ( model.teams, model.rounds, model.submissions ) of
-        ( Succeeded teams, Succeeded rounds, Succeeded submissions ) ->
+        ( Success teams, Success rounds, Success submissions ) ->
             let
                 filteredTeams =
                     if model.filterTournament == "" then
@@ -709,13 +709,13 @@ viewDashboard model =
             else
                 viewMatrix activeTeams visibleRounds submissions model.selectedCell
 
-        ( Failed err, _, _ ) ->
+        ( Failure err, _, _ ) ->
             UI.error err
 
-        ( _, Failed err, _ ) ->
+        ( _, Failure err, _ ) ->
             UI.error err
 
-        ( _, _, Failed err ) ->
+        ( _, _, Failure err ) ->
             UI.error err
 
         _ ->
@@ -795,7 +795,7 @@ viewSelectedCell model =
             let
                 cellTeamName =
                     case model.teams of
-                        Succeeded teams ->
+                        Success teams ->
                             teams
                                 |> List.filter (\t -> t.id == cell.teamId)
                                 |> List.head
@@ -807,7 +807,7 @@ viewSelectedCell model =
 
                 cellRoundNumber =
                     case model.rounds of
-                        Succeeded rounds ->
+                        Success rounds ->
                             rounds
                                 |> List.filter (\r -> r.id == cell.roundId)
                                 |> List.head

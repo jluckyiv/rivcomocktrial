@@ -33,11 +33,11 @@ page _ _ _ =
 
 
 type alias Model =
-    { tournament : RemoteData Api.Tournament
-    , pendingCoaches : RemoteData (List Api.CoachUser)
-    , pendingWithdrawals : RemoteData (List Api.WithdrawalRequest)
-    , pendingEligibility : RemoteData (List Api.ChangeRequest)
-    , teams : RemoteData (List Api.Team)
+    { tournament : RemoteData String Api.Tournament
+    , pendingCoaches : RemoteData String (List Api.CoachUser)
+    , pendingWithdrawals : RemoteData String (List Api.WithdrawalRequest)
+    , pendingEligibility : RemoteData String (List Api.ChangeRequest)
+    , teams : RemoteData String (List Api.Team)
     }
 
 
@@ -118,65 +118,65 @@ update msg model =
                                         _ ->
                                             Effect.none
                             in
-                            ( { model | tournament = Succeeded tournament }
+                            ( { model | tournament = Success tournament }
                             , phaseEffects
                             )
 
                         Ok [] ->
-                            ( { model | tournament = Failed "no-active" }
+                            ( { model | tournament = Failure "no-active" }
                             , Effect.none
                             )
 
                         Err _ ->
-                            ( { model | tournament = Failed "Failed to load tournament." }
+                            ( { model | tournament = Failure "Failed to load tournament." }
                             , Effect.none
                             )
 
                 Just "pending-coaches" ->
                     case Pb.decodeList Api.coachUserDecoder value of
                         Ok coaches ->
-                            ( { model | pendingCoaches = Succeeded coaches }
+                            ( { model | pendingCoaches = Success coaches }
                             , Effect.none
                             )
 
                         Err _ ->
-                            ( { model | pendingCoaches = Failed "Failed to load pending coaches." }
+                            ( { model | pendingCoaches = Failure "Failed to load pending coaches." }
                             , Effect.none
                             )
 
                 Just "pending-withdrawals" ->
                     case Pb.decodeList Api.withdrawalRequestDecoder value of
                         Ok reqs ->
-                            ( { model | pendingWithdrawals = Succeeded reqs }
+                            ( { model | pendingWithdrawals = Success reqs }
                             , Effect.none
                             )
 
                         Err _ ->
-                            ( { model | pendingWithdrawals = Failed "Failed to load pending withdrawals." }
+                            ( { model | pendingWithdrawals = Failure "Failed to load pending withdrawals." }
                             , Effect.none
                             )
 
                 Just "pending-eligibility" ->
                     case Pb.decodeList Api.changeRequestDecoder value of
                         Ok reqs ->
-                            ( { model | pendingEligibility = Succeeded reqs }
+                            ( { model | pendingEligibility = Success reqs }
                             , Effect.none
                             )
 
                         Err _ ->
-                            ( { model | pendingEligibility = Failed "Failed to load eligibility requests." }
+                            ( { model | pendingEligibility = Failure "Failed to load eligibility requests." }
                             , Effect.none
                             )
 
                 Just "dashboard-teams" ->
                     case Pb.decodeList Api.teamDecoder value of
                         Ok teams ->
-                            ( { model | teams = Succeeded teams }
+                            ( { model | teams = Success teams }
                             , Effect.none
                             )
 
                         Err _ ->
-                            ( { model | teams = Failed "Failed to load teams." }
+                            ( { model | teams = Failure "Failed to load teams." }
                             , Effect.none
                             )
 
@@ -210,16 +210,19 @@ view model =
 viewBody : Model -> Html Msg
 viewBody model =
     case model.tournament of
+        NotAsked ->
+            UI.notAsked "Getting ready…"
+
         Loading ->
             UI.loading
 
-        Failed "no-active" ->
+        Failure "no-active" ->
             viewNoActiveTournament
 
-        Failed err ->
+        Failure err ->
             UI.error err
 
-        Succeeded tournament ->
+        Success tournament ->
             case tournament.status of
                 Api.TournamentRegistration ->
                     viewRegistrationPhase tournament model
@@ -400,14 +403,17 @@ viewCompletedPhase tournament =
 -- HELPERS
 
 
-remoteCount : RemoteData Int -> String
+remoteCount : RemoteData String Int -> String
 remoteCount rd =
     case rd of
+        NotAsked ->
+            "_"
+
         Loading ->
             "…"
 
-        Failed _ ->
+        Failure _ ->
             "?"
 
-        Succeeded n ->
+        Success n ->
             String.fromInt n

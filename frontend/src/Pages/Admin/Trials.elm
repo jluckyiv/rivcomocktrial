@@ -56,11 +56,11 @@ type RoundAction
 
 type alias Model =
     { roundId : String
-    , round : RemoteData Round
-    , trials : RemoteData (List Trial)
-    , teams : RemoteData (List Team)
-    , courtrooms : RemoteData (List Courtroom)
-    , judges : RemoteData (List Judge)
+    , round : RemoteData String Round
+    , trials : RemoteData String (List Trial)
+    , teams : RemoteData String (List Team)
+    , courtrooms : RemoteData String (List Courtroom)
+    , judges : RemoteData String (List Judge)
     , submissionCounts : Dict String Int
     , assignment : AssignmentState
     , roundAction : Maybe RoundAction
@@ -151,45 +151,45 @@ update msg model =
                 Just "round" ->
                     case Pb.decodeList Api.roundDecoder value of
                         Ok (round :: _) ->
-                            ( { model | round = Succeeded round }, Effect.none )
+                            ( { model | round = Success round }, Effect.none )
 
                         Ok [] ->
-                            ( { model | round = Failed "Round not found" }, Effect.none )
+                            ( { model | round = Failure "Round not found" }, Effect.none )
 
                         Err err ->
-                            ( { model | round = Failed err }, Effect.none )
+                            ( { model | round = Failure err }, Effect.none )
 
                 Just "trials" ->
                     case Pb.decodeList Api.trialDecoder value of
                         Ok trials ->
-                            ( { model | trials = Succeeded trials }, Effect.none )
+                            ( { model | trials = Success trials }, Effect.none )
 
                         Err err ->
-                            ( { model | trials = Failed err }, Effect.none )
+                            ( { model | trials = Failure err }, Effect.none )
 
                 Just "teams" ->
                     case Pb.decodeList Api.teamDecoder value of
                         Ok teams ->
-                            ( { model | teams = Succeeded teams }, Effect.none )
+                            ( { model | teams = Success teams }, Effect.none )
 
                         Err err ->
-                            ( { model | teams = Failed err }, Effect.none )
+                            ( { model | teams = Failure err }, Effect.none )
 
                 Just "courtrooms" ->
                     case Pb.decodeList Api.courtroomDecoder value of
                         Ok courtrooms ->
-                            ( { model | courtrooms = Succeeded courtrooms }, Effect.none )
+                            ( { model | courtrooms = Success courtrooms }, Effect.none )
 
                         Err err ->
-                            ( { model | courtrooms = Failed err }, Effect.none )
+                            ( { model | courtrooms = Failure err }, Effect.none )
 
                 Just "judges" ->
                     case Pb.decodeList Api.judgeDecoder value of
                         Ok judges ->
-                            ( { model | judges = Succeeded judges }, Effect.none )
+                            ( { model | judges = Success judges }, Effect.none )
 
                         Err err ->
-                            ( { model | judges = Failed err }, Effect.none )
+                            ( { model | judges = Failure err }, Effect.none )
 
                 Just "ballot-submissions" ->
                     case Pb.decodeList Api.ballotSubmissionDecoder value of
@@ -242,7 +242,7 @@ update msg model =
                 Just "update-round-status" ->
                     case Pb.decodeRecord Api.roundDecoder value of
                         Ok round ->
-                            ( { model | round = Succeeded round, roundAction = Nothing }
+                            ( { model | round = Success round, roundAction = Nothing }
                             , Effect.none
                             )
 
@@ -256,7 +256,7 @@ update msg model =
             let
                 currentValue =
                     case model.trials of
-                        Succeeded trials ->
+                        Success trials ->
                             trials
                                 |> List.filter (\t -> t.id == trialId)
                                 |> List.head
@@ -293,7 +293,7 @@ update msg model =
                     let
                         maybeTrial =
                             case model.trials of
-                                Succeeded trials ->
+                                Success trials ->
                                     trials
                                         |> List.filter (\t -> t.id == trialId)
                                         |> List.head
@@ -335,7 +335,7 @@ update msg model =
 
         ClickOpenRound ->
             case model.round of
-                Succeeded round ->
+                Success round ->
                     ( { model | roundAction = Just OpeningRound }
                     , Pb.adminUpdate
                         { collection = "rounds"
@@ -350,7 +350,7 @@ update msg model =
 
         ClickLockRound ->
             case model.round of
-                Succeeded round ->
+                Success round ->
                     ( { model | roundAction = Just LockingRound }
                     , Pb.adminUpdate
                         { collection = "rounds"
@@ -365,7 +365,7 @@ update msg model =
 
         ClickUnlockRound ->
             case model.round of
-                Succeeded round ->
+                Success round ->
                     ( { model | roundAction = Just UnlockingRound }
                     , Pb.adminUpdate
                         { collection = "rounds"
@@ -452,7 +452,7 @@ viewTitleBar model =
     let
         title =
             case model.round of
-                Succeeded round ->
+                Success round ->
                     "Round " ++ String.fromInt round.number ++ " — " ++ round.date
 
                 _ ->
@@ -468,7 +468,7 @@ viewTitleBar model =
 viewRoundActions : Model -> Html Msg
 viewRoundActions model =
     case model.round of
-        Succeeded round ->
+        Success round ->
             div [ Attr.class "flex items-center gap-4 mb-6" ]
                 [ viewStatusBadge round.status
                 , viewActionButton model.roundAction round.status
@@ -541,18 +541,21 @@ viewActionButton action status =
 viewTrialsTable : Model -> Html Msg
 viewTrialsTable model =
     case model.trials of
+        NotAsked ->
+            UI.notAsked "Getting ready…"
+
         Loading ->
             div [ Attr.class "text-center py-8" ]
                 [ span [ Attr.class "loading loading-spinner loading-lg" ] [] ]
 
-        Failed err ->
+        Failure err ->
             div [ Attr.class "alert alert-error" ] [ text err ]
 
-        Succeeded trials ->
+        Success trials ->
             let
                 teams =
                     case model.teams of
-                        Succeeded ts ->
+                        Success ts ->
                             ts
 
                         _ ->
@@ -560,7 +563,7 @@ viewTrialsTable model =
 
                 courtrooms =
                     case model.courtrooms of
-                        Succeeded cs ->
+                        Success cs ->
                             cs
 
                         _ ->
@@ -568,7 +571,7 @@ viewTrialsTable model =
 
                 judges =
                     case model.judges of
-                        Succeeded js ->
+                        Success js ->
                             js
 
                         _ ->
@@ -576,7 +579,7 @@ viewTrialsTable model =
 
                 editable =
                     case model.round of
-                        Succeeded round ->
+                        Success round ->
                             round.status == Upcoming
 
                         _ ->
@@ -584,7 +587,7 @@ viewTrialsTable model =
 
                 showSubmissions =
                     case model.round of
-                        Succeeded round ->
+                        Success round ->
                             round.status == Open || round.status == Locked
 
                         _ ->

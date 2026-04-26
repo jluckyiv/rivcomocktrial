@@ -62,7 +62,7 @@ type BulkState
 
 
 type alias Model =
-    { schools : RemoteData (List School)
+    { schools : RemoteData String (List School)
     , form : FormState
     , bulk : BulkState
     , deleting : Maybe String
@@ -107,10 +107,10 @@ update msg model =
                 Just "schools" ->
                     case Pb.decodeList Api.schoolDecoder value of
                         Ok items ->
-                            ( { model | schools = Succeeded items }, Effect.none )
+                            ( { model | schools = Success items }, Effect.none )
 
                         Err err ->
-                            ( { model | schools = Failed err }, Effect.none )
+                            ( { model | schools = Failure err }, Effect.none )
 
                 Just "save-school" ->
                     case Pb.decodeRecord Api.schoolDecoder value of
@@ -405,16 +405,19 @@ view model =
 viewDataTable : Model -> Html Msg
 viewDataTable model =
     case model.schools of
+        NotAsked ->
+            UI.notAsked "Getting ready…"
+
         Loading ->
             UI.loading
 
-        Failed err ->
+        Failure err ->
             UI.error err
 
-        Succeeded [] ->
+        Success [] ->
             UI.emptyState "No schools yet. Add one to get started."
 
-        Succeeded schools ->
+        Success schools ->
             UI.dataTable
                 { columns = [ "Name", "District", "Actions" ]
                 , rows = schools
