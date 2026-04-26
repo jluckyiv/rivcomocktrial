@@ -11,6 +11,7 @@ primary_region = "lax"
   SMTP_TLS = "true"
   SMTP_SENDER_ADDRESS = "noreply@rivcomocktrial.org"
   SMTP_SENDER_NAME = "Riverside County Mock Trial"
+  ORIGIN = "https://rivcomocktrial-staging.fly.dev"
 
 [http_service]
   internal_port = 8090

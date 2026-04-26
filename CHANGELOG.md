@@ -6,6 +6,44 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.9.3 — Single-origin Caddy reverse proxy on staging (PR 2/3 for #173)
+
+### Added
+
+- `backend/Caddyfile` — reverse proxy listening on `:8090` (the
+  external/Fly-edge port stays `8090` so PocketBase docs examples
+  copy-paste cleanly against both local dev and the production
+  image). Routes `/api/*` and `/_/*` to PocketBase at
+  `localhost:8091` (with `flush_interval -1` to preserve SSE for
+  realtime), everything else to the SvelteKit Node bundle at
+  `localhost:3000`. `auto_https off` because Fly terminates TLS at
+  the edge.
+- `backend/entrypoint.sh` — shell supervisor that starts PocketBase
+  on `127.0.0.1:8091`, the SvelteKit Node bundle on
+  `localhost:3000`, and Caddy on `:8090`, with `trap` + `wait -n`
+  so any process dying brings the machine down (Fly restarts).
+  PocketBase moved off `:8090` internally because Caddy on
+  `0.0.0.0:8090` and PB on `127.0.0.1:8090` collide on Linux
+  without `SO_REUSEPORT` — the wildcard bind covers the loopback
+  interface.
+- `docs/decisions.md` — ADR-015 captures the realtime/cookie
+  rationale for single-origin deploy.
+
+### Changed
+
+- `backend/Dockerfile` rewritten as three stages: `web-builder`
+  (Node, builds SvelteKit and prunes dev deps), `pb-fetcher`
+  (alpine, downloads the PocketBase binary in isolation), and the
+  final alpine runtime with PB + nodejs + caddy + tini. Drops the
+  Elm `frontend-builder` stage entirely. `EXPOSE 8090`.
+- `fly.staging.toml`: `internal_port` stays `8090` (Caddy now fronts
+  the container on that port). Added `ORIGIN =
+  "https://rivcomocktrial-staging.fly.dev"` to the env block;
+  adapter-node rejects POSTs whose `Origin` header doesn't match.
+- `.github/workflows/deploy.yml` path filter: dropped `frontend/**`,
+  added `web/**`. Production deploy stays unwired in this PR; PR 3
+  adds it.
+
 ## v0.9.2 — feat(web): adapter-node + deploy-aware PB URL (PR 1/3 for #173)
 
 ### Changed

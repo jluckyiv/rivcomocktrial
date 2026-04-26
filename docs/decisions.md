@@ -5,6 +5,84 @@ rationale. Newest first.
 
 ---
 
+## ADR-015: Single-origin deploy via Caddy reverse proxy
+
+**Date:** 2026-04-26
+
+**Context:** The SvelteKit rebuild (ADR-014) authenticates with
+httpOnly cookies set by `web/src/hooks.server.ts`. The tournament-day
+admin UI will use PocketBase realtime (Server-Sent Events). The PB JS
+SDK reads its auth token from a JS-accessible store to authenticate
+the realtime subscription, which conflicts with our httpOnly cookie if
+the SvelteKit app and PocketBase live on different origins.
+
+Two-origin deploys (e.g. Vercel for SvelteKit + Fly for PB) force one
+of:
+
+1. Share the auth cookie at parent domain `.rivcomocktrial.org` plus a
+   custom PB hook that reads it.
+2. A SvelteKit endpoint that mints a short-lived realtime token for
+   the SDK to use.
+
+Both add real complexity, a class of subtle cross-origin bugs, and
+SameSite=None cookies (which Safari ITP and Brave actively penalize).
+
+**Decision:** Deploy SvelteKit and PocketBase together in a single
+container behind a Caddy reverse proxy. One Fly app per environment.
+
+Internal layout:
+
+- Caddy listens on `:8090` (the only port Fly's edge connects to).
+  Keeping the external port at `8090` matches the PocketBase docs
+  so examples copy-paste cleanly against both `pb:dev` (direct PB)
+  and the production image (Caddy → PB).
+- PocketBase listens on `127.0.0.1:8091` inside the container. We
+  can't keep it on `127.0.0.1:8090` because Caddy's wildcard bind
+  on `0.0.0.0:8090` covers the loopback interface too — they
+  collide on Linux without `SO_REUSEPORT`.
+- SvelteKit Node bundle (`adapter-node`) listens on `localhost:3000`.
+- Caddy routes `/api/*` and `/_/*` to PocketBase; everything else to
+  SvelteKit. `flush_interval -1` on the PB route preserves SSE.
+- A small shell entrypoint supervises all three with `trap` +
+  `wait -n`. `tini` reaps zombies. No s6-overlay.
+- Fly terminates TLS at the edge; Caddy listens plain HTTP
+  (`auto_https off`).
+
+**Rationale:** Cookies stay SameSite=Lax because the browser, the
+SvelteKit Node bundle, and the PB API all share one origin. The PB
+SDK works as-is for realtime — no token-mint endpoint, no cookie
+bridging. CORS is gone. One URL per environment.
+
+**Alternatives considered:**
+
+- **SvelteKit proxies PocketBase.** SvelteKit forwards `/api/*` and
+  `/_/*` to localhost:8090 itself. Rejected: SvelteKit must proxy SSE
+  and PocketBase admin assets — more edge cases than Caddy and a
+  larger blast radius if SvelteKit hangs.
+- **Two Fly apps.** Independent deploys, but two URLs and a CORS
+  surface. Rejected for the cookie/realtime reasons above.
+- **Netlify (web) + Fly (PB).** Free PR previews, simpler Dockerfile.
+  Rejected for the same reasons. Revisit only if realtime is dropped
+  or a token-mint endpoint becomes acceptable.
+
+**Consequences:**
+
+- One image, one machine, one URL per environment. PB admin UI lives
+  at `rivcomocktrial.org/_/`, not a separate hostname.
+- Memory tightens: Node ~80 MB + PB ~30 MB + Caddy ~20 MB on a 512 MB
+  shared-cpu-1x machine. Workable; bump to `1gb` if PB OOMs under WAL
+  pressure.
+- Vertical scaling only. The SQLite volume is single-attach, so
+  scaling to >1 machine requires splitting PB onto its own app
+  (revisits this ADR). Not a concern at current load.
+- Three processes to supervise. Shell + `trap` + `wait -n` is enough
+  because Fly already restarts the whole machine on exit; per-service
+  restart isn't needed.
+- Caddy version pin (`caddy=...` in `apk add`) is worth considering if
+  SSE buffering regresses on a future release.
+
+---
+
 ## ADR-014: Elm rebuild abandoned; switching to SvelteKit
 
 **Date:** 2026-04-25
