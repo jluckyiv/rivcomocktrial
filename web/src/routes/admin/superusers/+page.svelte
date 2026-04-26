@@ -15,13 +15,13 @@
 		<h1 class="text-xl font-semibold">Superusers</h1>
 	</div>
 
-	<p class="text-muted-foreground mb-4 text-sm">
-		Superusers are RCOE administrators with full access. The primary contact's email is shown
-		on public registration pages.
+	<p class="mb-4 text-sm text-muted-foreground">
+		Superusers are RCOE administrators with full access. The primary contact's email is shown on
+		public registration pages.
 	</p>
 
 	{#if form?.error}
-		<p class="text-destructive mb-4 text-sm">{form.error}</p>
+		<p class="mb-4 text-sm text-destructive">{form.error}</p>
 	{/if}
 
 	<Table.Root>
@@ -38,7 +38,7 @@
 				<Table.Row>
 					{#if confirmDeleteId === su.id}
 						<Table.Cell class="text-muted-foreground" colspan={3}>
-							Delete <span class="text-foreground font-medium">{su.email}</span>?
+							Delete <span class="font-medium text-foreground">{su.email}</span>?
 						</Table.Cell>
 						<Table.Cell class="text-right">
 							<form method="POST" action="?/delete" class="inline" use:enhance>
@@ -71,13 +71,9 @@
 						</Table.Cell>
 						<Table.Cell class="text-right">
 							{#if su.id === data.currentUserId}
-								<span class="text-muted-foreground text-xs">you</span>
+								<span class="text-xs text-muted-foreground">you</span>
 							{:else}
-								<Button
-									variant="ghost"
-									size="sm"
-									onclick={() => (confirmDeleteId = su.id)}
-								>
+								<Button variant="ghost" size="sm" onclick={() => (confirmDeleteId = su.id)}>
 									Delete
 								</Button>
 							{/if}

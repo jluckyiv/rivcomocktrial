@@ -5,7 +5,7 @@ import type { DistrictsResponse, SchoolsResponse } from '$lib/pocketbase-types';
 export const load: PageServerLoad = async ({ locals }) => {
 	const [districts, schools] = await Promise.all([
 		locals.pb.collection('districts').getFullList<DistrictsResponse>({ sort: 'name' }),
-		locals.pb.collection('schools').getFullList<SchoolsResponse>({ fields: 'district' }),
+		locals.pb.collection('schools').getFullList<SchoolsResponse>({ fields: 'district' })
 	]);
 
 	const schoolCountByDistrict = new Map<string, number>();
@@ -68,5 +68,5 @@ export const actions: Actions = {
 		} catch {
 			return fail(500, { error: 'Failed to delete district.' });
 		}
-	},
+	}
 };

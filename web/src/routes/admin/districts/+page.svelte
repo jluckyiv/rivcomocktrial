@@ -28,7 +28,7 @@
 	</div>
 
 	{#if form?.error}
-		<p class="text-destructive mb-4 text-sm">{form.error}</p>
+		<p class="mb-4 text-sm text-destructive">{form.error}</p>
 	{/if}
 
 	<Table.Root>
@@ -48,24 +48,19 @@
 								method="POST"
 								action="?/update"
 								class="flex items-center gap-2"
-								use:enhance={() => () => { editingId = null; }}
+								use:enhance={() => () => {
+									editingId = null;
+								}}
 							>
 								<input type="hidden" name="id" value={district.id} />
-								<Input
-									name="name"
-									bind:value={editName}
-									class="h-8 max-w-sm"
-									autofocus
-								/>
+								<Input name="name" bind:value={editName} class="h-8 max-w-sm" autofocus />
 								<Button type="submit" size="sm">Save</Button>
-								<Button type="button" variant="ghost" size="sm" onclick={cancelEdit}>
-									Cancel
-								</Button>
+								<Button type="button" variant="ghost" size="sm" onclick={cancelEdit}>Cancel</Button>
 							</form>
 						</Table.Cell>
 					{:else if confirmDeleteId === district.id}
 						<Table.Cell class="text-muted-foreground" colspan={2}>
-							Delete <span class="text-foreground font-medium">{district.name}</span>
+							Delete <span class="font-medium text-foreground">{district.name}</span>
 							and all its schools?
 						</Table.Cell>
 						<Table.Cell class="text-right">
@@ -84,7 +79,7 @@
 						</Table.Cell>
 					{:else}
 						<Table.Cell>{district.name}</Table.Cell>
-						<Table.Cell class="text-muted-foreground text-right">
+						<Table.Cell class="text-right text-muted-foreground">
 							{data.schoolCountByDistrict[district.id] ?? 0}
 						</Table.Cell>
 						<Table.Cell class="text-right">

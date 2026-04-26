@@ -1,5 +1,11 @@
 <script lang="ts">
-	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
+	import {
+		Card,
+		CardContent,
+		CardDescription,
+		CardHeader,
+		CardTitle
+	} from '$lib/components/ui/card';
 </script>
 
 <div class="mx-auto max-w-md px-4 py-16">
@@ -15,7 +21,7 @@
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<p class="text-muted-foreground text-sm">
+					<p class="text-sm text-muted-foreground">
 						Your registration will be reviewed by RCOE before you can log in.
 					</p>
 				</CardContent>

@@ -24,13 +24,13 @@
 		<h1 class="text-xl font-semibold">Tournaments</h1>
 	</div>
 
-	<p class="text-muted-foreground mb-4 text-sm">
-		Set a tournament to <code>registration</code> to open coach signup. Only one tournament should
-		be in registration status at a time.
+	<p class="mb-4 text-sm text-muted-foreground">
+		Set a tournament to <code>registration</code> to open coach signup. Only one tournament should be
+		in registration status at a time.
 	</p>
 
 	{#if form?.error}
-		<p class="text-destructive mb-4 text-sm">{form.error}</p>
+		<p class="mb-4 text-sm text-destructive">{form.error}</p>
 	{/if}
 
 	<Table.Root>
@@ -49,8 +49,8 @@
 				<Table.Row>
 					{#if confirmDeleteId === t.id}
 						<Table.Cell class="text-muted-foreground" colspan={5}>
-							Delete <span class="text-foreground font-medium">{t.name}</span>? This
-							removes all related teams, rounds, and trials.
+							Delete <span class="font-medium text-foreground">{t.name}</span>? This removes all
+							related teams, rounds, and trials.
 						</Table.Cell>
 						<Table.Cell class="text-right">
 							<form method="POST" action="?/delete" class="inline" use:enhance>
@@ -69,24 +69,18 @@
 					{:else}
 						<Table.Cell class="font-medium">{t.name}</Table.Cell>
 						<Table.Cell class="text-muted-foreground">{t.year}</Table.Cell>
-						<Table.Cell class="text-muted-foreground text-center">
+						<Table.Cell class="text-center text-muted-foreground">
 							{t.num_preliminary_rounds}
 						</Table.Cell>
-						<Table.Cell class="text-muted-foreground text-center">
+						<Table.Cell class="text-center text-muted-foreground">
 							{t.num_elimination_rounds}
 						</Table.Cell>
 						<Table.Cell>
-							<form
-								method="POST"
-								action="?/setStatus"
-								class="flex items-center gap-2"
-								use:enhance
-							>
+							<form method="POST" action="?/setStatus" class="flex items-center gap-2" use:enhance>
 								<input type="hidden" name="id" value={t.id} />
 								<span
-									class="inline-block h-2 w-2 shrink-0 rounded-full {STATUS_DOT[
-										t.status
-									] ?? 'bg-zinc-400'}"
+									class="inline-block h-2 w-2 shrink-0 rounded-full {STATUS_DOT[t.status] ??
+										'bg-zinc-400'}"
 									aria-hidden="true"
 								></span>
 								<select
@@ -94,7 +88,7 @@
 									value={t.status}
 									onchange={(e) =>
 										(e.currentTarget.form as HTMLFormElement | null)?.requestSubmit()}
-									class="border-input bg-background h-8 rounded-md border px-2 text-sm capitalize"
+									class="h-8 rounded-md border border-input bg-background px-2 text-sm capitalize"
 								>
 									{#each STATUSES as s (s)}
 										<option value={s}>{s}</option>
@@ -103,11 +97,7 @@
 							</form>
 						</Table.Cell>
 						<Table.Cell class="text-right">
-							<Button
-								variant="ghost"
-								size="sm"
-								onclick={() => (confirmDeleteId = t.id)}
-							>
+							<Button variant="ghost" size="sm" onclick={() => (confirmDeleteId = t.id)}>
 								Delete
 							</Button>
 						</Table.Cell>
@@ -116,16 +106,11 @@
 			{/each}
 
 			<Table.Row>
-				<Table.Cell colspan={6} class="pb-0 pt-6 text-sm font-medium">Add tournament</Table.Cell>
+				<Table.Cell colspan={6} class="pt-6 pb-0 text-sm font-medium">Add tournament</Table.Cell>
 			</Table.Row>
 			<Table.Row>
 				<Table.Cell>
-					<form
-						id="create-tournament"
-						method="POST"
-						action="?/create"
-						use:enhance
-					></form>
+					<form id="create-tournament" method="POST" action="?/create" use:enhance></form>
 					<Input
 						name="name"
 						form="create-tournament"
@@ -168,9 +153,7 @@
 				</Table.Cell>
 				<Table.Cell></Table.Cell>
 				<Table.Cell class="text-right">
-					<Button type="submit" form="create-tournament" size="sm" variant="outline">
-						Add
-					</Button>
+					<Button type="submit" form="create-tournament" size="sm" variant="outline">Add</Button>
 				</Table.Cell>
 			</Table.Row>
 		</Table.Body>

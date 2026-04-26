@@ -28,9 +28,7 @@ export const USER_STATUS = {
 
 export type UserStatus = (typeof USER_STATUS)[keyof typeof USER_STATUS];
 
-export function isTournamentOpenForRegistration(
-	t: { status: string } | null | undefined
-): boolean {
+export function isTournamentOpenForRegistration(t: { status: string } | null | undefined): boolean {
 	return t?.status === TOURNAMENT_STATUS.registration;
 }
 
@@ -61,9 +59,7 @@ export function canRunTournament(teams: ReadonlyArray<{ status: string }>): Tour
 // the source of truth at runtime; this function exists so the same
 // transitions can be exercised in tests and (eventually) shared with
 // the admin UI for showing what action will happen.
-export function nextTeamStatusForUserStatus(
-	userStatus: UserStatus
-): TeamStatus | null {
+export function nextTeamStatusForUserStatus(userStatus: UserStatus): TeamStatus | null {
 	switch (userStatus) {
 		case USER_STATUS.approved:
 			return TEAM_STATUS.active;
