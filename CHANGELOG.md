@@ -6,6 +6,23 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.9.6 — fix(skills/pr-review): hard sentinel between orchestration and brief
+
+### Changed
+
+- `.claude/skills/pr-review/SKILL.md` rewritten with a strong
+  separator between the orchestration block (calling agent's only
+  job: spawn a subagent) and the subagent brief (everything the
+  reviewer reads). The previous structure put orchestration first
+  but left the brief flowing after it, which let the calling agent
+  treat the playbook as its own instructions and review in the
+  foreground — observed on PR 181 and the cumulative #173 review.
+  The new structure adds a "READ THIS FIRST. DO NOT EXECUTE THE
+  PLAYBOOK YOURSELF" callout, an explicit "you do not run
+  `gh pr view`" instruction, and an HTML-comment sentinel
+  (`SUBAGENT BRIEF — everything below this marker is for the
+  subagent`) that's hard to miss visually.
+
 ## v0.9.5 — Auto-bootstrap baseline superuser on fresh deploy (#184)
 
 ### Added
