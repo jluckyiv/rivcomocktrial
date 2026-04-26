@@ -60,8 +60,7 @@ function groupByWins<T>(teams: RankedTeam<T>[]): [number, RankedTeam<T>[]][] {
 function pairWithinBrackets<T>(
 	allHistory: MatchHistory<T>,
 	brackets: [number, RankedTeam<T>[]][]
-): [RankedTeam<T>[], [RankedTeam<T>, RankedTeam<T>][]] {
-	// Returns [spillover, pairs] — swapped from Elm's (pairs, spill) for clarity
+): [[RankedTeam<T>, RankedTeam<T>][], RankedTeam<T>[]] {
 	const allPairs: [RankedTeam<T>, RankedTeam<T>][] = []
 	const allSpill: RankedTeam<T>[] = []
 	for (const [, bracketTeams] of brackets) {
