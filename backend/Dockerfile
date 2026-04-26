@@ -1,42 +1,43 @@
-# Stage 1: Build Elm frontend
-FROM node:20-slim AS frontend-builder
+# Stage 1: Build SvelteKit (Node bundle via adapter-node)
+FROM node:20-slim AS web-builder
 
-WORKDIR /app
+WORKDIR /app/web
 
-# Install CA certificates for SSL and elm-land
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
-RUN npm install -g elm-land@0.20.1
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
 
-# Copy frontend source
-COPY frontend/ ./frontend/
+COPY web/ ./
+RUN npm run build && npm prune --omit=dev
 
-# Install dependencies and build
-WORKDIR /app/frontend
-RUN npm install
-ENV PATH="/app/frontend/node_modules/.bin:$PATH"
-RUN elm-land build
-
-# Stage 2: PocketBase
-FROM alpine:3.19
+# Stage 2: Download PocketBase binary in isolation
+FROM alpine:3.19 AS pb-fetcher
 
 ARG PB_VERSION=0.36.3
 ARG TARGETARCH
 
-RUN apk add --no-cache ca-certificates unzip wget
+RUN apk add --no-cache ca-certificates unzip wget \
+	&& wget -q "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_${TARGETARCH}.zip" -O /tmp/pb.zip \
+	&& unzip /tmp/pb.zip -d /usr/local/bin/ \
+	&& rm /tmp/pb.zip \
+	&& chmod +x /usr/local/bin/pocketbase
 
-# Download PocketBase
-RUN wget -q "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_${TARGETARCH}.zip" -O /tmp/pb.zip \
-    && unzip /tmp/pb.zip -d /usr/local/bin/ \
-    && rm /tmp/pb.zip \
-    && chmod +x /usr/local/bin/pocketbase
+# Stage 3: Final runtime image
+FROM alpine:3.19
 
-# Copy frontend build output into PocketBase public dir
-COPY --from=frontend-builder /app/frontend/dist /pb/pb_public
+RUN apk add --no-cache ca-certificates nodejs caddy tini
 
-# Copy migrations and hooks
+COPY --from=pb-fetcher /usr/local/bin/pocketbase /usr/local/bin/pocketbase
+
+COPY --from=web-builder /app/web/build /app/web/build
+COPY --from=web-builder /app/web/package.json /app/web/package.json
+COPY --from=web-builder /app/web/node_modules /app/web/node_modules
+
 COPY backend/pb_migrations /pb/pb_migrations
 COPY backend/pb_hooks /pb/pb_hooks
+COPY backend/Caddyfile /etc/caddy/Caddyfile
+COPY backend/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
-EXPOSE 8090
+EXPOSE 8080
 
-CMD ["pocketbase", "serve", "--http=0.0.0.0:8090", "--dir=/pb/pb_data", "--migrationsDir=/pb/pb_migrations", "--hooksDir=/pb/pb_hooks", "--publicDir=/pb/pb_public"]
+ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/entrypoint.sh"]

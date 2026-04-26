@@ -1,0 +1,16 @@
+{
+	auto_https off
+	admin off
+	persist_config off
+}
+
+:8080 {
+	encode zstd gzip
+
+	@pb path /api/* /_/*
+	reverse_proxy @pb localhost:8090 {
+		flush_interval -1
+	}
+
+	reverse_proxy localhost:3000
+}
