@@ -1,19 +1,49 @@
 ---
 name: pr-review
-description: Pre-merge review of a single PR — verdict (merge / fix first / hold) plus file:line references. Interactive, foreground. Use for "review PR #N" or when the user wants a second pair of eyes on a branch before it ships.
+description: Pre-merge review of a single PR — verdict (merge / fix first / hold) plus file:line references. Runs in a fresh Opus subagent so the review is independent of the calling session's context. Use for "review PR #N" or when the user wants a second pair of eyes on a branch before it ships.
 ---
 
 # pr-review
 
-Pre-merge review of a single PR for the rivcomocktrial project.
-Interactive — runs in the foreground, returns a clear verdict and
-specific file:line callouts. Different from `/audit`, which is a
-codebase-wide quality pass via a fresh subagent.
+Pre-merge review of a single PR for the rivcomocktrial project. Runs
+in a **fresh Opus subagent** to keep the review independent of the
+calling session's context (no bias from prior conversation, no
+pollution of the foreground with PR diffs and file contents). The
+subagent returns a verdict that the calling agent surfaces directly.
+
+Different from `/audit`: that one runs a codebase-wide / PR-scoped
+structured findings pass; `/pr-review` returns a single ship/fix/hold
+verdict on one PR.
 
 ## Argument
 
 PR number (e.g. `172`), branch name, or omitted (review the current
 branch's PR).
+
+## Orchestration (calling agent does this)
+
+When this skill is invoked:
+
+1. **Resolve the argument** to a PR number:
+   - Numeric → use as-is.
+   - Branch name → `gh pr list --head <branch> --json number --jq '.[0].number'`.
+   - Omitted → current branch via `gh pr list --head $(git branch --show-current) --json number --jq '.[0].number'`.
+   - If no PR found, tell the user and stop.
+2. **Launch a fresh subagent** via the `Agent` tool:
+   - `subagent_type: "general-purpose"`
+   - `model: "opus"`
+   - `description: "Review PR #<n>"`
+   - `prompt`: a self-contained brief. Use this template:
+     ```
+     You are reviewing PR #<n> for the rivcomocktrial project. You're
+     a fresh Opus instance with no prior conversation context. Read
+     everything below before fetching anything, then run the playbook
+     and return the verdict.
+
+     <paste everything from "## Verdict format" through the end of
+     this SKILL.md file verbatim>
+     ```
+3. **Surface the subagent's verdict directly** to the user. Don't paraphrase, summarize, or add framing — the verdict format is already terse and structured. The user can ask follow-ups in the calling session afterward.
 
 ## Verdict format
 
