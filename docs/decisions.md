@@ -5,7 +5,63 @@ rationale. Newest first.
 
 ---
 
+## ADR-014: Elm rebuild abandoned; switching to SvelteKit
+
+**Date:** 2026-04-25
+
+**Supersedes:** ADR-012, ADR-013
+
+**Context:** After months of work on an Elm rebuild of the frontend
+(ADR-012), the project never reached a working end-to-end state. The
+core problem was AI-assisted development: Claude Code consistently
+produced React-shaped Elm (flat DTO layers, components with state,
+wire types in page models) despite repeated correction. The correction
+overhead compounded with each session until the refactor stalled. The
+Elm architecture is sound — the problem is that the AI's training data
+biases it toward patterns that are idiomatic in React/TypeScript but
+anti-patterns in Elm. Correcting that bias mid-session is possible but
+costly, and the corrections did not persist across sessions.
+
+**Decision:** Abandon the Elm frontend. Rebuild the SvelteKit app at
+`web/` in the repo root. Stack: SvelteKit + Svelte 5 (runes) +
+TypeScript + Tailwind v4 + shadcn-svelte + Vitest + Playwright.
+
+The existing `backend/` PocketBase instance (schema, migrations, hooks)
+is unchanged. The Elm algorithm modules in `frontend/src/` serve as
+domain reference and their tests in `frontend/tests/` serve as the
+spec for porting to TypeScript. The `frontend/` directory stays until
+the SvelteKit rebuild reaches parity, then is deleted.
+
+Auth moves to httpOnly cookies + server-side session
+(`src/hooks.server.ts`), replacing the Elm app's localStorage tokens
+and dual `pbAdmin`/`pb` SDK pattern.
+
+The persistence freeze (ADR-013) no longer applies. The backend is
+open for schema changes as the SvelteKit rebuild proceeds.
+
+**Rationale:** SvelteKit + TypeScript aligns with the AI's defaults.
+The patterns the AI produces without prompting — server load functions,
+form actions, `$state` runes, shadcn components — are idiomatic
+SvelteKit. No correction overhead. The domain logic (algorithms,
+competition rules) transfers directly to TypeScript and remains the
+user's primary area of control.
+
+**Consequences:**
+
+- `frontend/` is legacy. Untracked Elm files in it are left alone
+  until the directory is deleted wholesale.
+- `docs/elm-conventions.md`, `docs/refactor-process.md`,
+  `docs/ui-conventions.md`, `docs/domain-audit.md`, `docs/roadmap.md`,
+  `docs/domain-roadmap.md`, and `docs/slices/` archived to
+  `docs/archive/`.
+- Algorithm modules ported slice by slice with Vitest tests.
+- ADR-012 and ADR-013 are superseded by this decision.
+
+---
+
 ## ADR-013: Persistence layer freeze during domain refactor
+
+**Superseded by ADR-014.**
 
 **Date:** 2026-04-25
 
@@ -100,6 +156,8 @@ in the agent transcript or commit log.
 ---
 
 ## ADR-012: One module per domain concept; pages talk only to domain modules
+
+**Superseded by ADR-014.**
 
 **Date:** 2026-04-25
 
