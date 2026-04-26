@@ -203,6 +203,74 @@ Staging data is disposable. Production holds real data.
 To deploy production: GitHub → Actions → "Deploy to fly.io" → Run
 workflow → target `production`. Approve the environment prompt.
 
+### DNS and TLS for the production domain
+
+One-time bootstrap. Re-run if the prod app is destroyed and rebuilt
+under a new IP, or if the domain moves to a new registrar.
+
+**1. Allocate fly IPs for the production app.**
+
+```bash
+fly ips list --app rivcomocktrial
+```
+
+If no IPv4 / IPv6 is shown, allocate them. Use a *shared* IPv4 to
+avoid the per-IP fee unless the app needs a dedicated one:
+
+```bash
+fly ips allocate-v4 --shared --app rivcomocktrial
+fly ips allocate-v6 --app rivcomocktrial
+```
+
+Re-run `fly ips list --app rivcomocktrial` and note the IPv4 (`A`
+record target) and IPv6 (`AAAA` record target).
+
+**2. Add DNS records at the registrar.**
+
+For the apex (`rivcomocktrial.org`):
+
+| Type   | Host | Value                     |
+|--------|------|---------------------------|
+| `A`    | `@`  | the IPv4 from step 1      |
+| `AAAA` | `@`  | the IPv6 from step 1      |
+
+For the staging subdomain (`staging.rivcomocktrial.org`), if the
+project keeps using one:
+
+| Type    | Host      | Value                            |
+|---------|-----------|----------------------------------|
+| `CNAME` | `staging` | `rivcomocktrial-staging.fly.dev` |
+
+**3. Tell fly about the cert.**
+
+```bash
+fly certs add rivcomocktrial.org --app rivcomocktrial
+```
+
+If fly outputs an `_acme-challenge.rivcomocktrial.org` record for
+DNS-01 validation, add that at the registrar too. Skip if it asks
+only for the `A`/`AAAA` records you already added (HTTP-01).
+
+**4. Wait for fly to issue the cert and verify.**
+
+```bash
+fly certs show rivcomocktrial.org --app rivcomocktrial
+```
+
+`Status: Ready` means TLS is live. DNS propagation typically takes
+a few minutes; cert issuance another minute or two after that.
+
+**5. Sanity-check from the outside.**
+
+```bash
+dig +short rivcomocktrial.org           # should match the IPv4 from step 1
+xh https://rivcomocktrial.org/          # should return SvelteKit HTML
+xh -h https://rivcomocktrial.org/_/     # should return PB admin SPA
+```
+
+If any check fails, re-read fly's output from `fly certs show` —
+it lists exactly what's missing.
+
 ### Secrets
 
 Non-secret env (SMTP host, sender, port, ORIGIN) lives in the fly

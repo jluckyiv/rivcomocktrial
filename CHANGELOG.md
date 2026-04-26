@@ -28,14 +28,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
   "Deployment" section that documents the unified architecture
   (single-origin Caddy in one container), both environments
   side-by-side, the staging-on-push / production-on-dispatch
-  pipeline, and `fly secrets` for `SMTP_PASSWORD`. Links to
-  ADR-015.
-
-### Out of band
-
-- DNS for `rivcomocktrial.org` is set at the registrar (not in this
-  repo) and `fly certs add rivcomocktrial.org` provisions the cert.
-  These are one-time bootstraps; no future PR action needed.
+  pipeline, `fly secrets` for `SMTP_PASSWORD`, and a step-by-step
+  DNS + TLS bootstrap walkthrough (`fly ips`, registrar records,
+  `fly certs add`, verification). Links to ADR-015.
 
 ## v0.9.3 — Single-origin Caddy reverse proxy on staging (PR 2/3 for #173)
 
