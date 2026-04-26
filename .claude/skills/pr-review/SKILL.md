@@ -8,7 +8,8 @@ description: Pre-merge review of a single PR — verdict (merge / fix first / ho
 > **READ THIS FIRST. DO NOT EXECUTE THE PLAYBOOK YOURSELF.**
 >
 > If you are the calling agent and this skill was just invoked, you
-> have **one job**: spawn a subagent and pass the brief to it. You
+> have **one job**: spawn a fresh **Opus** subagent (`subagent_type:
+> "general-purpose"`, `model: "opus"`) and pass the brief to it. You
 > are NOT the reviewer. The brief below is for the subagent, not for
 > you.
 
