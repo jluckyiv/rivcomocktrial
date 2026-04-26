@@ -21,6 +21,19 @@ Versions follow [Semantic Versioning](https://semver.org/).
   Without `ORIGIN`, adapter-node would 403 every form-action POST.
   `SMTP_PASSWORD` is set per-app via `fly secrets set`, not
   committed.
+- `web/e2e/deploy-smoke.e2e.ts` — read-only Playwright smoke tests
+  for any deployed env: `/`, `/_/`, `/login`,
+  `/register/teacher-coach`, SSE realtime through Caddy (real
+  `EventSource` + `PB_CONNECT` event), and `Set-Cookie` HttpOnly +
+  Secure flags. Driven by `SMOKE_BASE_URL` env (defaults to
+  staging).
+- `web/playwright.deploy.config.ts` — separate Playwright config
+  used by the smoke tests; no `webServer`, just the env-driven
+  `baseURL`. Local `playwright.config.ts` ignores the smoke spec so
+  `npm run test:e2e` keeps working unchanged.
+- `npm run test:smoke` — wraps the smoke run. Use
+  `SMOKE_BASE_URL=https://rivcomocktrial.fly.dev npm run test:smoke`
+  to target production.
 
 ### Changed
 
