@@ -248,8 +248,8 @@ For the apex (`rivcomocktrial.org`):
 
 | Type   | Host | Value                     |
 |--------|------|---------------------------|
-| `A`    | `@`  | the IPv4 from step 1      |
-| `AAAA` | `@`  | the IPv6 from step 1      |
+| `A`    | `@`  | the IPv4 from step 2      |
+| `AAAA` | `@`  | the IPv6 from step 2      |
 
 For the staging subdomain (`staging.rivcomocktrial.org`), if the
 project keeps using one:
@@ -280,7 +280,7 @@ a few minutes; cert issuance another minute or two after that.
 **6. Sanity-check from the outside.**
 
 ```bash
-dig +short rivcomocktrial.org           # should match the IPv4 from step 1
+dig +short rivcomocktrial.org           # should match the IPv4 from step 2
 xh https://rivcomocktrial.org/          # should return SvelteKit HTML
 xh -h https://rivcomocktrial.org/_/     # should return PB admin SPA
 ```
