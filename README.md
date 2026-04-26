@@ -208,7 +208,24 @@ workflow → target `production`. Approve the environment prompt.
 One-time bootstrap. Re-run if the prod app is destroyed and rebuilt
 under a new IP, or if the domain moves to a new registrar.
 
-**1. Allocate fly IPs for the production app.**
+Always pass `--app rivcomocktrial` (or `--config fly.toml`) — the
+repo has both `fly.toml` and `fly.staging.toml`, so flyctl won't
+auto-pick one and errors out without it.
+
+**1. Make sure the production app exists.**
+
+```bash
+fly apps list
+```
+
+If `rivcomocktrial` isn't in the list, create it (this only
+registers the app — it doesn't deploy anything):
+
+```bash
+fly apps create rivcomocktrial
+```
+
+**2. Allocate fly IPs for the production app.**
 
 ```bash
 fly ips list --app rivcomocktrial
@@ -225,7 +242,7 @@ fly ips allocate-v6 --app rivcomocktrial
 Re-run `fly ips list --app rivcomocktrial` and note the IPv4 (`A`
 record target) and IPv6 (`AAAA` record target).
 
-**2. Add DNS records at the registrar.**
+**3. Add DNS records at the registrar.**
 
 For the apex (`rivcomocktrial.org`):
 
@@ -241,7 +258,7 @@ project keeps using one:
 |---------|-----------|----------------------------------|
 | `CNAME` | `staging` | `rivcomocktrial-staging.fly.dev` |
 
-**3. Tell fly about the cert.**
+**4. Tell fly about the cert.**
 
 ```bash
 fly certs add rivcomocktrial.org --app rivcomocktrial
@@ -251,7 +268,7 @@ If fly outputs an `_acme-challenge.rivcomocktrial.org` record for
 DNS-01 validation, add that at the registrar too. Skip if it asks
 only for the `A`/`AAAA` records you already added (HTTP-01).
 
-**4. Wait for fly to issue the cert and verify.**
+**5. Wait for fly to issue the cert and verify.**
 
 ```bash
 fly certs show rivcomocktrial.org --app rivcomocktrial
@@ -260,7 +277,7 @@ fly certs show rivcomocktrial.org --app rivcomocktrial
 `Status: Ready` means TLS is live. DNS propagation typically takes
 a few minutes; cert issuance another minute or two after that.
 
-**5. Sanity-check from the outside.**
+**6. Sanity-check from the outside.**
 
 ```bash
 dig +short rivcomocktrial.org           # should match the IPv4 from step 1
