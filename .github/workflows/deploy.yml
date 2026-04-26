@@ -29,14 +29,16 @@ jobs:
 
       - name: Download PocketBase
         run: |
+          set -euo pipefail
           PB_VERSION=$(grep 'ARG PB_VERSION=' backend/Dockerfile | cut -d= -f2)
-          wget -q "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip" \
+          wget "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip" \
             -O /tmp/pb.zip
           unzip /tmp/pb.zip -d /tmp/pb/
           chmod +x /tmp/pb/pocketbase
 
       - name: Apply migrations and smoke-check health
         run: |
+          set -euo pipefail
           mkdir -p /tmp/pb_data
           /tmp/pb/pocketbase serve \
             --http=127.0.0.1:8091 \
@@ -45,6 +47,10 @@ jobs:
           PB_PID=$!
 
           for i in $(seq 1 30); do
+            if ! kill -0 "$PB_PID" 2>/dev/null; then
+              echo "PocketBase exited early"
+              exit 1
+            fi
             if curl -sf http://127.0.0.1:8091/api/health > /dev/null; then
               echo "PocketBase healthy after ${i}s"
               break

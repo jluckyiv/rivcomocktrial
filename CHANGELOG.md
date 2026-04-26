@@ -6,6 +6,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.9.9 — ci: migration smoke test before deploy (#192)
+
+### Added
+
+- `deploy.yml`: `migrate-check` job downloads the same PocketBase version as
+  the Dockerfile, applies all migrations to a fresh empty data dir, and
+  verifies `/api/health` returns 200. `staging` and `production` jobs now
+  `needs: migrate-check`, so a migration failure blocks the deploy. Closes
+  #177.
+
 ## v0.9.8 — fix: hook panics, ballot const scope, e2e suite for SvelteKit (#191)
 
 ### Fixed
