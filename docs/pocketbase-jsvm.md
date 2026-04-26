@@ -138,19 +138,6 @@ $app.findRecordsByFilter(
 Params object can be a single argument; multiple param
 objects are spread.
 
-## Lefthook persistence-freeze
-
-`backend/pb_hooks/` and `backend/pb_migrations/` are blocked
-from edits by the `persistence-freeze` lefthook. This is a
-guardrail against drive-by changes. When edits are
-intentional, override with `ALLOW_FROZEN_EDIT=1`:
-
-```bash
-ALLOW_FROZEN_EDIT=1 git commit -m "..."
-```
-
-Configured in `lefthook.yml`.
-
 ## Smoke check after touching backend
 
 After any change to `backend/pb_hooks/` or

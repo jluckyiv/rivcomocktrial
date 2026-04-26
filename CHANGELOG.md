@@ -33,6 +33,18 @@ Versions follow [Semantic Versioning](https://semver.org/).
   `Edit/MultiEdit(backend/pb_migrations/**)` so AI can't rewrite
   shipped migrations — append-only convention preserved.
 
+### Removed
+
+- `lefthook.yml` — both pre-commit checks were enforcing retired
+  rules (`persistence-freeze` per ADR-013, `domain-pair` against
+  `frontend/src/*.elm` files that no longer exist). Run
+  `lefthook uninstall` locally to drop the git pre-commit script.
+- `persistence-freeze` job in `.github/workflows/ci.yml` — was the
+  CI backstop for the now-removed lefthook check. ADR-013 retired
+  by ADR-014.
+- `docs/pocketbase-jsvm.md` "Lefthook persistence-freeze" section —
+  replaced by nothing; the freeze is gone.
+
 ### Closes
 
 - #184 — Bootstrap a baseline superuser at deploy time.
