@@ -6,7 +6,7 @@
 
 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 	<a href="/admin/tournaments">
-		<Card.Root class="hover:bg-muted/50 transition-colors">
+		<Card.Root class="transition-colors hover:bg-muted/50">
 			<Card.Header>
 				<Card.Title>Tournaments</Card.Title>
 				<Card.Description>Create tournaments and open registration</Card.Description>
@@ -15,7 +15,7 @@
 	</a>
 
 	<a href="/admin/teams">
-		<Card.Root class="hover:bg-muted/50 transition-colors">
+		<Card.Root class="transition-colors hover:bg-muted/50">
 			<Card.Header>
 				<Card.Title>Teams</Card.Title>
 				<Card.Description>Approved teams per tournament</Card.Description>
@@ -24,7 +24,7 @@
 	</a>
 
 	<a href="/admin/districts">
-		<Card.Root class="hover:bg-muted/50 transition-colors">
+		<Card.Root class="transition-colors hover:bg-muted/50">
 			<Card.Header>
 				<Card.Title>Districts</Card.Title>
 				<Card.Description>Manage Riverside County school districts</Card.Description>
@@ -33,7 +33,7 @@
 	</a>
 
 	<a href="/admin/schools">
-		<Card.Root class="hover:bg-muted/50 transition-colors">
+		<Card.Root class="transition-colors hover:bg-muted/50">
 			<Card.Header>
 				<Card.Title>Schools</Card.Title>
 				<Card.Description>Manage participating schools</Card.Description>
@@ -42,7 +42,7 @@
 	</a>
 
 	<a href="/admin/registrations">
-		<Card.Root class="hover:bg-muted/50 transition-colors">
+		<Card.Root class="transition-colors hover:bg-muted/50">
 			<Card.Header>
 				<Card.Title>Registrations</Card.Title>
 				<Card.Description>Review and approve coach registrations</Card.Description>
@@ -51,7 +51,7 @@
 	</a>
 
 	<a href="/admin/superusers">
-		<Card.Root class="hover:bg-muted/50 transition-colors">
+		<Card.Root class="transition-colors hover:bg-muted/50">
 			<Card.Header>
 				<Card.Title>Superusers</Card.Title>
 				<Card.Description>Manage RCOE admins and primary contact</Card.Description>

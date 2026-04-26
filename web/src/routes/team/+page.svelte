@@ -20,8 +20,8 @@
 			<Card.Header>
 				<Card.Title>No team yet</Card.Title>
 				<Card.Description>
-					Your registration is on file but no team record exists. This shouldn't happen —
-					please contact RCOE.
+					Your registration is on file but no team record exists. This shouldn't happen — please
+					contact RCOE.
 				</Card.Description>
 			</Card.Header>
 		</Card.Root>

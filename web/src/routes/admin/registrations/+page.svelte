@@ -27,13 +27,13 @@
 		<h1 class="text-xl font-semibold">Registrations</h1>
 	</div>
 
-	<div class="border-border mb-4 flex gap-1 border-b">
+	<div class="mb-4 flex gap-1 border-b border-border">
 		{#each TABS as tab (tab.key)}
 			<a
 				href="?status={tab.key}"
 				class="-mb-px border-b-2 px-3 py-2 text-sm {data.status === tab.key
 					? 'border-foreground text-foreground'
-					: 'text-muted-foreground hover:text-foreground border-transparent'}"
+					: 'border-transparent text-muted-foreground hover:text-foreground'}"
 			>
 				{tab.label}
 			</a>
@@ -41,11 +41,11 @@
 	</div>
 
 	{#if form?.error}
-		<p class="text-destructive mb-4 text-sm">{form.error}</p>
+		<p class="mb-4 text-sm text-destructive">{form.error}</p>
 	{/if}
 
 	{#if data.coaches.length === 0}
-		<p class="text-muted-foreground py-8 text-center text-sm">
+		<p class="py-8 text-center text-sm text-muted-foreground">
 			No {data.status} registrations.
 		</p>
 	{:else}
@@ -69,7 +69,7 @@
 						<Table.Cell class="text-muted-foreground">
 							{coach.expand?.school?.name ?? '—'}
 						</Table.Cell>
-						<Table.Cell class="text-muted-foreground text-xs">
+						<Table.Cell class="text-xs text-muted-foreground">
 							{formatDate(coach.created)}
 						</Table.Cell>
 						<Table.Cell class="text-right">
@@ -91,9 +91,7 @@
 									<form method="POST" action="?/setStatus" use:enhance>
 										<input type="hidden" name="id" value={coach.id} />
 										<input type="hidden" name="status" value="rejected" />
-										<Button type="submit" size="sm" variant="destructive">
-											Reject
-										</Button>
+										<Button type="submit" size="sm" variant="destructive">Reject</Button>
 									</form>
 								{/if}
 							</div>

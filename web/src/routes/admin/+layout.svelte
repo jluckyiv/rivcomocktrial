@@ -1,31 +1,20 @@
 <script lang="ts">
-	let { children } = $props();
+	import NavBar from '$lib/components/NavBar.svelte';
+
+	let { data, children } = $props();
+
+	const links = [
+		{ href: '/admin/tournaments', label: 'Tournaments' },
+		{ href: '/admin/teams', label: 'Teams' },
+		{ href: '/admin/districts', label: 'Districts' },
+		{ href: '/admin/schools', label: 'Schools' },
+		{ href: '/admin/registrations', label: 'Registrations' },
+		{ href: '/admin/superusers', label: 'Superusers' }
+	];
 </script>
 
 <div class="min-h-screen">
-	<header class="bg-background border-b px-6 py-3">
-		<nav class="flex items-center gap-6">
-			<span class="font-semibold">Mock Trial Admin</span>
-			<a href="/admin/tournaments" class="text-muted-foreground hover:text-foreground text-sm">
-				Tournaments
-			</a>
-			<a href="/admin/teams" class="text-muted-foreground hover:text-foreground text-sm">
-				Teams
-			</a>
-			<a href="/admin/districts" class="text-muted-foreground hover:text-foreground text-sm">
-				Districts
-			</a>
-			<a href="/admin/schools" class="text-muted-foreground hover:text-foreground text-sm">
-				Schools
-			</a>
-			<a href="/admin/registrations" class="text-muted-foreground hover:text-foreground text-sm">
-				Registrations
-			</a>
-			<a href="/admin/superusers" class="text-muted-foreground hover:text-foreground text-sm">
-				Superusers
-			</a>
-		</nav>
-	</header>
+	<NavBar title="Mock Trial Admin" {links} userEmail={data.userEmail} />
 	<main class="px-6 py-8">
 		{@render children()}
 	</main>

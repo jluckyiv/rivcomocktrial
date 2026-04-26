@@ -12,10 +12,10 @@
 		</Card.Header>
 		<Card.Content class="grid gap-3">
 			<p>
-				Your registration is pending review by RCOE. You will receive an email when your
-				account is approved.
+				Your registration is pending review by RCOE. You will receive an email when your account is
+				approved.
 			</p>
-			<p class="text-muted-foreground text-sm">
+			<p class="text-sm text-muted-foreground">
 				Questions? Contact RCOE at
 				<a href="mailto:{data.contact.email}" class="underline">{data.contact.email}</a>.
 			</p>

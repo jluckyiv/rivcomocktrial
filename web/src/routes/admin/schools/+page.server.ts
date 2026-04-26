@@ -9,7 +9,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		locals.pb.collection('districts').getFullList<DistrictsResponse>({ sort: 'name' }),
 		locals.pb
 			.collection('schools')
-			.getFullList<SchoolWithDistrict>({ sort: 'name', expand: 'district' }),
+			.getFullList<SchoolWithDistrict>({ sort: 'name', expand: 'district' })
 	]);
 	return { districts, schools };
 };
@@ -31,7 +31,9 @@ export const actions: Actions = {
 		if (!name) return fail(400, { error: 'Name is required.' });
 
 		try {
-			await locals.pb.collection('schools').create({ name, nickname: nickname || null, district: district || null });
+			await locals.pb
+				.collection('schools')
+				.create({ name, nickname: nickname || null, district: district || null });
 		} catch {
 			return fail(500, { error: 'Failed to create school.' });
 		}
@@ -53,7 +55,7 @@ export const actions: Actions = {
 			await locals.pb.collection('schools').update(id, {
 				name,
 				nickname: nickname || null,
-				district: district || null,
+				district: district || null
 			});
 		} catch {
 			return fail(500, { error: 'Failed to update school.' });
@@ -72,5 +74,5 @@ export const actions: Actions = {
 		} catch {
 			return fail(500, { error: 'Failed to delete school.' });
 		}
-	},
+	}
 };

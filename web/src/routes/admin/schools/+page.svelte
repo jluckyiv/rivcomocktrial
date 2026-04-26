@@ -26,9 +26,7 @@
 				)
 	);
 
-	const editingDistrict = $derived(
-		data.districts.find((d) => d.id === editDistrictId)
-	);
+	const editingDistrict = $derived(data.districts.find((d) => d.id === editDistrictId));
 
 	function startEdit(id: string, name: string, nickname: string, districtId: string) {
 		editingId = id;
@@ -58,7 +56,7 @@
 	</div>
 
 	{#if form?.error}
-		<p class="text-destructive mb-4 text-sm">{form.error}</p>
+		<p class="mb-4 text-sm text-destructive">{form.error}</p>
 	{/if}
 
 	<Table.Root>
@@ -80,7 +78,9 @@
 								method="POST"
 								action="?/update"
 								class="flex flex-wrap items-center gap-2"
-								use:enhance={() => () => { editingId = null; }}
+								use:enhance={() => () => {
+									editingId = null;
+								}}
 							>
 								<input type="hidden" name="id" value={school.id} />
 								<Input
@@ -112,14 +112,12 @@
 									</Select.Content>
 								</Select.Root>
 								<Button type="submit" size="sm">Save</Button>
-								<Button type="button" variant="ghost" size="sm" onclick={cancelEdit}>
-									Cancel
-								</Button>
+								<Button type="button" variant="ghost" size="sm" onclick={cancelEdit}>Cancel</Button>
 							</form>
 						</Table.Cell>
 					{:else if confirmDeleteId === school.id}
 						<Table.Cell class="text-muted-foreground" colspan={3}>
-							Delete <span class="text-foreground font-medium">{school.name}</span>?
+							Delete <span class="font-medium text-foreground">{school.name}</span>?
 						</Table.Cell>
 						<Table.Cell class="text-right">
 							<form method="POST" action="?/delete" class="inline" use:enhance>
@@ -144,12 +142,7 @@
 								variant="ghost"
 								size="sm"
 								onclick={() =>
-									startEdit(
-										school.id,
-										school.name,
-										school.nickname ?? '',
-										school.district ?? ''
-									)}
+									startEdit(school.id, school.name, school.nickname ?? '', school.district ?? '')}
 							>
 								Edit
 							</Button>
@@ -180,10 +173,7 @@
 						<Input name="nickname" placeholder="Nickname" class="h-8 w-32" />
 						<Select.Root type="single" name="district" bind:value={newDistrictId}>
 							<Select.Trigger class="h-8 w-52">
-								<span
-									data-slot="select-value"
-									class={newDistrict ? '' : 'text-muted-foreground'}
-								>
+								<span data-slot="select-value" class={newDistrict ? '' : 'text-muted-foreground'}>
 									{newDistrict?.name ?? 'Select district'}
 								</span>
 							</Select.Trigger>

@@ -71,10 +71,24 @@ export const actions: Actions = {
 		} catch (e: unknown) {
 			const err = e as { status?: number; message?: string };
 			if (err.status === 403) {
-				return fail(403, { error: err.message ?? 'Account not active.', step: 'verify', otpId, collection, email, next });
+				return fail(403, {
+					error: err.message ?? 'Account not active.',
+					step: 'verify',
+					otpId,
+					collection,
+					email,
+					next
+				});
 			}
-			return fail(400, { error: 'Invalid or expired code.', step: 'verify', otpId, collection, email, next });
+			return fail(400, {
+				error: 'Invalid or expired code.',
+				step: 'verify',
+				otpId,
+				collection,
+				email,
+				next
+			});
 		}
 		redirectAfterAuth(collection, next);
-	},
+	}
 };

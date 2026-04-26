@@ -18,7 +18,7 @@
 		</Card.Header>
 		<Card.Content>
 			{#if form?.error}
-				<p class="text-destructive mb-4 text-sm">{form.error}</p>
+				<p class="mb-4 text-sm text-destructive">{form.error}</p>
 			{/if}
 
 			<form
@@ -36,14 +36,7 @@
 				<input type="hidden" name="next" value={data.next} />
 				<div class="grid gap-1.5">
 					<Label for="email">Email</Label>
-					<Input
-						id="email"
-						name="email"
-						type="email"
-						autocomplete="email"
-						autofocus
-						required
-					/>
+					<Input id="email" name="email" type="email" autocomplete="email" autofocus required />
 				</div>
 				<div class="grid gap-1.5">
 					<Label for="password">Password</Label>
@@ -62,7 +55,7 @@
 		</Card.Content>
 	</Card.Root>
 
-	<p class="text-muted-foreground mt-4 text-center text-sm">
+	<p class="mt-4 text-center text-sm text-muted-foreground">
 		Registering a team? <a href="/register" class="underline">Register here</a>
 	</p>
 </div>

@@ -1,40 +1,38 @@
-export type Side = 'Prosecution' | 'Defense'
+export type Side = 'Prosecution' | 'Defense';
 
-export type NominationCategory = 'Advocate' | 'NonAdvocate'
+export type NominationCategory = 'Advocate' | 'NonAdvocate';
 
-export type AwardTiebreaker = 'ByRawScore'
+export type AwardTiebreaker = 'ByRawScore';
 
-export type Witness = { name: string; role: string }
+export type Witness = { name: string; role: string };
 
 export type AwardCategory =
 	| { kind: 'BestAttorney'; side: Side }
 	| { kind: 'BestWitness'; witness: Witness }
 	| { kind: 'BestClerk' }
-	| { kind: 'BestBailiff' }
+	| { kind: 'BestBailiff' };
 
-export type Student = { firstName: string; lastName: string }
+export type Student = { firstName: string; lastName: string };
 
 export type StudentScore = {
-	student: Student
-	category: AwardCategory
-	totalRankPoints: number
-}
+	student: Student;
+	category: AwardCategory;
+	totalRankPoints: number;
+};
 
 export function nominationCategory(category: AwardCategory): NominationCategory {
 	switch (category.kind) {
 		case 'BestAttorney':
-			return 'Advocate'
+			return 'Advocate';
 		case 'BestWitness':
 		case 'BestClerk':
 		case 'BestBailiff':
-			return 'NonAdvocate'
+			return 'NonAdvocate';
 	}
 }
 
-export function scoreByRankPoints(
-	entries: [Student, AwardCategory, number[]][]
-): StudentScore[] {
-	const count = entries.length
+export function scoreByRankPoints(entries: [Student, AwardCategory, number[]][]): StudentScore[] {
+	const count = entries.length;
 	return entries
 		.map(([student, category, ranks]) => ({
 			student,
@@ -42,12 +40,12 @@ export function scoreByRankPoints(
 			totalRankPoints: ranks
 				.map((rank) => rankPoints(count, rank))
 				.filter((p): p is number => p !== null)
-				.reduce((sum, p) => sum + p, 0),
+				.reduce((sum, p) => sum + p, 0)
 		}))
-		.sort((a, b) => b.totalRankPoints - a.totalRankPoints)
+		.sort((a, b) => b.totalRankPoints - a.totalRankPoints);
 }
 
 function rankPoints(count: number, rank: number): number | null {
-	if (count < 1 || rank < 1 || rank > 5) return null
-	return count + 1 - rank
+	if (count < 1 || rank < 1 || rank > 5) return null;
+	return count + 1 - rank;
 }

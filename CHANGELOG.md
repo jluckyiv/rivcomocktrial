@@ -6,6 +6,30 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.9.7 — feat: logout flow and responsive nav bar (#188)
+
+### Added
+
+- `web/src/lib/components/NavBar.svelte` — shared nav bar component
+  with desktop inline links and mobile hamburger menu (Tailwind `md:`
+  breakpoints; no Sheet dependency needed).
+- `web/src/routes/logout/+page.server.ts` — POST action clears
+  PocketBase `authStore` and redirects to `/login`. The existing
+  `hooks.server.ts` cookie export writes the cleared cookie on every
+  response, so no extra cookie logic is required.
+- Both `/admin` and `/team` layouts now use `NavBar`; logout is
+  available to all authenticated users.
+
+### Changed
+
+- `web/src/routes/admin/+layout.server.ts` — returns `userEmail` so
+  the nav bar can show the logged-in user.
+- First Prettier run across all `web/` source files; pre-existing
+  ESLint issues fixed (`svelte/no-navigation-without-resolve` disabled
+  — project does not use SvelteKit base path; `pocketbase-types.ts`
+  excluded from lint as a generated file; `_`-prefixed unused vars
+  allowed).
+
 ## v0.9.6 — fix(skills/pr-review): hard sentinel between orchestration and brief
 
 ### Changed

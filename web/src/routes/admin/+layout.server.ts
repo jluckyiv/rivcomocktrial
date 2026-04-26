@@ -6,4 +6,5 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 	if (!isSuperuser) {
 		redirect(303, `/login?next=${encodeURIComponent(url.pathname)}`);
 	}
+	return { userEmail: locals.user!.email as string };
 };

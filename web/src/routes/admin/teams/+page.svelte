@@ -32,7 +32,7 @@
 					value={data.selected?.id ?? ''}
 					onchange={(e) =>
 						(window.location.search = `?tournament=${(e.currentTarget as HTMLSelectElement).value}`)}
-					class="border-input bg-background h-8 rounded-md border px-2 text-sm"
+					class="h-8 rounded-md border border-input bg-background px-2 text-sm"
 				>
 					{#each data.tournaments as t (t.id)}
 						<option value={t.id}>{t.name} ({t.status})</option>
@@ -43,24 +43,26 @@
 	</div>
 
 	{#if !data.selected}
-		<p class="text-muted-foreground py-8 text-center text-sm">
-			No tournaments yet. Create one in <a href="/admin/tournaments" class="underline">Tournaments</a>.
+		<p class="py-8 text-center text-sm text-muted-foreground">
+			No tournaments yet. Create one in <a href="/admin/tournaments" class="underline"
+				>Tournaments</a
+			>.
 		</p>
 	{:else}
-		<p class="text-muted-foreground mb-4 text-sm">
+		<p class="mb-4 text-sm text-muted-foreground">
 			{data.selected.name} ({data.selected.year}) — {data.selected.status}
 		</p>
 
 		{#if !readiness.ok}
 			<div
-				class="bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-200 mb-4 rounded-md border border-amber-200 dark:border-amber-900 px-3 py-2 text-sm"
+				class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
 				role="status"
 			>
 				⚠️ {readiness.reason}
 			</div>
 		{:else}
 			<div
-				class="bg-emerald-50 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200 mb-4 rounded-md border border-emerald-200 dark:border-emerald-900 px-3 py-2 text-sm"
+				class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"
 				role="status"
 			>
 				✓ {readiness.activeCount} active teams — ready to run.
@@ -68,7 +70,7 @@
 		{/if}
 
 		{#if data.teams.length === 0}
-			<p class="text-muted-foreground py-8 text-center text-sm">No teams in this tournament yet.</p>
+			<p class="py-8 text-center text-sm text-muted-foreground">No teams in this tournament yet.</p>
 		{:else}
 			<Table.Root>
 				<Table.Header>
@@ -92,9 +94,8 @@
 							<Table.Cell>
 								<span class="inline-flex items-center gap-2">
 									<span
-										class="inline-block h-2 w-2 shrink-0 rounded-full {STATUS_DOT[
-											team.status
-										] ?? 'bg-zinc-400'}"
+										class="inline-block h-2 w-2 shrink-0 rounded-full {STATUS_DOT[team.status] ??
+											'bg-zinc-400'}"
 										aria-hidden="true"
 									></span>
 									{TEAM_STATUS_LABEL[team.status] ?? team.status}
