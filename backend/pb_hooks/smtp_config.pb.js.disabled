@@ -1,0 +1,23 @@
+/// <reference path="../pb_data/types.d.ts" />
+
+// Configure SMTP from environment variables on every startup.
+// No-ops if SMTP_HOST is unset (e.g., CI without mail).
+onBootstrap((e) => {
+    const host = $os.getenv("SMTP_HOST");
+    if (!host) {
+        return e.next();
+    }
+
+    const s = $app.settings();
+    s.smtp.enabled = true;
+    s.smtp.host = host;
+    s.smtp.port = parseInt($os.getenv("SMTP_PORT") || "587");
+    s.smtp.username = $os.getenv("SMTP_USERNAME") || "";
+    s.smtp.password = $os.getenv("SMTP_PASSWORD") || "";
+    s.smtp.tls = $os.getenv("SMTP_TLS") === "true";
+    s.meta.senderAddress = $os.getenv("SMTP_SENDER_ADDRESS") || "";
+    s.meta.senderName = $os.getenv("SMTP_SENDER_NAME") || "Riverside County Mock Trial";
+    $app.save(s);
+
+    return e.next();
+});

@@ -1,14 +1,17 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-const REGISTRATION_STATUS = "registration";
+// Note: PocketBase v0.36 JSVM runs each hook callback in a fresh
+// VM context, so top-level `const`s are NOT visible inside the
+// callbacks. Use `require()` inside the callback instead.
 
 // Pre-commit: verify a registration-status tournament exists before
 // creating the user record. Throws BadRequestError if registration is
 // closed so the coach never becomes an orphaned account.
 onRecordCreateRequest((e) => {
+    const { TOURNAMENT_STATUS, USER_ROLE } = require(`${__hooks}/_constants.js`);
     const user = e.record;
 
-    if (user.get("role") !== "coach") {
+    if (user.get("role") !== USER_ROLE.COACH) {
         return e.next();
     }
 
@@ -18,7 +21,7 @@ onRecordCreateRequest((e) => {
         "-created",
         2,
         0,
-        { status: REGISTRATION_STATUS }
+        { status: TOURNAMENT_STATUS.REGISTRATION }
     );
 
     if (tournaments.length === 0) {
@@ -42,9 +45,10 @@ onRecordCreateRequest((e) => {
 // Post-commit: create the pending team record after the user record
 // is committed so the coach relation resolves correctly.
 onRecordAfterCreateSuccess((e) => {
+    const { TOURNAMENT_STATUS, USER_ROLE, TEAM_STATUS } = require(`${__hooks}/_constants.js`);
     const user = e.record;
 
-    if (user.get("role") !== "coach") {
+    if (user.get("role") !== USER_ROLE.COACH) {
         return;
     }
 
@@ -54,7 +58,7 @@ onRecordAfterCreateSuccess((e) => {
         "-created",
         1,
         0,
-        { status: REGISTRATION_STATUS }
+        { status: TOURNAMENT_STATUS.REGISTRATION }
     );
 
     const tournament = tournaments[0];
@@ -65,7 +69,7 @@ onRecordAfterCreateSuccess((e) => {
     team.set("school", user.get("school"));
     team.set("name", user.get("team_name"));
     team.set("coach", user.id);
-    team.set("status", "pending");
+    team.set("status", TEAM_STATUS.PENDING);
 
     try {
         $app.save(team);
@@ -79,9 +83,10 @@ onRecordAfterCreateSuccess((e) => {
 
 // When a coach is deleted, remove all associated team records.
 onRecordAfterDeleteSuccess((e) => {
+    const { USER_ROLE } = require(`${__hooks}/_constants.js`);
     const user = e.record;
 
-    if (user.get("role") !== "coach") {
+    if (user.get("role") !== USER_ROLE.COACH) {
         return;
     }
 
@@ -109,19 +114,20 @@ onRecordAfterDeleteSuccess((e) => {
 // When a coach's status changes to approved or rejected, sync
 // the linked team's status. Runs after the user record commits.
 onRecordAfterUpdateSuccess((e) => {
+    const { USER_ROLE, USER_STATUS, TEAM_STATUS } = require(`${__hooks}/_constants.js`);
     const user = e.record;
 
-    if (user.get("role") !== "coach") {
+    if (user.get("role") !== USER_ROLE.COACH) {
         return;
     }
 
     const status = user.get("status");
     let teamStatus;
 
-    if (status === "approved") {
-        teamStatus = "active";
-    } else if (status === "rejected") {
-        teamStatus = "rejected";
+    if (status === USER_STATUS.APPROVED) {
+        teamStatus = TEAM_STATUS.ACTIVE;
+    } else if (status === USER_STATUS.REJECTED) {
+        teamStatus = TEAM_STATUS.REJECTED;
     } else {
         return;
     }

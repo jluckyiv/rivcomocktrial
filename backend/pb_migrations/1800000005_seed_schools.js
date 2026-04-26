@@ -1,0 +1,121 @@
+/// <reference path="../pb_data/types.d.ts" />
+// Seed 75 Riverside County schools if the collection is empty.
+// Depends on districts being seeded first (migration 1800000004).
+// Down migration is a no-op — never auto-delete reference data.
+migrate(
+  (app) => {
+    const existing = app.findRecordsByFilter("schools", "id != ''", "", 1, 0);
+    if (existing.length > 0) return;
+
+    const allDistricts = app.findRecordsByFilter("districts", "id != ''", "", 100, 0);
+    const districtIdByName = {};
+    for (const d of allDistricts) {
+      districtIdByName[d.get("name")] = d.id;
+    }
+
+    const collection = app.findCollectionByNameOrId("schools");
+
+    const schools = [
+      { name: "Notre Dame High School", district: "Diocese of San Bernardino" },
+      { name: "St. Jeanne de Lestonnac Catholic High School", district: "Diocese of San Bernardino" },
+      { name: "Xavier College Preparatory High School", district: "Diocese of San Bernardino" },
+      { name: "Alvord High School", district: "Alvord Unified School District" },
+      { name: "Hillcrest High School", district: "Alvord Unified School District" },
+      { name: "La Sierra High School", district: "Alvord Unified School District" },
+      { name: "Mission View High School", district: "Alvord Unified School District" },
+      { name: "Norte Vista High School", district: "Alvord Unified School District" },
+      { name: "Banning High School", district: "Banning Unified School District" },
+      { name: "Banning Independent Study School", district: "Banning Unified School District" },
+      { name: "New Horizon High School", district: "Banning Unified School District" },
+      { name: "Beaumont High School", district: "Beaumont Unified School District" },
+      { name: "Glen View High School", district: "Beaumont Unified School District" },
+      { name: "Coachella Valley High School", district: "Coachella Valley Unified School District" },
+      { name: "Desert Mirage High School", district: "Coachella Valley Unified School District" },
+      { name: "La Familia High School", district: "Coachella Valley Unified School District" },
+      { name: "West Shores High School", district: "Coachella Valley Unified School District" },
+      { name: "Academy of Innovation", district: "Corona-Norco Unified School District" },
+      { name: "Centennial High School", district: "Corona-Norco Unified School District" },
+      { name: "Corona High School", district: "Corona-Norco Unified School District" },
+      { name: "Eastvale STEM Academy", district: "Corona-Norco Unified School District" },
+      { name: "Eleanor Roosevelt High School", district: "Corona-Norco Unified School District" },
+      { name: "John F. Kennedy Middle College High School", district: "Corona-Norco Unified School District" },
+      { name: "Lee V. Pollard High School", district: "Corona-Norco Unified School District" },
+      { name: "Norco High School", district: "Corona-Norco Unified School District" },
+      { name: "Orange Grove High School", district: "Corona-Norco Unified School District" },
+      { name: "Santiago High School", district: "Corona-Norco Unified School District" },
+      { name: "Amistad High School", district: "Desert Sands Unified School District" },
+      { name: "Indio High School", district: "Desert Sands Unified School District" },
+      { name: "La Quinta High School", district: "Desert Sands Unified School District" },
+      { name: "Palm Desert High School", district: "Desert Sands Unified School District" },
+      { name: "Shadow Hills High School", district: "Desert Sands Unified School District" },
+      { name: "Summit High School", district: "Desert Sands Unified School District" },
+      { name: "Hamilton High School", district: "Hemet Unified School District" },
+      { name: "Hemet High School", district: "Hemet Unified School District" },
+      { name: "Tahquitz High School", district: "Hemet Unified School District" },
+      { name: "The Academy of Innovation", district: "Hemet Unified School District" },
+      { name: "West Valley High School", district: "Hemet Unified School District" },
+      { name: "Western Center Academy", district: "Hemet Unified School District" },
+      { name: "Jurupa Valley High School", district: "Jurupa Unified School District" },
+      { name: "Nueva Vista Continuation High School", district: "Jurupa Unified School District" },
+      { name: "Patriot High School", district: "Jurupa Unified School District" },
+      { name: "Rubidoux High School", district: "Jurupa Unified School District" },
+      { name: "Elsinore High School", district: "Lake Elsinore Unified School District" },
+      { name: "Keith McCarthy Academy", district: "Lake Elsinore Unified School District" },
+      { name: "Lakeside High School", district: "Lake Elsinore Unified School District" },
+      { name: "Ortega High School", district: "Lake Elsinore Unified School District" },
+      { name: "Temescal Canyon High School", district: "Lake Elsinore Unified School District" },
+      { name: "Canyon Springs High School", district: "Moreno Valley Unified School District" },
+      { name: "March Mountain High School", district: "Moreno Valley Unified School District" },
+      { name: "Moreno Valley High School", district: "Moreno Valley Unified School District" },
+      { name: "Moreno Valley Online", district: "Moreno Valley Unified School District" },
+      { name: "Valley View High School", district: "Moreno Valley Unified School District" },
+      { name: "Vista del Lago High School", district: "Moreno Valley Unified School District" },
+      { name: "Murrieta Mesa High School", district: "Murrieta Valley Unified School District" },
+      { name: "Murrieta Valley High School", district: "Murrieta Valley Unified School District" },
+      { name: "Vista Murrieta High School", district: "Murrieta Valley Unified School District" },
+      { name: "Cathedral City High School", district: "Palm Springs Unified School District" },
+      { name: "Desert Hot Springs High School", district: "Palm Springs Unified School District" },
+      { name: "Palm Springs High School", district: "Palm Springs Unified School District" },
+      { name: "Rancho Mirage High School", district: "Palm Springs Unified School District" },
+      { name: "Palo Verde High School", district: "Palo Verde Unified School District" },
+      { name: "Twin Palms Continuation School", district: "Palo Verde Unified School District" },
+      { name: "California Military Institute", district: "Perris Union High School District" },
+      { name: "Heritage High School", district: "Perris Union High School District" },
+      { name: "Inland Online Academy", district: "Perris Union High School District" },
+      { name: "Liberty High School", district: "Perris Union High School District" },
+      { name: "Paloma Valley High School", district: "Perris Union High School District" },
+      { name: "Perris High School", district: "Perris Union High School District" },
+      { name: "Perris Lake High School", district: "Perris Union High School District" },
+      { name: "Abraham Lincoln High School", district: "Riverside Unified School District" },
+      { name: "Arlington High School", district: "Riverside Unified School District" },
+      { name: "John W. North High School", district: "Riverside Unified School District" },
+      { name: "Martin Luther King Jr. High School", district: "Riverside Unified School District" },
+      { name: "Polytechnic High School", district: "Riverside Unified School District" },
+      { name: "Ramona High School", district: "Riverside Unified School District" },
+      { name: "Riverside Virtual School", district: "Riverside Unified School District" },
+      { name: "Mountain View High School", district: "San Jacinto Unified School District" },
+      { name: "San Jacinto High School", district: "San Jacinto Unified School District" },
+      { name: "San Jacinto Leadership Academy", district: "San Jacinto Unified School District" },
+      { name: "San Jacinto Middle College High School", district: "San Jacinto Unified School District" },
+      { name: "Chaparral High School", district: "Temecula Valley Unified School District" },
+      { name: "Great Oak High School", district: "Temecula Valley Unified School District" },
+      { name: "Rancho Vista High School", district: "Temecula Valley Unified School District" },
+      { name: "Susan Nelson High School", district: "Temecula Valley Unified School District" },
+      { name: "Temecula Valley High School", district: "Temecula Valley Unified School District" },
+      { name: "Citrus Hill High School", district: "Val Verde Unified School District" },
+      { name: "Orange Vista High School", district: "Val Verde Unified School District" },
+      { name: "Rancho Verde High School", district: "Val Verde Unified School District" },
+      { name: "Val Verde Academy", district: "Val Verde Unified School District" },
+      { name: "Val Verde High School", district: "Val Verde Unified School District" },
+    ];
+
+    for (const { name, district: districtName } of schools) {
+      const record = new Record(collection);
+      record.set("name", name);
+      const districtId = districtIdByName[districtName];
+      if (districtId) record.set("district", districtId);
+      app.save(record);
+    }
+  },
+  (_app) => {}
+);

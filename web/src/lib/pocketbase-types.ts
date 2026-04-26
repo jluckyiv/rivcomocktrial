@@ -19,6 +19,7 @@ export const Collections = {
 	CaseCharacters: "case_characters",
 	CoCoaches: "co_coaches",
 	Courtrooms: "courtrooms",
+	Districts: "districts",
 	EligibilityChangeRequests: "eligibility_change_requests",
 	EligibilityListEntries: "eligibility_list_entries",
 	Judges: "judges",
@@ -110,6 +111,8 @@ export type SuperusersRecord = {
 	email: string
 	emailVisibility?: boolean
 	id: string
+	is_primary_contact?: boolean
+	name?: string
 	password: string
 	tokenKey: string
 	updated: IsoAutoDateString
@@ -228,6 +231,13 @@ export type CourtroomsRecord = {
 	created: IsoAutoDateString
 	id: string
 	location?: string
+	name: string
+	updated: IsoAutoDateString
+}
+
+export type DistrictsRecord = {
+	created: IsoAutoDateString
+	id: string
 	name: string
 	updated: IsoAutoDateString
 }
@@ -405,9 +415,10 @@ export type RoundsRecord = {
 
 export type SchoolsRecord = {
 	created: IsoAutoDateString
-	district?: string
+	district?: RecordIdString
 	id: string
 	name: string
+	nickname?: string
 	updated: IsoAutoDateString
 }
 
@@ -555,6 +566,7 @@ export type BallotSubmissionsResponse<Texpand = unknown> = Required<BallotSubmis
 export type CaseCharactersResponse<Texpand = unknown> = Required<CaseCharactersRecord> & BaseSystemFields<Texpand>
 export type CoCoachesResponse<Texpand = unknown> = Required<CoCoachesRecord> & BaseSystemFields<Texpand>
 export type CourtroomsResponse<Texpand = unknown> = Required<CourtroomsRecord> & BaseSystemFields<Texpand>
+export type DistrictsResponse<Texpand = unknown> = Required<DistrictsRecord> & BaseSystemFields<Texpand>
 export type EligibilityChangeRequestsResponse<Texpand = unknown> = Required<EligibilityChangeRequestsRecord> & BaseSystemFields<Texpand>
 export type EligibilityListEntriesResponse<Texpand = unknown> = Required<EligibilityListEntriesRecord> & BaseSystemFields<Texpand>
 export type JudgesResponse<Texpand = unknown> = Required<JudgesRecord> & BaseSystemFields<Texpand>
@@ -588,6 +600,7 @@ export type CollectionRecords = {
 	case_characters: CaseCharactersRecord
 	co_coaches: CoCoachesRecord
 	courtrooms: CourtroomsRecord
+	districts: DistrictsRecord
 	eligibility_change_requests: EligibilityChangeRequestsRecord
 	eligibility_list_entries: EligibilityListEntriesRecord
 	judges: JudgesRecord
@@ -620,6 +633,7 @@ export type CollectionResponses = {
 	case_characters: CaseCharactersResponse
 	co_coaches: CoCoachesResponse
 	courtrooms: CourtroomsResponse
+	districts: DistrictsResponse
 	eligibility_change_requests: EligibilityChangeRequestsResponse
 	eligibility_list_entries: EligibilityListEntriesResponse
 	judges: JudgesResponse

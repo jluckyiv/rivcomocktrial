@@ -1,10 +1,26 @@
 services:
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   pocketbase:
     build:
       context: .
       dockerfile: backend/Dockerfile.dev
     ports:
       - "8090:8090"
+    environment:
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_USERNAME: ""
+      SMTP_PASSWORD: ""
+      SMTP_TLS: "false"
+      SMTP_SENDER_ADDRESS: noreply@rivcomocktrial.org
+      SMTP_SENDER_NAME: Riverside County Mock Trial
+    depends_on:
+      - mailpit
     volumes:
       - ./backend/pb_data:/pb/pb_data
       - ./backend/pb_migrations:/pb/pb_migrations

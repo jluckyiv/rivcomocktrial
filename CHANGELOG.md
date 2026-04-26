@@ -6,6 +6,107 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.9.0 — Phase C: end-to-end coach registration workflow
+
+### Added
+
+#### Public flow
+
+- `/register/teacher-coach` form: name, email, school
+  (search-filterable select grouped by district), team name
+  (auto-fills from selected school), password. Gated server-side:
+  shows "Registration is closed" card if no tournament has
+  `status="registration"`.
+- `/register/pending` confirmation page after submit. Both pages
+  display the primary contact email pulled from the database.
+- `/login` page authenticates against `_superusers` then `users`,
+  redirects by collection (`/admin` for superusers, `/team` for
+  coaches).
+
+#### Admin UI
+
+- `/admin` dashboard with cards linking to each section.
+- `/admin/tournaments` — create, change status (with colored status
+  indicator), delete. Default new tournament: 4 prelim + 3 elim
+  rounds, status=`draft`.
+- `/admin/districts` — inline-edit table of Riverside County
+  districts.
+- `/admin/schools` — inline-edit table with name/nickname/district
+  filter.
+- `/admin/registrations` — pending/approved/rejected tabs.
+  Approve/reject actions sync the linked team's status via the
+  post-update hook.
+- `/admin/superusers` — add admins, designate primary contact via
+  radio (mutual exclusion). Cannot delete self.
+- `/admin/teams` — list of teams in the selected tournament with a
+  readiness banner (warns on odd active-team counts; tournaments need
+  an even number of teams to run).
+- `/admin/+layout.server.ts` guards every child route — non-superusers
+  redirect to `/login?next=...`.
+
+#### Coach UI
+
+- `/team` landing page shows the coach's team name, school,
+  tournament, status, and any nickname or team number.
+- `/team/+layout.server.ts` guard redirects unauthenticated visitors
+  to login and superusers to `/admin`.
+
+#### Backend
+
+- `backend/pb_hooks/_constants.js` — shared constants for tournament,
+  user, and team status values. Hooks `require()` it inside callbacks
+  (PocketBase v0.36 JSVM runs each callback in a fresh VM, so
+  top-level `const`s in hook files are not visible at trigger time).
+- `backend/pb_hooks/contact_route.pb.js` — public `GET /api/contact`
+  endpoint returning the primary RCOE contact (a flagged superuser,
+  or oldest as fallback). Server-side via `$app` so superuser data
+  isn't exposed publicly.
+- `backend/pb_hooks/registration.pb.js` — converted to use
+  `_constants` via `require()` at trigger time, fixing a
+  `ReferenceError` that previously surfaced as a generic 400 from the
+  form.
+
+#### Migrations
+
+- `1800000001_create_districts.js` through
+  `1800000005_seed_schools.js` — districts collection,
+  schools→district relation, nickname, cascading deletes, and seed
+  data for 19 districts and 75 schools.
+- `1800000006_superusers_primary_contact.js` —
+  `is_primary_contact` boolean on `_superusers`.
+- `1800000007_disable_login_alerts.js` — disable PB v0.36's "new
+  login" alert email on the `users` collection (replaces an
+  auto-generated migration that used the legacy collection ID).
+- `1800000008_seed_superusers.js` — seed RCOE admins from a static
+  list, flag `mknust@rcoe.us` as primary contact. Idempotent.
+
+#### Tests
+
+- `web/src/lib/domain/registration.ts` + 14 vitest cases covering the
+  registration state machine: `isTournamentOpenForRegistration`,
+  `activeTeamCount`, `canRunTournament` (odd-count detection),
+  `nextTeamStatusForUserStatus`.
+- `web/e2e/registration-flow.e2e.ts` — Playwright happy-path:
+  register → admin approve → coach login → see team. Self-skips when
+  `TEST_ADMIN_EMAIL`/`TEST_ADMIN_PASSWORD` env vars or an open
+  tournament are missing.
+
+### Changed
+
+- `web/src/hooks.server.ts` refreshes auth against the correct
+  collection (`_superusers` or `users`) based on the cookie's record
+  type.
+- `web/src/app.d.ts` — `pb` is now `TypedPocketBase`.
+- `backend/pb_hooks/smtp_config.pb.js` renamed to `.disabled` —
+  direct property assignment (`s.smtp.enabled = ...`) panics
+  PocketBase v0.36 at startup. Tracked in
+  [#146](https://github.com/jluckyiv/rivcomocktrial/issues/146).
+
+### Removed
+
+- Auto-generated `1777193384_updated_users.js` migration (replaced by
+  the hand-written `1800000007_disable_login_alerts.js`).
+
 ## v0.8.1 — Seed data: Riverside County high schools (#145)
 
 ### Added

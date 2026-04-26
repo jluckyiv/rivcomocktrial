@@ -3,20 +3,20 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "echo 'Run in separate terminals:\n  npm run pb:dev\n  npm run fe:dev'",
+    "dev": "echo 'Run in separate terminals:\n  npm run pb:dev\n  npm run web:dev\nMailpit UI: http://localhost:8025'",
     "pb:start": "docker compose up -d",
     "pb:stop": "docker compose down",
     "pb:dev": "docker compose watch",
     "pb:kill": "pkill -f 'docker compose watch' || true; docker compose down",
-    "fe:dev": "cd frontend && PATH=\"./node_modules/.bin:$PATH\" elm-land server",
-    "fe:build": "cd frontend && PATH=\"./node_modules/.bin:$PATH\" elm-land build",
-    "fe:review": "cd frontend && npx elm-review",
-    "fe:test": "cd frontend && npx elm-test",
+    "web:dev": "cd web && npm run dev",
+    "web:build": "cd web && npm run build",
+    "pb:seed-admins": "PB_ADMIN_EMAIL=$(cat .pocketbase/adminUserEmail 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Email') PB_ADMIN_PASSWORD=$(cat .pocketbase/adminUserPassword 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Password') node backend/pb_seed/seed_admins.js",
+    "pb:seed-districts": "PB_ADMIN_EMAIL=$(cat .pocketbase/adminUserEmail 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Email') PB_ADMIN_PASSWORD=$(cat .pocketbase/adminUserPassword 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Password') node backend/pb_seed/seed_districts.js",
+    "pb:seed-schools": "PB_ADMIN_EMAIL=$(cat .pocketbase/adminUserEmail 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Email') PB_ADMIN_PASSWORD=$(cat .pocketbase/adminUserPassword 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Password') node backend/pb_seed/seed_schools.js",
     "pb:credentials": "mkdir -p .pocketbase && op read 'op://Private/localhost dev pocketbase admin user/Email' > .pocketbase/adminUserEmail && op read 'op://Private/localhost dev pocketbase admin user/Password' > .pocketbase/adminUserPassword && echo 'Credentials saved to .pocketbase/'",
-    "pb:deploy-frontend": "docker cp frontend/dist/. rivcomocktrial-pocketbase-1:/pb/pb_public/",
     "e2e": "PB_ADMIN_EMAIL=$(cat .pocketbase/adminUserEmail 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Email') PB_ADMIN_PASSWORD=$(cat .pocketbase/adminUserPassword 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Password') npx playwright test",
-    "lint:js": "eslint frontend/src/interop.js backend/pb_hooks/",
-    "lint": "npm run lint:js && npm run fe:review"
+    "lint:js": "eslint backend/pb_hooks/",
+    "lint": "npm run lint:js"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
