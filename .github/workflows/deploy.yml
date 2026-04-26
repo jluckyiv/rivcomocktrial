@@ -21,7 +21,47 @@ on:
         default: staging
 
 jobs:
+  migrate-check:
+    name: migration smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download PocketBase
+        run: |
+          PB_VERSION=$(grep 'ARG PB_VERSION=' backend/Dockerfile | cut -d= -f2)
+          wget -q "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip" \
+            -O /tmp/pb.zip
+          unzip /tmp/pb.zip -d /tmp/pb/
+          chmod +x /tmp/pb/pocketbase
+
+      - name: Apply migrations and smoke-check health
+        run: |
+          mkdir -p /tmp/pb_data
+          /tmp/pb/pocketbase serve \
+            --http=127.0.0.1:8091 \
+            --dir=/tmp/pb_data \
+            --migrationsDir=backend/pb_migrations &
+          PB_PID=$!
+
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8091/api/health > /dev/null; then
+              echo "PocketBase healthy after ${i}s"
+              break
+            fi
+            sleep 1
+            if [ "$i" -eq 30 ]; then
+              echo "PocketBase did not become healthy within 30s"
+              kill "$PB_PID" 2>/dev/null || true
+              exit 1
+            fi
+          done
+
+          kill "$PB_PID"
+          wait "$PB_PID" 2>/dev/null || true
+
   staging:
+    needs: migrate-check
     if: github.event_name == 'push' || github.event.inputs.target == 'staging'
     runs-on: ubuntu-latest
     steps:
@@ -32,6 +72,7 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
   production:
+    needs: migrate-check
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'production'
     runs-on: ubuntu-latest
     environment: production
