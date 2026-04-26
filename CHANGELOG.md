@@ -6,6 +6,49 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.9.5 — Auto-bootstrap baseline superuser on fresh deploy (#184)
+
+### Added
+
+- `backend/pb_hooks/bootstrap_superuser.pb.js` — `onBootstrap`
+  hook that creates one baseline superuser if
+  `BOOTSTRAP_SUPERUSER_EMAIL` and `BOOTSTRAP_SUPERUSER_PASSWORD`
+  are set. Idempotent: skips if a superuser with that email already
+  exists. No-op when the env vars are unset (local dev unchanged).
+- `scripts/seed-prod-bootstrap.sh` — local helper that reads
+  `op://Private/rivcomocktrial/{username,password}` from 1Password
+  and pushes them to fly as secrets via `fly secrets set`. One
+  argument: target app name (defaults to `rivcomocktrial`).
+
+### Changed
+
+- README "Creating a superuser on a deployed env" replaced with a
+  "Bootstrapping a superuser on a fresh deploy" section that walks
+  through the helper-driven flow and keeps the SSH path as a
+  fallback.
+- `.claude/settings.json`: dropped four stale freeze deny rules
+  (`Edit/Write/MultiEdit/NotebookEdit(backend/pb_hooks/**)` and
+  `Write/NotebookEdit(backend/pb_migrations/**)`) per ADR-014, which
+  retired the persistence freeze. Kept
+  `Edit/MultiEdit(backend/pb_migrations/**)` so AI can't rewrite
+  shipped migrations — append-only convention preserved.
+
+### Removed
+
+- `lefthook.yml` — both pre-commit checks were enforcing retired
+  rules (`persistence-freeze` per ADR-013, `domain-pair` against
+  `frontend/src/*.elm` files that no longer exist). Run
+  `lefthook uninstall` locally to drop the git pre-commit script.
+- `persistence-freeze` job in `.github/workflows/ci.yml` — was the
+  CI backstop for the now-removed lefthook check. ADR-013 retired
+  by ADR-014.
+- `docs/pocketbase-jsvm.md` "Lefthook persistence-freeze" section —
+  replaced by nothing; the freeze is gone.
+
+### Closes
+
+- #184 — Bootstrap a baseline superuser at deploy time.
+
 ## v0.9.4 — Production deploy wired up (PR 3/3 for #173)
 
 ### Added
