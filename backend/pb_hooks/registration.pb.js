@@ -115,8 +115,16 @@ onRecordAfterCreateSuccess((e) => {
         } catch (err) {
             console.error(
                 "[registration] Failed to save join request for user " +
-                user.id + " — " + err
+                user.id + " — rolling back user record. Error: " + err
             );
+            try {
+                $app.delete(user);
+            } catch (deleteErr) {
+                console.error(
+                    "[registration] Failed to delete orphaned user " +
+                    user.id + " — manual cleanup required. Error: " + deleteErr
+                );
+            }
         }
         return;
     }
