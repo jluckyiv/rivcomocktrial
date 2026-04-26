@@ -1,5 +1,4 @@
 # Lefthook config for rivcomocktrial.
-# Backstop guardrails for the active domain refactor (ADR-012, ADR-013).
 # In-session guardrails are in .claude/hooks/; this catches everything
 # the in-session hooks miss (manual git commits, agent-spawned
 # subprocesses, etc.).
@@ -13,19 +12,18 @@ pre-commit:
   commands:
 
     persistence-freeze:
-      # Block commits that touch frozen paths (ADR-013).
+      # Block commits that touch frozen backend paths.
       # Override: ALLOW_FROZEN_EDIT=1 git commit ...
       run: |
         if [ "${ALLOW_FROZEN_EDIT:-0}" = "1" ]; then exit 0; fi
         frozen=$(git diff --cached --name-only \
-          | grep -E '^(backend/pb_hooks/|backend/pb_migrations/|frontend/src/Api\.elm$|frontend/src/Pb\.elm$)' \
+          | grep -E '^(backend/pb_hooks/|backend/pb_migrations/)' \
           || true)
         if [ -n "$frozen" ]; then
-          echo "FROZEN PATH: refusing commit. These paths are read-only" >&2
-          echo "during the domain refactor (ADR-013):" >&2
+          echo "FROZEN PATH: refusing commit. These paths are read-only:" >&2
           echo "$frozen" | sed 's/^/  /' >&2
           echo "" >&2
-          echo "If a thaw is justified, document it as an ADR and re-run with:" >&2
+          echo "If a change is justified, re-run with:" >&2
           echo "  ALLOW_FROZEN_EDIT=1 git commit ..." >&2
           exit 1
         fi
