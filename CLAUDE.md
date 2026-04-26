@@ -37,7 +37,17 @@ Admin-side competition management tool + public-facing site for Riverside County
 - `npm run pb:kill` — kill watch process and stop PocketBase
 - `npm run e2e` — run Playwright end-to-end tests (requires local PocketBase running, uses 1Password for credentials)
 
-<!-- TODO: fill in after Phase A scaffolding — add web/ dev commands (SvelteKit dev server, build, test, check) and update npm run dev description to cover both servers -->
+SvelteKit dev commands (run from `web/`):
+
+- `npm run dev` — start SvelteKit dev server (http://localhost:5173)
+- `npm run build` — production build
+- `npm run check` — svelte-check type checking
+- `npm run test:unit` — Vitest unit tests
+- `npm run test:e2e` — Playwright end-to-end tests
+- `npm run lint` — ESLint + Prettier check
+- `npm run format` — Prettier format
+
+To run both servers: `npm run pb:dev` from repo root (foreground), then `cd web && npm run dev` in a second terminal.
 
 ## Development Workflow
 
@@ -55,11 +65,45 @@ Admin-side competition management tool + public-facing site for Riverside County
 - E2E tests: `npm run e2e` — Playwright, targets port 8090 (production build).
 - No mocks. Integration tests hit real local PocketBase.
 
-<!-- TODO: fill in after Phase A scaffolding — add Vitest unit test commands for web/ -->
+- Unit tests: `cd web && npm run test:unit` — Vitest, targets `web/src/`
+- E2E tests: `npm run e2e` from repo root — Playwright, targets port 8090 (production build).
 
 ## Frontend Architecture
 
-<!-- TODO: fill in after Phase A scaffolding — SvelteKit patterns (server load, form actions, hooks.server.ts, auth via httpOnly cookies), file structure under web/src/, shadcn-svelte component usage -->
+### File structure
+
+```
+web/src/
+  app.d.ts              — App.Locals declaration (pb, user)
+  hooks.server.ts       — per-request PocketBase client; cookie auth
+  lib/
+    pocketbase.ts       — singleton client (client-side use only)
+    pocketbase-types.ts — generated TypeScript types (pocketbase-typegen)
+    components/         — shadcn-svelte components
+  routes/               — file-based routing (+page.svelte, +page.server.ts)
+```
+
+### Auth
+
+httpOnly cookies + server-side session. `hooks.server.ts` creates one
+`PocketBase` client per request, loads auth from the request cookie, refreshes
+if valid, and writes the cookie back on every response. Pages access
+`event.locals.pb` and `event.locals.user`.
+
+Two roles: superuser (admin) and coach. Login routes TBD (e.g. `/admin/login`,
+`/login`). The existing `auth_guard.pb.js` hook still gates coach login.
+
+### Data loading and mutations
+
+- **Load:** `+page.server.ts` `load()` calls PocketBase via `locals.pb`.
+- **Mutations:** SvelteKit form actions in `+page.server.ts`.
+- **Domain logic:** plain TypeScript modules in `src/lib/domain/`.
+- **Components:** shadcn-svelte primitives; Tailwind for layout and spacing.
+
+### Types
+
+`src/lib/pocketbase-types.ts` is auto-generated — do not edit by hand.
+Regenerate with: `cd web && npx pocketbase-typegen --db ../backend/pb_data/data.db --out src/lib/pocketbase-types.ts`
 
 ## Backend Architecture
 
@@ -77,4 +121,4 @@ Migrations in `backend/pb_migrations/` use JS format. Name new migrations with a
 - PocketBase admin: http://localhost:8090/_/
 - PocketBase API: http://localhost:8090/api/
 
-<!-- TODO: fill in after Phase A scaffolding — SvelteKit dev server URL -->
+- SvelteKit dev server: http://localhost:5173
