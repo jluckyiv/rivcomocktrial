@@ -4,9 +4,8 @@
 // VM context, so top-level `const`s are NOT visible inside the
 // callbacks. Use `require()` inside the callback instead.
 
-// Pre-commit: verify a registration-status tournament exists before
-// creating the user record. Throws BadRequestError if registration is
-// closed so the coach never becomes an orphaned account.
+// Pre-commit: verify a registration-status tournament exists and handle
+// name+school+tournament collisions before the user record is created.
 onRecordCreateRequest((e) => {
     const { TOURNAMENT_STATUS, USER_ROLE } = require(`${__hooks}/_constants.js`);
     const user = e.record;
@@ -38,14 +37,53 @@ onRecordCreateRequest((e) => {
         );
     }
 
+    const tournament = tournaments[0];
+    const joinTeamId = e.requestInfo().body["join_team_id"];
+
+    // Check for name+school+tournament collision.
+    const school = user.get("school");
+    const teamName = user.get("team_name");
+    const existing = $app.findRecordsByFilter(
+        "teams",
+        "name = {:name} && school = {:school} && tournament = {:tournament}",
+        "",
+        1,
+        0,
+        { name: teamName, school: school, tournament: tournament.id }
+    );
+
+    if (existing.length > 0) {
+        const existingTeam = existing[0];
+        if (!joinTeamId) {
+            // Collision with no join intent: tell the client which team exists.
+            throw new BadRequestError(
+                "A team with this name already exists at your school. " +
+                "Choose a different name, or request to join the existing team.",
+                { existingTeamId: existingTeam.id }
+            );
+        }
+        if (joinTeamId !== existingTeam.id) {
+            throw new BadRequestError(
+                "The team ID does not match the existing team at your school."
+            );
+        }
+        // join_team_id matches the collision — proceed; post-commit creates join request.
+    } else if (joinTeamId) {
+        // join_team_id provided but no collision — ignore it and create a new team.
+        console.warn(
+            "[registration] join_team_id provided but no name+school collision found. " +
+            "Creating new team instead."
+        );
+    }
+
     return e.next();
 }, "users");
 
 
-// Post-commit: create the pending team record after the user record
-// is committed so the coach relation resolves correctly.
+// Post-commit: create a pending team or join request after the user commits.
 onRecordAfterCreateSuccess((e) => {
-    const { TOURNAMENT_STATUS, USER_ROLE, TEAM_STATUS } = require(`${__hooks}/_constants.js`);
+    const { TOURNAMENT_STATUS, USER_ROLE, TEAM_STATUS, JOIN_REQUEST_STATUS } =
+        require(`${__hooks}/_constants.js`);
     const user = e.record;
 
     if (user.get("role") !== USER_ROLE.COACH) {
@@ -62,13 +100,35 @@ onRecordAfterCreateSuccess((e) => {
     );
 
     const tournament = tournaments[0];
+    const joinTeamId = e.requestInfo().body["join_team_id"];
+
+    if (joinTeamId) {
+        // Join-existing path: create a pending join request.
+        const joinRequestsCollection = $app.findCollectionByNameOrId("join_requests");
+        const joinRequest = new Record(joinRequestsCollection);
+        joinRequest.set("user", user.id);
+        joinRequest.set("team", joinTeamId);
+        joinRequest.set("status", JOIN_REQUEST_STATUS.PENDING);
+
+        try {
+            $app.save(joinRequest);
+        } catch (err) {
+            console.error(
+                "[registration] Failed to save join request for user " +
+                user.id + " — " + err
+            );
+        }
+        return;
+    }
+
+    // New-team path: create a pending team linked to this coach.
     const teamsCollection = $app.findCollectionByNameOrId("teams");
     const team = new Record(teamsCollection);
 
     team.set("tournament", tournament.id);
     team.set("school", user.get("school"));
     team.set("name", user.get("team_name"));
-    team.set("coach", user.id);
+    team.set("coaches", [user.id]);
     team.set("status", TEAM_STATUS.PENDING);
 
     try {
@@ -81,18 +141,20 @@ onRecordAfterCreateSuccess((e) => {
 }, "users");
 
 
-// When a coach is deleted, remove all associated team records.
-onRecordAfterDeleteSuccess((e) => {
+// Pre-delete: block coach deletion if they are the sole coach on any
+// active or pending team. The caller must add another coach or withdraw
+// the team before the coach record can be deleted.
+onRecordDeleteRequest((e) => {
     const { USER_ROLE } = require(`${__hooks}/_constants.js`);
     const user = e.record;
 
     if (user.get("role") !== USER_ROLE.COACH) {
-        return;
+        return e.next();
     }
 
     const teams = $app.findRecordsByFilter(
         "teams",
-        "coach = {:coachId}",
+        "coaches ~ {:coachId} && (status = 'pending' || status = 'active')",
         "",
         100,
         0,
@@ -100,14 +162,16 @@ onRecordAfterDeleteSuccess((e) => {
     );
 
     for (const team of teams) {
-        try {
-            $app.delete(team);
-        } catch (err) {
-            console.error(
-                "[registration] Failed to delete team " + team.id + " — " + err
+        const coaches = team.get("coaches");
+        if (coaches.length <= 1) {
+            throw new BadRequestError(
+                `Cannot delete coach: sole coach on team "${team.get("name")}". ` +
+                "Add another coach or withdraw the team first."
             );
         }
     }
+
+    return e.next();
 }, "users");
 
 
@@ -136,7 +200,7 @@ onRecordAfterUpdateSuccess((e) => {
     // must not be touched if the coach record is updated later.
     const teams = $app.findRecordsByFilter(
         "teams",
-        "coach = {:coachId} && status = 'pending'",
+        "coaches ~ {:coachId} && status = 'pending'",
         "",
         100,
         0,
