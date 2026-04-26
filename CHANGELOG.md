@@ -6,6 +6,37 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.9.4 — Production deploy wired up (PR 3/3 for #173)
+
+### Added
+
+- `.github/workflows/deploy.yml` gains a `production` job triggered
+  by `workflow_dispatch` with a `target` input (`staging` |
+  `production`). Production runs under the `production` GitHub
+  Environment so the repo owner can require manual approval before
+  any deploy. Staging continues to auto-deploy on push to `main`.
+- `fly.toml` `[env]` block: `SMTP_HOST`, `SMTP_PORT`,
+  `SMTP_USERNAME`, `SMTP_TLS`, `SMTP_SENDER_ADDRESS`,
+  `SMTP_SENDER_NAME`, and `ORIGIN = "https://rivcomocktrial.org"`.
+  Without `ORIGIN`, adapter-node would 403 every form-action POST.
+  `SMTP_PASSWORD` is set per-app via `fly secrets set`, not
+  committed.
+
+### Changed
+
+- `README.md` "Staging Environment" section replaced with a
+  "Deployment" section that documents the unified architecture
+  (single-origin Caddy in one container), both environments
+  side-by-side, the staging-on-push / production-on-dispatch
+  pipeline, and `fly secrets` for `SMTP_PASSWORD`. Links to
+  ADR-015.
+
+### Out of band
+
+- DNS for `rivcomocktrial.org` is set at the registrar (not in this
+  repo) and `fly certs add rivcomocktrial.org` provisions the cert.
+  These are one-time bootstraps; no future PR action needed.
+
 ## v0.9.3 — Single-origin Caddy reverse proxy on staging (PR 2/3 for #173)
 
 ### Added
