@@ -6,6 +6,35 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.9.1 — Project review skills: /pr-review and /audit
+
+### Added
+
+- `/pr-review` project skill at `.claude/skills/pr-review/SKILL.md`.
+  Interactive, foreground PR review against the SvelteKit + PocketBase
+  stack and the mock-trial domain rules. Returns a verdict
+  (merge / fix first / hold) plus `file:line` callouts.
+- `/audit` project skill at `.claude/skills/audit/SKILL.md`.
+  PR-scoped or codebase-wide quality pass — runs `npm run check` and
+  `npm run lint`, executes targeted grep checks via
+  `.claude/skills/audit/audit-checks.sh`, then briefs a fresh Opus
+  subagent for a structured findings report
+  (Critical / Warnings / Suggestions / Praise).
+- `audit-checks.sh` covers SvelteKit/TS anti-patterns (`let`
+  reactive state, `$:` derived, `any`, unjustified `as` casts,
+  `localStorage` auth, direct `new PocketBase(`, client-side
+  `fetch`) and `pb_hooks` anti-patterns (filter concatenation, PK
+  lookups via filter, unwrapped `$app.save`, top-level `const` for
+  PB v0.36 JSVM, switch-without-default).
+
+### Removed
+
+- Three Elm-era global slash commands deleted from
+  `~/.claude/commands/`: `elm-review.md`, `elm-audit.md`,
+  `js-audit.md`. Their underlying skill files in `~/Vault/_skills/`
+  and scripts in `~/Vault/_scripts/` were archived to `_archive/`
+  subdirectories (recoverable, not in this repo).
+
 ## v0.9.0 — Phase C: end-to-end coach registration workflow
 
 ### Added
