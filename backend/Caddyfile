@@ -4,11 +4,11 @@
 	persist_config off
 }
 
-:8080 {
+:8090 {
 	encode zstd gzip
 
 	@pb path /api/* /_/*
-	reverse_proxy @pb localhost:8090 {
+	reverse_proxy @pb localhost:8091 {
 		flush_interval -1
 	}
 

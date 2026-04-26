@@ -38,6 +38,6 @@ COPY backend/Caddyfile /etc/caddy/Caddyfile
 COPY backend/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-EXPOSE 8080
+EXPOSE 8090
 
 ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/entrypoint.sh"]

@@ -32,9 +32,15 @@ container behind a Caddy reverse proxy. One Fly app per environment.
 
 Internal layout:
 
-- PocketBase listens on `localhost:8090` (unchanged from dev).
+- Caddy listens on `:8090` (the only port Fly's edge connects to).
+  Keeping the external port at `8090` matches the PocketBase docs
+  so examples copy-paste cleanly against both `pb:dev` (direct PB)
+  and the production image (Caddy → PB).
+- PocketBase listens on `127.0.0.1:8091` inside the container. We
+  can't keep it on `127.0.0.1:8090` because Caddy's wildcard bind
+  on `0.0.0.0:8090` covers the loopback interface too — they
+  collide on Linux without `SO_REUSEPORT`.
 - SvelteKit Node bundle (`adapter-node`) listens on `localhost:3000`.
-- Caddy listens on `:8080` (the only port Fly's edge connects to).
 - Caddy routes `/api/*` and `/_/*` to PocketBase; everything else to
   SvelteKit. `flush_interval -1` on the PB route preserves SSE.
 - A small shell entrypoint supervises all three with `trap` +
