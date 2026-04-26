@@ -6,6 +6,26 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.9.2 — feat(web): adapter-node + deploy-aware PB URL (PR 1/3 for #173)
+
+### Changed
+
+- `web/svelte.config.js`: switched adapter from `@sveltejs/adapter-auto`
+  to `@sveltejs/adapter-node`. Production builds now write a Node
+  bundle to `web/build/` that Caddy can sit in front of.
+- `web/src/hooks.server.ts`: PocketBase URL now reads from
+  `PB_INTERNAL_URL` (defaults to `http://localhost:8090`); auth cookie
+  `secure` flag follows `!dev` so production gets `Secure` cookies
+  behind Fly's HTTPS edge.
+- `web/src/lib/pocketbase.ts` (currently unused singleton): rewritten
+  to be origin-aware. Browser uses `/` in production (same-origin
+  through Caddy) and `http://localhost:8090` in dev (split origins);
+  server uses `PB_INTERNAL_URL` env or the localhost fallback.
+
+No infra changes — Dockerfile and fly configs are still on the Elm
+path. PRs 2 and 3 for #173 will land the Caddy reverse proxy and the
+production deploy.
+
 ## v0.9.1 — Project review skills: /pr-review and /audit
 
 ### Added
