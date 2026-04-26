@@ -15,7 +15,8 @@
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run && npm run test:e2e",
 		"test:e2e": "playwright test",
-		"test:smoke": "playwright test --config playwright.deploy.config.ts"
+		"test:smoke": "playwright test --config playwright.deploy.config.ts",
+		"test:schema": "vitest run --project=server src/lib/schema"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^2.0.4",

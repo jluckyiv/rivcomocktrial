@@ -2,7 +2,9 @@
 // Multi-coach teams:
 // - Rename teams.coach (single) → teams.coaches (multi-relation)
 // - Drop co_coaches collection (superseded by multi-relation)
-// - Update all collection access rules: `coach =` → `coaches ~`
+// - Update access rules that referenced `coach =` → `coaches ~`
+//   Only the rules that were originally coach-gated are updated.
+//   Rules that were null (admin-only) or "" (public) are left unchanged.
 // - Add unique index on (name, school, tournament)
 migrate(
   (app) => {
@@ -32,7 +34,9 @@ migrate(
       // already gone
     }
 
-    // 4. Update access rules on dependent collections
+    // 4. Update access rules on dependent collections.
+    //    Only rules that were originally "team.coach = @request.auth.id"
+    //    are listed here. Null and "" rules are intentionally omitted.
     const ruleUpdates = [
       {
         name: "eligibility_list_entries",
@@ -47,15 +51,15 @@ migrate(
       {
         name: "eligibility_change_requests",
         rules: {
+          // updateRule and deleteRule were null (admin-only); leave unchanged.
           listRule: "team.coaches ~ @request.auth.id",
           viewRule: "team.coaches ~ @request.auth.id",
           createRule: "team.coaches ~ @request.auth.id",
-          updateRule: "team.coaches ~ @request.auth.id",
-          deleteRule: "team.coaches ~ @request.auth.id",
         },
       },
       {
         name: "roster_submissions",
+        // listRule and viewRule were "" (public); leave unchanged.
         rules: {
           createRule: "team.coaches ~ @request.auth.id",
           updateRule: "team.coaches ~ @request.auth.id",
@@ -63,6 +67,7 @@ migrate(
       },
       {
         name: "roster_entries",
+        // listRule and viewRule were "" (public); leave unchanged.
         rules: {
           createRule: "team.coaches ~ @request.auth.id",
           updateRule: "team.coaches ~ @request.auth.id",
@@ -71,6 +76,7 @@ migrate(
       },
       {
         name: "attorney_tasks",
+        // listRule and viewRule were "" (public); leave unchanged.
         rules: {
           createRule: "roster_entry.team.coaches ~ @request.auth.id",
           updateRule: "roster_entry.team.coaches ~ @request.auth.id",
@@ -79,12 +85,11 @@ migrate(
       },
       {
         name: "withdrawal_requests",
+        // updateRule and deleteRule were null (admin-only); leave unchanged.
         rules: {
           listRule: "team.coaches ~ @request.auth.id",
           viewRule: "team.coaches ~ @request.auth.id",
           createRule: "team.coaches ~ @request.auth.id",
-          updateRule: "team.coaches ~ @request.auth.id",
-          deleteRule: "team.coaches ~ @request.auth.id",
         },
       },
       {
@@ -112,7 +117,7 @@ migrate(
     }
   },
   (app) => {
-    // Reverse: coaches → coach (single), restore old rules
+    // Reverse: coaches → coach (single), restore only the rules that were changed.
     const teams = app.findCollectionByNameOrId("teams");
     const coachesField = teams.fields.getByName("coaches");
     coachesField.name = "coach";
@@ -143,8 +148,6 @@ migrate(
           listRule: "team.coach = @request.auth.id",
           viewRule: "team.coach = @request.auth.id",
           createRule: "team.coach = @request.auth.id",
-          updateRule: "team.coach = @request.auth.id",
-          deleteRule: "team.coach = @request.auth.id",
         },
       },
       {
@@ -176,8 +179,6 @@ migrate(
           listRule: "team.coach = @request.auth.id",
           viewRule: "team.coach = @request.auth.id",
           createRule: "team.coach = @request.auth.id",
-          updateRule: "team.coach = @request.auth.id",
-          deleteRule: "team.coach = @request.auth.id",
         },
       },
       {
