@@ -6,6 +6,21 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.6.0 — SvelteKit rebuild begins; Elm frontend abandoned (#142)
+
+### Changed
+
+- Abandoned Elm frontend rebuild (ADR-014); switching to SvelteKit +
+  TypeScript + Svelte 5 + Tailwind v4 + shadcn-svelte
+- Stripped Elm-refactor-era content from `CLAUDE.md`, hooks, settings,
+  and `lefthook.yml`; added TODO markers for post-scaffold fill-in
+- Archived Elm-era docs (`elm-conventions.md`, `refactor-process.md`,
+  `ui-conventions.md`, `domain-audit.md`, `roadmap.md`,
+  `domain-roadmap.md`, `slices/`) to `docs/archive/`
+- Added ADR-014 (Elm abandoned → SvelteKit); superseded ADR-012 and
+  ADR-013
+- Deleted `.claude/skills/refactor-slice/` (Elm-specific)
+
 ## v0.5.10 — Admin Trials page + ballot schema (#111, #129, #130, #137)
 
 ### Added
