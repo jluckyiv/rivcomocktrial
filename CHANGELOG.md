@@ -6,6 +6,20 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.7.0 — Phase A: SvelteKit scaffold + PocketBase wire (#143)
+
+### Added
+
+- `web/`: SvelteKit + Svelte 5 + TypeScript + Tailwind v4 + shadcn-svelte
+  (Vega preset) + Vitest + Playwright
+- `web/src/hooks.server.ts`: per-request PocketBase client; httpOnly cookie
+  auth (loads from cookie, refreshes if valid, writes back on every response)
+- `web/src/lib/pocketbase-types.ts`: TypeScript types generated from local DB
+  via `pocketbase-typegen`
+- `web/src/lib/pocketbase.ts`: singleton PocketBase client for client-side use
+- `web/src/app.d.ts`: `App.Locals` declaration (`pb`, `user`)
+- Proof-of-life route: schools list rendered server-side from PocketBase
+
 ## v0.6.0 — SvelteKit rebuild begins; Elm frontend abandoned (#142)
 
 ### Changed
