@@ -32,8 +32,8 @@ page _ _ _ =
 
 
 type alias Model =
-    { requests : RemoteData (List Api.ChangeRequest)
-    , teams : RemoteData (List Api.Team)
+    { requests : RemoteData String (List Api.ChangeRequest)
+    , teams : RemoteData String (List Api.Team)
     , error : Maybe String
     }
 
@@ -103,14 +103,14 @@ update msg model =
                 Just "change-requests" ->
                     case Pb.decodeList Api.changeRequestDecoder value of
                         Ok requests ->
-                            ( { model | requests = Succeeded requests }
+                            ( { model | requests = Success requests }
                             , Effect.none
                             )
 
                         Err _ ->
                             ( { model
                                 | requests =
-                                    Failed "Failed to load change requests."
+                                    Failure "Failed to load change requests."
                               }
                             , Effect.none
                             )
@@ -118,13 +118,13 @@ update msg model =
                 Just "teams" ->
                     case Pb.decodeList Api.teamDecoder value of
                         Ok teams ->
-                            ( { model | teams = Succeeded teams }
+                            ( { model | teams = Success teams }
                             , Effect.none
                             )
 
                         Err _ ->
                             ( { model
-                                | teams = Failed "Failed to load teams."
+                                | teams = Failure "Failed to load teams."
                               }
                             , Effect.none
                             )
@@ -135,8 +135,8 @@ update msg model =
                             ( { model
                                 | requests =
                                     case model.requests of
-                                        Succeeded reqs ->
-                                            Succeeded
+                                        Success reqs ->
+                                            Success
                                                 (List.map
                                                     (\r ->
                                                         if r.id == updated.id then
@@ -201,22 +201,28 @@ view model =
 viewContent : Model -> Html Msg
 viewContent model =
     case ( model.requests, model.teams ) of
+        ( NotAsked, _ ) ->
+            UI.notAsked "Getting ready…"
+
+        ( _, NotAsked ) ->
+            UI.notAsked "Getting ready…"
+
         ( Loading, _ ) ->
             UI.loading
 
         ( _, Loading ) ->
             UI.loading
 
-        ( Failed err, _ ) ->
+        ( Failure err, _ ) ->
             UI.error err
 
-        ( _, Failed err ) ->
+        ( _, Failure err ) ->
             UI.error err
 
-        ( Succeeded [], _ ) ->
+        ( Success [], _ ) ->
             UI.emptyState "No change requests yet."
 
-        ( Succeeded requests, Succeeded teams ) ->
+        ( Success requests, Success teams ) ->
             UI.dataTable
                 { columns =
                     [ "Team"

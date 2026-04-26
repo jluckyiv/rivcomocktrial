@@ -60,7 +60,7 @@ type FormState
 
 
 type alias Model =
-    { tournaments : RemoteData (List Tournament)
+    { tournaments : RemoteData String (List Tournament)
     , form : FormState
     , deleting : Maybe String
     }
@@ -102,10 +102,10 @@ update msg model =
                 Just "tournaments" ->
                     case Pb.decodeList Api.tournamentDecoder value of
                         Ok items ->
-                            ( { model | tournaments = Succeeded items }, Effect.none )
+                            ( { model | tournaments = Success items }, Effect.none )
 
                         Err err ->
-                            ( { model | tournaments = Failed err }, Effect.none )
+                            ( { model | tournaments = Failure err }, Effect.none )
 
                 Just "save-tournament" ->
                     case Pb.decodeRecord Api.tournamentDecoder value of
@@ -403,16 +403,19 @@ view model =
 viewDataTable : Model -> Html Msg
 viewDataTable model =
     case model.tournaments of
+        NotAsked ->
+            UI.notAsked "Getting ready…"
+
         Loading ->
             UI.loading
 
-        Failed err ->
+        Failure err ->
             UI.error err
 
-        Succeeded [] ->
+        Success [] ->
             UI.emptyState "No tournaments yet. Create one to get started."
 
-        Succeeded tournaments ->
+        Success tournaments ->
             UI.dataTable
                 { columns = [ "Name", "Year", "Rounds", "Status", "Actions" ]
                 , rows = tournaments

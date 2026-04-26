@@ -32,9 +32,9 @@ page _ _ _ =
 
 
 type alias Model =
-    { coaches : RemoteData (List Api.CoachUser)
-    , teams : RemoteData (List Api.Team)
-    , withdrawalRequests : RemoteData (List Api.WithdrawalRequest)
+    { coaches : RemoteData String (List Api.CoachUser)
+    , teams : RemoteData String (List Api.Team)
+    , withdrawalRequests : RemoteData String (List Api.WithdrawalRequest)
     , error : Maybe String
     }
 
@@ -163,14 +163,14 @@ update msg model =
                 Just "coaches" ->
                     case Pb.decodeList Api.coachUserDecoder value of
                         Ok coaches ->
-                            ( { model | coaches = Succeeded coaches }
+                            ( { model | coaches = Success coaches }
                             , Effect.none
                             )
 
                         Err _ ->
                             ( { model
                                 | coaches =
-                                    Failed "Failed to load registrations."
+                                    Failure "Failed to load registrations."
                               }
                             , Effect.none
                             )
@@ -178,13 +178,13 @@ update msg model =
                 Just "reg-teams" ->
                     case Pb.decodeList Api.teamDecoder value of
                         Ok teams ->
-                            ( { model | teams = Succeeded teams }
+                            ( { model | teams = Success teams }
                             , Effect.none
                             )
 
                         Err _ ->
                             ( { model
-                                | teams = Failed "Failed to load teams."
+                                | teams = Failure "Failed to load teams."
                               }
                             , Effect.none
                             )
@@ -199,8 +199,8 @@ update msg model =
                             let
                                 newCoaches =
                                     case model.coaches of
-                                        Succeeded coaches ->
-                                            Succeeded
+                                        Success coaches ->
+                                            Success
                                                 (List.map
                                                     (\c ->
                                                         if c.id == updated.id then
@@ -233,8 +233,8 @@ update msg model =
 
                                         Just newStatus ->
                                             case model.teams of
-                                                Succeeded teams ->
-                                                    Succeeded
+                                                Success teams ->
+                                                    Success
                                                         (List.map
                                                             (\t ->
                                                                 if t.coach == updated.id then
@@ -269,8 +269,8 @@ update msg model =
                             let
                                 newCoaches =
                                     case model.coaches of
-                                        Succeeded coaches ->
-                                            Succeeded
+                                        Success coaches ->
+                                            Success
                                                 (List.filter
                                                     (\c -> c.id /= deletedId)
                                                     coaches
@@ -281,8 +281,8 @@ update msg model =
 
                                 newTeams =
                                     case model.teams of
-                                        Succeeded teams ->
-                                            Succeeded
+                                        Success teams ->
+                                            Success
                                                 (List.filter
                                                     (\t -> t.coach /= deletedId)
                                                     teams
@@ -308,14 +308,14 @@ update msg model =
                 Just "withdrawal-requests" ->
                     case Pb.decodeList Api.withdrawalRequestDecoder value of
                         Ok requests ->
-                            ( { model | withdrawalRequests = Succeeded requests }
+                            ( { model | withdrawalRequests = Success requests }
                             , Effect.none
                             )
 
                         Err _ ->
                             ( { model
                                 | withdrawalRequests =
-                                    Failed "Failed to load withdrawal requests."
+                                    Failure "Failed to load withdrawal requests."
                               }
                             , Effect.none
                             )
@@ -327,8 +327,8 @@ update msg model =
                                 -- Remove from pending list (approved or rejected).
                                 newWithdrawals =
                                     case model.withdrawalRequests of
-                                        Succeeded reqs ->
-                                            Succeeded
+                                        Success reqs ->
+                                            Success
                                                 (List.filter
                                                     (\r -> r.id /= updated.id)
                                                     reqs
@@ -342,8 +342,8 @@ update msg model =
                                 newTeams =
                                     if updated.status == Api.Approved then
                                         case model.teams of
-                                            Succeeded teams ->
-                                                Succeeded
+                                            Success teams ->
+                                                Success
                                                     (List.map
                                                         (\t ->
                                                             if t.id == updated.team then
@@ -381,8 +381,8 @@ update msg model =
                             let
                                 newTeams =
                                     case model.teams of
-                                        Succeeded teams ->
-                                            Succeeded
+                                        Success teams ->
+                                            Success
                                                 (List.map
                                                     (\t ->
                                                         if t.id == updated.id then
@@ -443,7 +443,7 @@ view model =
 viewPendingWithdrawals : Model -> Html Msg
 viewPendingWithdrawals model =
     case model.withdrawalRequests of
-        Succeeded ((_ :: _) as requests) ->
+        Success ((_ :: _) as requests) ->
             UI.card
                 [ UI.cardBody
                     [ UI.cardTitle "Pending Withdrawals"
@@ -459,12 +459,12 @@ viewPendingWithdrawals model =
             UI.empty
 
 
-viewWithdrawalRow : RemoteData (List Api.Team) -> Api.WithdrawalRequest -> Html Msg
+viewWithdrawalRow : RemoteData String (List Api.Team) -> Api.WithdrawalRequest -> Html Msg
 viewWithdrawalRow teamsData req =
     let
         teamName =
             case teamsData of
-                Succeeded teams ->
+                Success teams ->
                     teams
                         |> List.filter (\t -> t.id == req.team)
                         |> List.head
@@ -489,22 +489,28 @@ viewWithdrawalRow teamsData req =
 viewContent : Model -> Html Msg
 viewContent model =
     case ( model.coaches, model.teams ) of
+        ( NotAsked, _ ) ->
+            UI.notAsked "Getting ready…"
+
+        ( _, NotAsked ) ->
+            UI.notAsked "Getting ready…"
+
         ( Loading, _ ) ->
             UI.loading
 
         ( _, Loading ) ->
             UI.loading
 
-        ( Failed err, _ ) ->
+        ( Failure err, _ ) ->
             UI.error err
 
-        ( _, Failed err ) ->
+        ( _, Failure err ) ->
             UI.error err
 
-        ( Succeeded [], _ ) ->
+        ( Success [], _ ) ->
             UI.emptyState "No registrations yet."
 
-        ( Succeeded coaches, Succeeded teams ) ->
+        ( Success coaches, Success teams ) ->
             UI.dataTable
                 { columns =
                     [ "Coach"

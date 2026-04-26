@@ -17,6 +17,7 @@ module UI exposing
     , dataTable
     , empty
     , emptyState
+    , notAsked
     , error
     , errorList
     , errorSubmitButton
@@ -811,8 +812,12 @@ emptyState msg =
         [ p [] [ text msg ] ]
 
 
-{-| Renders nothing. Use for NotAsked RemoteData state.
--}
+notAsked : String -> Html msg
+notAsked msg =
+    div [ Attr.class "text-center text-base-content/50 py-8" ]
+        [ p [] [ text msg ] ]
+
+
 empty : Html msg
 empty =
     text ""
