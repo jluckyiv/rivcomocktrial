@@ -8,7 +8,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	try {
 		if (event.locals.pb.authStore.isValid) {
-			await event.locals.pb.collection('_superusers').authRefresh();
+			const collection = event.locals.pb.authStore.record?.collectionName ?? '_superusers';
+			if (collection === '_superusers') {
+				await event.locals.pb.collection('_superusers').authRefresh();
+			} else {
+				await event.locals.pb.collection('users').authRefresh();
+			}
 		}
 	} catch {
 		event.locals.pb.authStore.clear();

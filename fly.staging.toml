@@ -4,6 +4,14 @@ primary_region = "lax"
 [build]
   dockerfile = "backend/Dockerfile"
 
+[env]
+  SMTP_HOST = "smtp.resend.com"
+  SMTP_PORT = "465"
+  SMTP_USERNAME = "resend"
+  SMTP_TLS = "true"
+  SMTP_SENDER_ADDRESS = "noreply@rivcomocktrial.org"
+  SMTP_SENDER_NAME = "Riverside County Mock Trial"
+
 [http_service]
   internal_port = 8090
   force_https = true
