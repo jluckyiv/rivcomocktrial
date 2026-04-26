@@ -1,17 +1,23 @@
-<script lang="ts">
-	import type { PageData } from './$types';
-	let { data }: { data: PageData } = $props();
-</script>
+<div class="mx-auto max-w-md px-4 py-16">
+	<h1 class="mb-8 text-center text-2xl font-semibold">Riverside County Mock Trial</h1>
 
-<h1>Riverside County Mock Trial</h1>
+	<div class="grid gap-4">
+		<a href="/register/teacher-coach">
+			<div class="cursor-pointer rounded-xl border bg-card p-6 transition-colors hover:bg-accent">
+				<h2 class="font-semibold">Register your team</h2>
+				<p class="mt-1 text-sm text-muted-foreground">
+					New coaches: register a team for the upcoming tournament.
+				</p>
+			</div>
+		</a>
 
-<h2>Schools</h2>
-{#if data.schools.length === 0}
-	<p>No schools found.</p>
-{:else}
-	<ul>
-		{#each data.schools as school}
-			<li>{school.name}</li>
-		{/each}
-	</ul>
-{/if}
+		<a href="/login">
+			<div class="cursor-pointer rounded-xl border bg-card p-6 transition-colors hover:bg-accent">
+				<h2 class="font-semibold">Sign in</h2>
+				<p class="mt-1 text-sm text-muted-foreground">
+					Coaches and tournament staff: sign in to your account.
+				</p>
+			</div>
+		</a>
+	</div>
+</div>

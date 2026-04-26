@@ -1,4 +1,4 @@
-name: Deploy to fly.io (staging)
+name: Deploy to fly.io
 
 on:
   push:
@@ -9,15 +9,35 @@ on:
       - "fly.staging.toml"
       - "fly.toml"
       - ".dockerignore"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+        default: staging
 
 jobs:
-  deploy:
+  staging:
+    if: github.event_name == 'push' || github.event.inputs.target == 'staging'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: superfly/flyctl-actions/setup-flyctl@master
-
       - run: flyctl deploy --remote-only --config fly.staging.toml
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  production:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'production'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only --config fly.toml
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

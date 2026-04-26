@@ -6,6 +6,55 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.9.4 — Production deploy wired up (PR 3/3 for #173)
+
+### Added
+
+- `.github/workflows/deploy.yml` gains a `production` job triggered
+  by `workflow_dispatch` with a `target` input (`staging` |
+  `production`). Production runs under the `production` GitHub
+  Environment so the repo owner can require manual approval before
+  any deploy. Staging continues to auto-deploy on push to `main`.
+- `fly.toml` `[env]` block: `SMTP_HOST`, `SMTP_PORT`,
+  `SMTP_USERNAME`, `SMTP_TLS`, `SMTP_SENDER_ADDRESS`,
+  `SMTP_SENDER_NAME`, and `ORIGIN = "https://rivcomocktrial.org"`.
+  Without `ORIGIN`, adapter-node would 403 every form-action POST.
+  `SMTP_PASSWORD` is set per-app via `fly secrets set`, not
+  committed.
+- `web/e2e/deploy-smoke.e2e.ts` — read-only Playwright smoke tests
+  for any deployed env: `/`, `/_/`, `/login`,
+  `/register/teacher-coach`, SSE realtime through Caddy (real
+  `EventSource` + `PB_CONNECT` event), and `Set-Cookie` HttpOnly +
+  Secure flags. Driven by `SMOKE_BASE_URL` env (defaults to
+  staging).
+- `web/playwright.deploy.config.ts` — separate Playwright config
+  used by the smoke tests; no `webServer`, just the env-driven
+  `baseURL`. Local `playwright.config.ts` ignores the smoke spec so
+  `npm run test:e2e` keeps working unchanged.
+- `npm run test:smoke` — wraps the smoke run. Use
+  `SMOKE_BASE_URL=https://rivcomocktrial.fly.dev npm run test:smoke`
+  to target production.
+
+### Changed
+
+- Replaced the unstyled school-list scaffold at `/` with a real
+  landing page (closes #183). Authenticated users are redirected
+  by role: superusers to `/admin`, coaches to `/team`. Anonymous
+  visitors see two cards: "Register your team" and "Sign in." This
+  is intentionally minimal — the project is an admin tool, not a
+  marketing site, so the landing page just routes people to the
+  right place. Refinement deferred.
+
+### Changed
+
+- `README.md` "Staging Environment" section replaced with a
+  "Deployment" section that documents the unified architecture
+  (single-origin Caddy in one container), both environments
+  side-by-side, the staging-on-push / production-on-dispatch
+  pipeline, `fly secrets` for `SMTP_PASSWORD`, and a step-by-step
+  DNS + TLS bootstrap walkthrough (`fly ips`, registrar records,
+  `fly certs add`, verification). Links to ADR-015.
+
 ## v0.9.3 — Single-origin Caddy reverse proxy on staging (PR 2/3 for #173)
 
 ### Added

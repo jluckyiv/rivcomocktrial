@@ -20,9 +20,11 @@ workflow.
 - **Email:** [Resend](https://resend.com) (production) /
   [Mailpit](https://mailpit.axllent.org) (local dev)
 - **Deployment:** [fly.io](https://fly.io) via Docker —
-  single container serves both frontend and backend
-- **CI/CD:** GitHub Actions deploys to fly.io staging on
-  push to main (path-scoped to app files only)
+  single container runs PocketBase, the SvelteKit Node
+  bundle, and a Caddy reverse proxy
+- **CI/CD:** GitHub Actions auto-deploys staging on push
+  to main; production deploys via manual
+  `workflow_dispatch`
 
 ## Project Layout
 
@@ -172,21 +174,136 @@ PB_ADMIN_PASSWORD=yourpassword \
 node backend/pb_seed/seed_admins.js
 ```
 
-## Staging Environment
+## Deployment
 
-| Service             | URL                                      |
-|---------------------|------------------------------------------|
-| Staging app         | https://rivcomocktrial-staging.fly.dev/  |
-| Staging admin UI    | https://rivcomocktrial-staging.fly.dev/_ |
+Single-origin Caddy reverse proxy fronts both apps in one container
+on fly.io. Caddy listens on `:8090` (matching the PocketBase docs
+port). Internally it routes `/api/*` and `/_/*` to PocketBase on
+`127.0.0.1:8091` and everything else to the SvelteKit Node bundle on
+`localhost:3000`. See [ADR-015](docs/decisions.md) for the
+realtime/cookie rationale.
 
-- Deploys automatically on push to main (only when
-  `web/`, `backend/`, fly configs, or `.dockerignore`
-  change)
-- Staging data is disposable
-- Production app (`rivcomocktrial`) is reserved for
-  real data
+### Environments
 
-### Creating a staging superuser
+| Env        | App                       | URL                                      | Config            |
+|------------|---------------------------|------------------------------------------|-------------------|
+| Staging    | `rivcomocktrial-staging`  | https://rivcomocktrial-staging.fly.dev/  | `fly.staging.toml`|
+| Production | `rivcomocktrial`          | https://rivcomocktrial.org/              | `fly.toml`        |
+
+Staging data is disposable. Production holds real data.
+
+### Pipeline
+
+- **Staging** auto-deploys on push to `main` when `web/`, `backend/`,
+  fly configs, or `.dockerignore` change.
+- **Production** deploys via manual GitHub Actions
+  `workflow_dispatch`. The `production` GitHub Environment is gated
+  by required reviewer.
+
+To deploy production: GitHub → Actions → "Deploy to fly.io" → Run
+workflow → target `production`. Approve the environment prompt.
+
+### DNS and TLS for the production domain
+
+One-time bootstrap. Re-run if the prod app is destroyed and rebuilt
+under a new IP, or if the domain moves to a new registrar.
+
+Always pass `--app rivcomocktrial` (or `--config fly.toml`) — the
+repo has both `fly.toml` and `fly.staging.toml`, so flyctl won't
+auto-pick one and errors out without it.
+
+**1. Make sure the production app exists.**
+
+```bash
+fly apps list
+```
+
+If `rivcomocktrial` isn't in the list, create it (this only
+registers the app — it doesn't deploy anything):
+
+```bash
+fly apps create rivcomocktrial
+```
+
+**2. Allocate fly IPs for the production app.**
+
+```bash
+fly ips list --app rivcomocktrial
+```
+
+If no IPv4 / IPv6 is shown, allocate them. Use a *shared* IPv4 to
+avoid the per-IP fee unless the app needs a dedicated one:
+
+```bash
+fly ips allocate-v4 --shared --app rivcomocktrial
+fly ips allocate-v6 --app rivcomocktrial
+```
+
+Re-run `fly ips list --app rivcomocktrial` and note the IPv4 (`A`
+record target) and IPv6 (`AAAA` record target).
+
+**3. Add DNS records at the registrar.**
+
+For the apex (`rivcomocktrial.org`):
+
+| Type   | Host | Value                     |
+|--------|------|---------------------------|
+| `A`    | `@`  | the IPv4 from step 2      |
+| `AAAA` | `@`  | the IPv6 from step 2      |
+
+For the staging subdomain (`staging.rivcomocktrial.org`), if the
+project keeps using one:
+
+| Type    | Host      | Value                            |
+|---------|-----------|----------------------------------|
+| `CNAME` | `staging` | `rivcomocktrial-staging.fly.dev` |
+
+**4. Tell fly about the cert.**
+
+```bash
+fly certs add rivcomocktrial.org --app rivcomocktrial
+```
+
+If fly outputs an `_acme-challenge.rivcomocktrial.org` record for
+DNS-01 validation, add that at the registrar too. Skip if it asks
+only for the `A`/`AAAA` records you already added (HTTP-01).
+
+**5. Wait for fly to issue the cert and verify.**
+
+```bash
+fly certs show rivcomocktrial.org --app rivcomocktrial
+```
+
+`Status: Ready` means TLS is live. DNS propagation typically takes
+a few minutes; cert issuance another minute or two after that.
+
+**6. Sanity-check from the outside.**
+
+```bash
+dig +short rivcomocktrial.org           # should match the IPv4 from step 2
+xh https://rivcomocktrial.org/          # should return SvelteKit HTML
+xh -h https://rivcomocktrial.org/_/     # should return PB admin SPA
+```
+
+If any check fails, re-read fly's output from `fly certs show` —
+it lists exactly what's missing.
+
+### Secrets
+
+Non-secret env (SMTP host, sender, port, ORIGIN) lives in the fly
+toml files. Secrets are set per-app via `fly secrets`:
+
+```bash
+# Staging
+fly secrets set SMTP_PASSWORD=re_xxxxxxxxxxxx \
+  --app rivcomocktrial-staging
+
+# Production
+fly secrets set SMTP_PASSWORD=re_xxxxxxxxxxxx \
+  --app rivcomocktrial
+```
+
+### Creating a superuser on a deployed env
 
 ```bash
 fly ssh console --config fly.staging.toml -C \
@@ -195,12 +312,14 @@ fly ssh console --config fly.staging.toml -C \
   --dir=/pb/pb_data"
 ```
 
+(Use `--config fly.toml` for production.)
+
 ## Documentation
 
 - [Competition Workflow](docs/competition-workflow.md)
   — end-to-end competition sequence and rules
 - [Architecture Decisions](docs/decisions.md) — key
-  technical choices and rationale (ADR-001–014)
+  technical choices and rationale
 
 ## Development Workflow
 
