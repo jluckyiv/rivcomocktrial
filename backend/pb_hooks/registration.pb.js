@@ -100,7 +100,7 @@ onRecordAfterCreateSuccess((e) => {
     );
 
     const tournament = tournaments[0];
-    const joinTeamId = e.requestInfo().body["join_team_id"];
+    const joinTeamId = e.requestInfo?.body?.["join_team_id"] ?? null;
 
     if (joinTeamId) {
         // Join-existing path: create a pending join request.
@@ -170,7 +170,7 @@ onRecordDeleteRequest((e) => {
     );
 
     for (const team of teams) {
-        const coaches = team.get("coaches");
+        const coaches = team.getStringSlice("coaches");
         if (coaches.length <= 1) {
             throw new BadRequestError(
                 `Cannot delete coach: sole coach on team "${team.get("name")}". ` +
