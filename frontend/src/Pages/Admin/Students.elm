@@ -59,7 +59,7 @@ type BulkState
 
 
 type alias Model =
-    { students : RemoteData (List Student)
+    { students : RemoteData String (List Student)
     , schools : List School
     , form : FormState
     , bulk : BulkState
@@ -113,10 +113,10 @@ update msg model =
                 Just "students" ->
                     case Pb.decodeList Api.studentDecoder value of
                         Ok items ->
-                            ( { model | students = Succeeded items }, Effect.none )
+                            ( { model | students = Success items }, Effect.none )
 
                         Err _ ->
-                            ( { model | students = Failed "Failed to load students." }, Effect.none )
+                            ( { model | students = Failure "Failed to load students." }, Effect.none )
 
                 Just "schools" ->
                     case Pb.decodeList Api.schoolDecoder value of
@@ -439,13 +439,16 @@ view model =
 viewDataTable : Model -> Html Msg
 viewDataTable model =
     case model.students of
+        NotAsked ->
+            UI.notAsked "Getting ready…"
+
         Loading ->
             UI.loading
 
-        Failed err ->
+        Failure err ->
             UI.error err
 
-        Succeeded students ->
+        Success students ->
             let
                 filtered =
                     if model.filterSchool == "" then

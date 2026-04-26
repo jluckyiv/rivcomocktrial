@@ -46,12 +46,12 @@ type alias Model =
 
 type alias TeamData =
     { team : Api.Team
-    , tournament : RemoteData Api.Tournament
-    , entries : RemoteData (List Api.EligibilityEntry)
-    , changeRequests : RemoteData (List Api.ChangeRequest)
-    , coCoaches : RemoteData (List Api.CoCoach)
-    , attorneyCoaches : RemoteData (List Api.AttorneyCoach)
-    , withdrawalRequest : RemoteData (Maybe Api.WithdrawalRequest)
+    , tournament : RemoteData String Api.Tournament
+    , entries : RemoteData String (List Api.EligibilityEntry)
+    , changeRequests : RemoteData String (List Api.ChangeRequest)
+    , coCoaches : RemoteData String (List Api.CoCoach)
+    , attorneyCoaches : RemoteData String (List Api.AttorneyCoach)
+    , withdrawalRequest : RemoteData String (Maybe Api.WithdrawalRequest)
     , studentForm : StudentFormState
     , changeRequestForm : ChangeRequestFormState
     , coCoachForm : CoCoachFormState
@@ -682,18 +682,18 @@ handleTeamPbMsg value data =
         Just "tournament" ->
             case Pb.decodeList Api.tournamentDecoder value of
                 Ok (t :: _) ->
-                    ( { data | tournament = Succeeded t }
+                    ( { data | tournament = Success t }
                     , Effect.none
                     )
 
                 Ok [] ->
-                    ( { data | tournament = Failed "Tournament not found." }
+                    ( { data | tournament = Failure "Tournament not found." }
                     , Effect.none
                     )
 
                 Err _ ->
                     ( { data
-                        | tournament = Failed "Failed to load tournament."
+                        | tournament = Failure "Failed to load tournament."
                       }
                     , Effect.none
                     )
@@ -701,11 +701,11 @@ handleTeamPbMsg value data =
         Just "entries" ->
             case Pb.decodeList Api.eligibilityEntryDecoder value of
                 Ok entries ->
-                    ( { data | entries = Succeeded entries }, Effect.none )
+                    ( { data | entries = Success entries }, Effect.none )
 
                 Err _ ->
                     ( { data
-                        | entries = Failed "Failed to load eligibility list."
+                        | entries = Failure "Failed to load eligibility list."
                       }
                     , Effect.none
                     )
@@ -713,14 +713,14 @@ handleTeamPbMsg value data =
         Just "change-requests" ->
             case Pb.decodeList Api.changeRequestDecoder value of
                 Ok requests ->
-                    ( { data | changeRequests = Succeeded requests }
+                    ( { data | changeRequests = Success requests }
                     , Effect.none
                     )
 
                 Err _ ->
                     ( { data
                         | changeRequests =
-                            Failed "Failed to load change requests."
+                            Failure "Failed to load change requests."
                       }
                     , Effect.none
                     )
@@ -728,11 +728,11 @@ handleTeamPbMsg value data =
         Just "co-coaches" ->
             case Pb.decodeList Api.coCoachDecoder value of
                 Ok coaches ->
-                    ( { data | coCoaches = Succeeded coaches }, Effect.none )
+                    ( { data | coCoaches = Success coaches }, Effect.none )
 
                 Err _ ->
                     ( { data
-                        | coCoaches = Failed "Failed to load co-coaches."
+                        | coCoaches = Failure "Failed to load co-coaches."
                       }
                     , Effect.none
                     )
@@ -740,14 +740,14 @@ handleTeamPbMsg value data =
         Just "attorney-coaches" ->
             case Pb.decodeList Api.attorneyCoachDecoder value of
                 Ok coaches ->
-                    ( { data | attorneyCoaches = Succeeded coaches }
+                    ( { data | attorneyCoaches = Success coaches }
                     , Effect.none
                     )
 
                 Err _ ->
                     ( { data
                         | attorneyCoaches =
-                            Failed "Failed to load attorney coaches."
+                            Failure "Failed to load attorney coaches."
                       }
                     , Effect.none
                     )
@@ -906,19 +906,19 @@ handleTeamPbMsg value data =
         Just "withdrawal-requests" ->
             case Pb.decodeList Api.withdrawalRequestDecoder value of
                 Ok (req :: _) ->
-                    ( { data | withdrawalRequest = Succeeded (Just req) }
+                    ( { data | withdrawalRequest = Success (Just req) }
                     , Effect.none
                     )
 
                 Ok [] ->
-                    ( { data | withdrawalRequest = Succeeded Nothing }
+                    ( { data | withdrawalRequest = Success Nothing }
                     , Effect.none
                     )
 
                 Err _ ->
                     ( { data
                         | withdrawalRequest =
-                            Failed "Failed to load withdrawal request."
+                            Failure "Failed to load withdrawal request."
                       }
                     , Effect.none
                     )
@@ -927,7 +927,7 @@ handleTeamPbMsg value data =
             case Pb.decodeRecord Api.withdrawalRequestDecoder value of
                 Ok req ->
                     ( { data
-                        | withdrawalRequest = Succeeded (Just req)
+                        | withdrawalRequest = Success (Just req)
                         , withdrawalForm = WithdrawalFormHidden
                       }
                     , Effect.none
@@ -950,7 +950,7 @@ handleTeamPbMsg value data =
             ( data, Effect.none )
 
 
-mapSucceeded : (a -> a) -> RemoteData a -> RemoteData a
+mapSucceeded : (a -> a) -> RemoteData String a -> RemoteData String a
 mapSucceeded =
     RemoteData.map
 
@@ -992,7 +992,7 @@ viewTeam data =
     let
         locked =
             case data.tournament of
-                Succeeded t ->
+                Success t ->
                     isLocked t
 
                 _ ->
@@ -1050,13 +1050,16 @@ viewEligibilitySection locked readOnly data =
 viewUnlockedEligibilityList : Bool -> TeamData -> Html Msg
 viewUnlockedEligibilityList readOnly data =
     case data.entries of
+        NotAsked ->
+            UI.notAsked "Getting ready…"
+
         Loading ->
             UI.loading
 
-        Failed err ->
+        Failure err ->
             UI.error err
 
-        Succeeded entries ->
+        Success entries ->
             UI.card
                 [ UI.cardBody
                     [ UI.cardTitle
@@ -1143,13 +1146,16 @@ viewEditableEntryRow readOnly entry =
 viewLockedEligibilityList : Bool -> TeamData -> Html Msg
 viewLockedEligibilityList readOnly data =
     case data.entries of
+        NotAsked ->
+            UI.notAsked "Getting ready…"
+
         Loading ->
             UI.loading
 
-        Failed err ->
+        Failure err ->
             UI.error err
 
-        Succeeded entries ->
+        Success entries ->
             UI.card
                 [ UI.cardBody
                     [ UI.cardTitle
@@ -1273,16 +1279,19 @@ viewChangeRequestForm formState =
 viewChangeRequests : TeamData -> Html Msg
 viewChangeRequests data =
     case data.changeRequests of
+        NotAsked ->
+            UI.notAsked "Getting ready…"
+
         Loading ->
             UI.empty
 
-        Failed err ->
+        Failure err ->
             UI.error err
 
-        Succeeded [] ->
+        Success [] ->
             UI.empty
 
-        Succeeded requests ->
+        Success requests ->
             UI.card
                 [ UI.cardBody
                     [ UI.cardTitle "Change Requests"
@@ -1346,16 +1355,19 @@ viewCoCoachesCard readOnly data =
               else
                 viewCoCoachForm data.coCoachForm
             , case data.coCoaches of
+                NotAsked ->
+                    UI.notAsked "Getting ready…"
+
                 Loading ->
                     UI.loading
 
-                Failed err ->
+                Failure err ->
                     UI.error err
 
-                Succeeded [] ->
+                Success [] ->
                     UI.emptyState "No co-coaches added."
 
-                Succeeded coaches ->
+                Success coaches ->
                     UI.dataTable
                         { columns = [ "Name", "Email", "" ]
                         , rows = coaches
@@ -1434,16 +1446,19 @@ viewAttorneyCoachesCard readOnly data =
               else
                 viewAttorneyForm data.attorneyForm
             , case data.attorneyCoaches of
+                NotAsked ->
+                    UI.notAsked "Getting ready…"
+
                 Loading ->
                     UI.loading
 
-                Failed err ->
+                Failure err ->
                     UI.error err
 
-                Succeeded [] ->
+                Success [] ->
                     UI.emptyState "No attorney coaches added."
 
-                Succeeded coaches ->
+                Success coaches ->
                     UI.dataTable
                         { columns = [ "Name", "Contact", "" ]
                         , rows = coaches
@@ -1523,17 +1538,20 @@ viewWithdrawalSection data =
 
     else
         case data.withdrawalRequest of
+            NotAsked ->
+                UI.notAsked "Getting ready…"
+
             Loading ->
                 UI.empty
 
-            Failed _ ->
+            Failure _ ->
                 UI.empty
 
-            Succeeded (Just _) ->
+            Success (Just _) ->
                 UI.alert { variant = "warning" }
                     [ text "A withdrawal request is pending admin review." ]
 
-            Succeeded Nothing ->
+            Success Nothing ->
                 case data.withdrawalForm of
                     WithdrawalFormHidden ->
                         UI.actionRow

@@ -68,7 +68,7 @@ type alias TaskFormRow =
 
 type alias TeamData =
     { team : Api.Team
-    , rounds : RemoteData (List Api.Round)
+    , rounds : RemoteData String (List Api.Round)
     , trials : List Api.Trial
     , caseCharacters : List Api.CaseCharacter
     , students : List Api.Student
@@ -581,10 +581,10 @@ handleTeamPbMsg value data =
         Just "rounds" ->
             case Pb.decodeList Api.roundDecoder value of
                 Ok items ->
-                    ( { data | rounds = Succeeded items }, Effect.none )
+                    ( { data | rounds = Success items }, Effect.none )
 
                 Err _ ->
-                    ( { data | rounds = Failed "Failed to load rounds." }, Effect.none )
+                    ( { data | rounds = Failure "Failed to load rounds." }, Effect.none )
 
         Just "trials" ->
             case Pb.decodeList Api.trialDecoder value of
@@ -1233,13 +1233,16 @@ viewContent model =
 viewTeamData : TeamData -> Html Msg
 viewTeamData data =
     case data.rounds of
+        NotAsked ->
+            UI.notAsked "Getting ready…"
+
         Loading ->
             UI.loading
 
-        Failed err ->
+        Failure err ->
             UI.error err
 
-        Succeeded rounds ->
+        Success rounds ->
             if List.isEmpty rounds then
                 UI.emptyState "No rounds scheduled yet."
 
