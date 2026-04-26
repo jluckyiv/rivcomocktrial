@@ -37,6 +37,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Replaced the unstyled school-list scaffold at `/` with a real
+  landing page (closes #183). Authenticated users are redirected
+  by role: superusers to `/admin`, coaches to `/team`. Anonymous
+  visitors see two cards: "Register your team" and "Sign in." This
+  is intentionally minimal — the project is an admin tool, not a
+  marketing site, so the landing page just routes people to the
+  right place. Refinement deferred.
+
+### Changed
+
 - `README.md` "Staging Environment" section replaced with a
   "Deployment" section that documents the unified architecture
   (single-origin Caddy in one container), both environments
