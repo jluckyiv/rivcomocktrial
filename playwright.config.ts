@@ -1,21 +1,25 @@
 import { defineConfig } from "@playwright/test";
 
 /**
- * E2E tests run against the production build served by PocketBase.
- * PocketBase must be running: npm run pb:start
- * Frontend must be built and deployed into the container:
- *   npm run fe:build && npm run pb:deploy-frontend
+ * E2E tests run against the SvelteKit dev server (port 5173).
+ * PocketBase must be running first: npm run pb:start
+ * Playwright starts the SvelteKit dev server automatically via webServer.
  *
- * For CI: ensure PocketBase is up and the build is in pb_public before
- * running `npx playwright test`.
+ * For CI: start PocketBase before running `npx playwright test`.
  */
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 15_000,
   retries: 0,
   use: {
-    baseURL: "http://localhost:8090",
+    baseURL: "http://localhost:5173",
     headless: true,
+  },
+  webServer: {
+    command: "cd web && npm run dev",
+    url: "http://localhost:5173",
+    reuseExistingServer: true,
+    timeout: 30_000,
   },
   projects: [
     {

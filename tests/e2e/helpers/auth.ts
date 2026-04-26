@@ -1,14 +1,12 @@
 import type { Page } from "@playwright/test";
 
 export async function adminLogin(page: Page) {
-  await page.goto("/admin/login");
-  // Email input is the first input inside a label containing "Email".
-  await page.locator('label:has-text("Email") input').fill(
-    process.env.PB_ADMIN_EMAIL!
-  );
-  await page.locator('input[type="password"]').fill(
+  await page.goto("/login");
+  // shadcn Label+Input are siblings, not nested — use name attribute.
+  await page.locator('input[name="email"]').fill(process.env.PB_ADMIN_EMAIL!);
+  await page.locator('input[name="password"]').fill(
     process.env.PB_ADMIN_PASSWORD!
   );
-  await page.getByRole("button", { name: "Login" }).click();
-  await page.locator("text=RCMT Admin").waitFor();
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.waitForURL(/\/admin/);
 }
