@@ -6,6 +6,38 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.9.8 — fix: hook panics, ballot const scope, e2e suite for SvelteKit (#191)
+
+### Fixed
+
+- `smtp_config.pb.js` re-enabled: use `onBootstrap` with `e.next()` first;
+  drop `$app.save(settings)` which caused nil pointer dereference in
+  PocketBase v0.36 (`core/db.go:314`). Closes #146.
+- `ballot_guard.pb.js`: extract `validateScorerToken` and `markTokenUsed`
+  to `_ballot_helpers.js`; `require()` inside each callback so helpers are
+  in scope under PB v0.36 fresh-VM-per-callback model. Closes #147.
+
+### Changed
+
+- Removed backend freeze guard (`.claude/hooks/freeze-bash-guard.sh`):
+  safeguard was for the Elm→SvelteKit transition; no longer needed.
+  Migration `Edit`/`MultiEdit` deny rules remain (migrations are append-only).
+- `playwright.config.ts`: target SvelteKit dev server (port 5173) via
+  `webServer`; drop stale Elm/`pb_public` approach.
+- `tests/e2e/helpers/auth.ts`: fix URL (`/login`), input selectors
+  (`name` attrs), button text (`Sign in`), and wait (`waitForURL`).
+- `tests/e2e/dashboard.spec.ts`: rewrite for SvelteKit nav-card dashboard.
+- `tests/e2e/registrations.spec.ts`: fix school creation (district relation
+  ID), remove DaisyUI selectors and loading-spinner waits, drop 2nd-team
+  badge tests (not yet ported).
+- Deleted `tests/e2e/pairings.spec.ts`: `/admin/pairings` not yet built
+  in SvelteKit.
+
+### Added
+
+- `tests/e2e/auth.spec.ts`: login redirect, logout redirect, protected
+  route blocked after logout. Closes #159.
+
 ## v0.9.7 — feat: logout flow and responsive nav bar (#188)
 
 ### Added
