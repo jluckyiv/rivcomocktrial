@@ -5,45 +5,77 @@ description: Pre-merge review of a single PR — verdict (merge / fix first / ho
 
 # pr-review
 
-Pre-merge review of a single PR for the rivcomocktrial project. Runs
-in a **fresh Opus subagent** to keep the review independent of the
-calling session's context (no bias from prior conversation, no
-pollution of the foreground with PR diffs and file contents). The
-subagent returns a verdict that the calling agent surfaces directly.
+> **READ THIS FIRST. DO NOT EXECUTE THE PLAYBOOK YOURSELF.**
+>
+> If you are the calling agent and this skill was just invoked, you
+> have **one job**: spawn a subagent and pass the brief to it. You
+> are NOT the reviewer. The brief below is for the subagent, not for
+> you.
 
-Different from `/audit`: that one runs a codebase-wide / PR-scoped
-structured findings pass; `/pr-review` returns a single ship/fix/hold
-verdict on one PR.
+## Why a subagent
 
-## Argument
+The reviewer must have **no prior conversation context**. The calling
+session knows what the PR author was thinking, what tradeoffs were
+discussed, what tests already passed locally — all of that biases a
+review. A fresh Opus instance reads the PR cold, like a human
+reviewer would.
 
-PR number (e.g. `172`), branch name, or omitted (review the current
-branch's PR).
-
-## Orchestration (calling agent does this)
+## Orchestration — the only thing the calling agent does
 
 When this skill is invoked:
 
 1. **Resolve the argument** to a PR number:
    - Numeric → use as-is.
    - Branch name → `gh pr list --head <branch> --json number --jq '.[0].number'`.
-   - Omitted → current branch via `gh pr list --head $(git branch --show-current) --json number --jq '.[0].number'`.
-   - If no PR found, tell the user and stop.
-2. **Launch a fresh subagent** via the `Agent` tool:
+   - Omitted → `gh pr list --head $(git branch --show-current) --json number --jq '.[0].number'`.
+   - If no PR found, tell the user and stop. Do NOT review the
+     branch in some other way.
+
+2. **Launch a subagent via the `Agent` tool**:
    - `subagent_type: "general-purpose"`
    - `model: "opus"`
    - `description: "Review PR #<n>"`
-   - `prompt`: a self-contained brief. Use this template:
-     ```
-     You are reviewing PR #<n> for the rivcomocktrial project. You're
-     a fresh Opus instance with no prior conversation context. Read
-     everything below before fetching anything, then run the playbook
-     and return the verdict.
+   - `prompt`: a self-contained brief — see template below.
 
-     <paste everything from "## Verdict format" through the end of
-     this SKILL.md file verbatim>
-     ```
-3. **Surface the subagent's verdict directly** to the user. Don't paraphrase, summarize, or add framing — the verdict format is already terse and structured. The user can ask follow-ups in the calling session afterward.
+3. **Surface the subagent's verdict directly to the user.** Don't
+   paraphrase, summarize, or add framing. The verdict format is
+   already terse and structured. The user can ask follow-ups in the
+   calling session afterward.
+
+That's it. You do not run `gh pr view`, you do not read changed
+files, you do not form your own opinion. The review is the
+subagent's job.
+
+### Subagent prompt template
+
+Use this verbatim, substituting `<n>` with the PR number:
+
+```
+You are reviewing PR #<n> for the rivcomocktrial project. You're a
+fresh Opus instance with no prior conversation context. Read
+everything below before fetching anything, then run the playbook
+and return the verdict.
+
+[paste everything from the SUBAGENT BRIEF marker below through the
+end of this SKILL.md file]
+```
+
+If you find yourself about to run `gh pr view`, `gh pr diff`, or
+read a file from the PR — STOP. That work belongs to the subagent.
+
+---
+
+<!-- ============================================================ -->
+<!-- SUBAGENT BRIEF — everything below this marker is for the     -->
+<!-- subagent, not for the calling agent. The orchestration above -->
+<!-- is the only part the calling agent acts on.                  -->
+<!-- ============================================================ -->
+
+# SUBAGENT BRIEF
+
+You are reviewing a single PR. Return a verdict and stop. The
+sections below are your full context — read them before fetching
+anything.
 
 ## Verdict format
 
