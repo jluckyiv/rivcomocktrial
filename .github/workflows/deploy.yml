@@ -43,7 +43,8 @@ jobs:
           /tmp/pb/pocketbase serve \
             --http=127.0.0.1:8091 \
             --dir=/tmp/pb_data \
-            --migrationsDir=backend/pb_migrations &
+            --migrationsDir=backend/pb_migrations \
+            --hooksDir=backend/pb_hooks &
           PB_PID=$!
 
           for i in $(seq 1 30); do
