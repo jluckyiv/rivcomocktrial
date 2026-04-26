@@ -6,6 +6,38 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.8.0 — Phase B: domain algorithm modules (#144)
+
+### Added
+
+- `web/src/lib/domain/standings.ts` — win/loss record and rank ordering
+- `web/src/lib/domain/matchHistory.ts` — trial history with per-team side
+  counts; reference-equality generic over team type
+- `web/src/lib/domain/eligibleStudents.ts` — student eligibility filtering
+  by role and side
+- `web/src/lib/domain/powerMatch.ts` — Swiss-system pairing algorithm with
+  HighHigh/HighLow cross-bracket strategies
+- `web/src/lib/domain/powerMatchFixtures.ts` — shared test fixtures for
+  power-match specs
+- `web/src/lib/domain/elimBracket.ts` — 8-team elimination bracket seeding
+  (1v8, 2v7, 3v6, 4v5)
+- `web/src/lib/domain/elimSideRules.ts` — Prosecution/Defense assignment
+  for elimination rounds; exports `Trial<T>` and `MeetingHistory`
+- `web/src/lib/domain/roundProgress.ts` — trial status rollup
+  (CheckInOpen → AllTrialsStarted → AllTrialsComplete → FullyVerified)
+- `web/src/lib/domain/trialClosure.ts` — `completeTrial` / `verifyTrial`
+  coordinating ballot status and trial status transitions
+- `web/src/lib/domain/ballotAssembly.ts` — assembles PocketBase API records
+  into domain ballot types (SubmittedBallot, VerifiedBallot, PresiderBallot)
+- `web/src/lib/domain/awards.ts` — rank-points scoring and award categories
+  (BestAttorney, BestWitness, BestClerk, BestBailiff)
+- 193 Vitest unit tests across 11 domain modules; 0 type errors
+
+### Fixed
+
+- Corrected swapped return-type annotation in `pairWithinBrackets`
+  (`powerMatch.ts`) caught by `svelte-check`
+
 ## v0.7.0 — Phase A: SvelteKit scaffold + PocketBase wire (#143)
 
 ### Added
