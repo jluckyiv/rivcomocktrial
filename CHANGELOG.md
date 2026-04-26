@@ -6,6 +6,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.8.1 — Seed data: Riverside County high schools (#145)
+
+### Added
+
+- `backend/pb_seed/schools.json` — 75 Riverside County high schools
+  across 19 districts (Diocese of San Bernardino plus 18 public
+  districts); importable via PocketBase admin UI for bulk-import
+  smoke test in Slice 01
+
 ## v0.8.0 — Phase B: domain algorithm modules (#144)
 
 ### Added
