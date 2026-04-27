@@ -4,6 +4,30 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.15 — docs: add implementation brief for new audit skills (#276)
+
+Adds `docs/audit-skills-brief.md` — a self-contained build plan for 5
+new sibling audit skills (`/audit-schema`, `/audit-docs`,
+`/audit-domain`, `/audit-a11y`, `/audit-deps`) so a fresh Claude
+session can implement them one-per-worktree without re-deriving the
+design.
+
+The brief locks in the project's "Happy Path Svelte Development"
+stance: keep FP values (immutability, exhaustive matching,
+parse-at-boundary, Result-shaped returns, no-booleans-for-state) where
+they fit Svelte/TS idiom; drop them where they fight the grain. The
+`$state` boundary is called out explicitly — domain modules in `lib/`
+stay pure and immutable; component-level reactive state in `.svelte`
+files is mutation-by-design and must not be flagged as an
+anti-pattern.
+
+### Added
+
+- `docs/audit-skills-brief.md` — implementation brief for the 5 new
+  audit skills, in build order: schema → docs → domain → a11y → deps,
+  plus a follow-up section for updating the existing `/audit` skill
+  with Svelte 5 deltas.
+
 ## v0.10.14 — docs: README Operations runbook and ADR-015 realtime clarification (#213)
 
 Closes #213.
