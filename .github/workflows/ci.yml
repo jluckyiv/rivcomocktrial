@@ -51,7 +51,7 @@ jobs:
       - name: Install Playwright browsers
         # prepare script runs `playwright install || echo ''` which silences
         # failures; this step ensures chromium + OS deps are present for the
-        # vitest client-project browser test in vitest-examples.
+        # Playwright e2e tests in web/e2e/ and tests/e2e/.
         run: npx playwright install --with-deps chromium
         working-directory: web
 

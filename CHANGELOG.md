@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.9.19 — chore: remove unused vitest client project (task 14) (#237)
+
+### Removed
+
+- `web/vite.config.ts` — removed browser-mode `client` vitest project and
+  `@vitest/browser-playwright` import; only the `server` project remains.
+- `@vitest/browser-playwright` and `vitest-browser-svelte` from
+  `web/package.json` devDependencies.
+
+### Changed
+
+- `web/eslint.config.js` — added `docs/**` to ignores so example files
+  are not linted.
+
+### Added
+
+- `web/docs/vitest-examples/` — example files moved here (history
+  preserved via `git mv`); includes README explaining they are not
+  collected by any test or CI job.
+
 ## v0.9.18 — chore: ESLint guard blocking test-helper imports in production
 code (#236)
 
