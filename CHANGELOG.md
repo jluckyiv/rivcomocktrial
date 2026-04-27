@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.2 — fix: seed-staging-smoke-users.sh disambiguates HTTP 400 (#260)
+
+Closes #254 (audit follow-up). Previously the seed script silently
+swallowed any HTTP 400 from the user-create POST as "coach already
+exists — skipping" and exited 0. Real validation failures (e.g. the
+registration hook rejecting the create) were hidden — the script
+reported success even though the staging users collection stayed
+empty.
+
+### Changed
+
+- `scripts/seed-staging-smoke-users.sh` — on HTTP 400, do a follow-up
+  GET filtered by email to confirm the record actually exists. Only
+  then skip. Otherwise print the real PB error body and exit 1.
+  Updated the header comment to reflect the new check.
+
 ## v0.10.1 — feat: pre-deploy pb_data snapshot in CI (#233)
 
 Closes the last open audit task. Every staging and production deploy
