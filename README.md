@@ -213,6 +213,25 @@ workflow → target `production`. Approve the environment prompt.
 
 ### DNS and TLS for the production domain
 
+DNS is hosted at Namecheap (registrar nameservers
+`dns1.registrar-servers.com` / `dns2.registrar-servers.com`).
+
+#### Current live records
+
+| Hostname                     | Type   | Value                     | Fly app                  |
+|------------------------------|--------|---------------------------|--------------------------|
+| `rivcomocktrial.org`         | `A`    | `66.241.124.227`          | `rivcomocktrial`         |
+| `rivcomocktrial.org`         | `AAAA` | `2a09:8280:1::10b:b21f:0` | `rivcomocktrial`         |
+| `www.rivcomocktrial.org`     | `A`    | `66.241.124.227`          | `rivcomocktrial`         |
+| `www.rivcomocktrial.org`     | `AAAA` | `2a09:8280:1::10b:b21f:0` | `rivcomocktrial`         |
+| `staging.rivcomocktrial.org` | `A`    | `66.241.124.95`           | `rivcomocktrial-staging` |
+| `staging.rivcomocktrial.org` | `AAAA` | `2a09:8280:1::da:c698:0`  | `rivcomocktrial-staging` |
+
+To re-fetch IPs: `fly ips list -a rivcomocktrial` and
+`fly ips list -a rivcomocktrial-staging`.
+
+#### Bootstrap procedure
+
 One-time bootstrap. Re-run if the prod app is destroyed and rebuilt
 under a new IP, or if the domain moves to a new registrar.
 
@@ -252,6 +271,12 @@ record target) and IPv6 (`AAAA` record target).
 
 **3. Add DNS records at the registrar.**
 
+> **Namecheap host-field gotcha:** the `Host` column wants `@` for the
+> apex (`rivcomocktrial.org`), not the full domain. If you type
+> `rivcomocktrial.org` in the Host field, Namecheap silently creates a
+> record for `rivcomocktrial.org.rivcomocktrial.org` and queries
+> return nothing.
+
 For the apex (`rivcomocktrial.org`):
 
 | Type   | Host | Value                     |
@@ -289,12 +314,25 @@ a few minutes; cert issuance another minute or two after that.
 
 ```bash
 dig +short rivcomocktrial.org           # should match the IPv4 from step 2
+dig @dns1.registrar-servers.com +short rivcomocktrial.org   # bypass resolver cache
 xh https://rivcomocktrial.org/          # should return SvelteKit HTML
 xh -h https://rivcomocktrial.org/_/     # should return PB admin SPA
 ```
 
+Querying the registrar's nameserver directly
+(`@dns1.registrar-servers.com`) is the fastest way to confirm a record
+just took, before recursive resolvers update.
+
 If any check fails, re-read fly's output from `fly certs show` —
 it lists exactly what's missing.
+
+#### `www.rivcomocktrial.org`
+
+Currently has `A` and `AAAA` records pointing to the prod IPs and a
+fly cert issued (see Current live records above). Decision pending in
+[#211](https://github.com/jluckyiv/rivcomocktrial/issues/211) — leave
+as alias, 301 to apex, or drop entirely. Update this section once
+chosen.
 
 ### Secrets
 
