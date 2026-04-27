@@ -4,6 +4,24 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.9.15 — feat: schema rule tests for all PocketBase collections
+
+### Added
+
+- `web/src/lib/schema/users.spec.ts` — 5 rule assertions for the users
+  collection (public create, admin-only list/view/update/delete).
+- `web/src/lib/schema/schools-districts.spec.ts` — 10 rule assertions
+  covering schools (public read, admin write) and districts (public
+  read, admin write).
+- `web/src/lib/schema/tournaments.spec.ts` — 30 rule assertions
+  covering tournaments, rounds, trials, students, case_characters
+  (all public read, admin write) and courtrooms (admin-only).
+- `web/src/lib/schema/ballots.spec.ts` — 30 rule assertions covering
+  ballot_submissions, ballot_scores, presider_ballots (public create,
+  admin-only read/update/delete), ballot_corrections and judges
+  (admin-only), and scorer_tokens (token-query-param-gated read, admin
+  write). Total schema test count: 121 (up from 46).
+
 ## v0.9.14 — feat: hook integration tests for auth, eligibility, withdrawal, ballot (#217)
 
 ### Added
