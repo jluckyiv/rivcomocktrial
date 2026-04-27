@@ -89,7 +89,7 @@
 								{team.expand?.school?.name ?? '—'}
 							</Table.Cell>
 							<Table.Cell class="text-muted-foreground">
-								{team.expand?.coach?.name || team.expand?.coach?.email || '—'}
+								{team.expand?.coaches?.map(c => c.name || c.email).join(', ') || '—'}
 							</Table.Cell>
 							<Table.Cell>
 								<span class="inline-flex items-center gap-2">

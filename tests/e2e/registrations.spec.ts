@@ -47,7 +47,7 @@ test.describe("Admin registrations", () => {
 
     await pbPatch("users", coach1.id, { status: "approved" });
 
-    const teams = await pbList("teams", `coach = '${coach1.id}'`);
+    const teams = await pbList("teams", `coaches ~ '${coach1.id}'`);
     for (const t of teams) {
       createdIds.push({ collection: "teams", id: (t as { id: string }).id });
     }
@@ -84,7 +84,7 @@ test.describe("Admin registrations", () => {
     })) as { id: string };
     createdIds.push({ collection: "users", id: coach.id });
 
-    const pendingTeams = await pbList("teams", `coach = '${coach.id}'`);
+    const pendingTeams = await pbList("teams", `coaches ~ '${coach.id}'`);
     for (const t of pendingTeams) {
       createdIds.push({ collection: "teams", id: (t as { id: string }).id });
     }

@@ -9,7 +9,7 @@ import type {
 type TeamWithRelations = TeamsResponse<{
 	school?: SchoolsResponse;
 	tournament?: TournamentsResponse;
-	coach?: UsersResponse;
+	coaches?: UsersResponse[];
 }>;
 
 export const load: PageServerLoad = async ({ locals, url }) => {
@@ -25,7 +25,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const teams = selected
 		? await locals.pb.collection('teams').getFullList<TeamWithRelations>({
 				filter: `tournament = "${selected.id}"`,
-				expand: 'school,tournament,coach',
+				expand: 'school,tournament,coaches',
 				sort: 'name'
 			})
 		: [];

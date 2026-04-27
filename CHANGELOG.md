@@ -6,6 +6,46 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.9.10 — feat: multi-coach teams, join requests, sole-coach guard, schema tests (#198)
+
+### Added
+
+- Migration 1800000009: converts `teams.coach` (single relation) to
+  `teams.coaches` (multi-relation, unlimited), drops `co_coaches` collection,
+  adds unique index on `(name, school, tournament)`, updates access rules
+  across 7 dependent collections to use the `~` (contains) operator. Closes #169 (backend).
+- Migration 1800000010: `join_requests` collection with pending/approved/rejected
+  status and coach-or-self list/view rules.
+- `registration.pb.js`: collision detection returns `existingTeamId` in error
+  data; post-create branches on `join_team_id` to create join request vs. new
+  team; join-request save failure rolls back the newly-created user; sole-coach
+  deletion guard blocks deleting a coach who is the only coach on a pending or
+  active team.
+- `_constants.js`: `JOIN_REQUEST_STATUS` constant.
+- `web/src/lib/schema/coach-access.spec.ts`: Vitest server-project schema
+  assertions for all 9 coach-gated collections (exact rule strings) plus
+  `co_coaches`-is-gone check (46 assertions total).
+- `web/src/lib/test-helpers/pb-admin.ts`: admin API helper for schema tests.
+- `test:schema` npm script in `web/package.json` and root `package.json`.
+
+### Fixed
+
+- `registration.pb.js` post-create hook: `e.requestInfo` does not exist on
+  `RecordEvent` (only on `RecordRequestEvent`), so reading `join_team_id` from
+  it always returned undefined — the join-existing branch was dead code. Fixed
+  by stashing join intent on the record in the pre-commit hook via
+  `e.record.set("_join_team_id", id)` and reading it back in the post-commit
+  hook via `user.get("_join_team_id")`. Also adds user rollback to the new-team
+  path to mirror the existing rollback on the join-request path.
+- `eligibility_change_requests` and `withdrawal_requests`: migration 1800000009
+  now correctly leaves `updateRule` and `deleteRule` as null (admin-only) rather
+  than overwriting them to coach-gated.
+- `pocketbase-types.ts`: `TeamsRecord.coaches` corrected to `RecordIdString[]`
+  (pocketbase-typegen 1.5.0 generates singular for multi-relation fields).
+- Admin teams view: `+page.server.ts` and `+page.svelte` updated to expand and
+  render `coaches` (multi) rather than `coach` (single).
+
+
 ## v0.9.9 — ci: migration smoke test before deploy (#192)
 
 ### Added
