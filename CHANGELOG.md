@@ -4,6 +4,27 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.13 — docs: archive completed audit and prune vestigial planning docs (#272)
+
+Audit work shipped across v0.9.12–v0.10.1; the audit doc itself is
+closeout history now. Moves `docs/audit-2026-04-26.md` and
+`docs/mvp-domain-gaps.md` into `docs/archive/`, and deletes the
+orphaned `docs/slices/01-admin-setup-schools.md` (an identical copy
+already lives at `docs/archive/slices/`; ADR-014 archived
+`docs/slices/` but this file got left behind).
+
+### Changed
+
+- `docs/archive/audit-2026-04-26.md` (moved from `docs/`)
+- `docs/archive/mvp-domain-gaps.md` (moved from `docs/`)
+- `CHANGELOG.md` — v0.10.0 entry's path reference updated to point at
+  the archived location
+
+### Removed
+
+- `docs/slices/01-admin-setup-schools.md` and the now-empty
+  `docs/slices/` directory
+
 ## v0.10.12 — fix: 301 redirect www.rivcomocktrial.org to apex (#271)
 
 Closes #211. Adds a `@www` host matcher in Caddyfile that redirects
