@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.3 — feat: add deploy:staging and deploy:prod npm scripts (#259)
+
+Wraps `gh workflow run deploy.yml -f target=<env>` as npm scripts so
+deploys can be triggered from the terminal without navigating the
+GitHub Actions UI. Documents both commands in the README.
+
+### Added
+
+- `npm run deploy:prod` — triggers the production `workflow_dispatch`
+- `npm run deploy:staging` — triggers a manual staging dispatch
+
 ## v0.10.2 — fix: seed-staging-smoke-users.sh disambiguates HTTP 400 (#260)
 
 Closes #254 (audit follow-up). Previously the seed script silently
