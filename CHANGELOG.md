@@ -176,7 +176,7 @@ of writes.
   placeholder with a description of the actual deploy step and how to
   use the step summary for rollback.
 
-## v0.10.0 — milestone: audit complete (docs/audit-2026-04-26.md)
+## v0.10.0 — milestone: audit complete (docs/archive/audit-2026-04-26.md)
 
 All 14 tasks from the April 2026 codebase audit are shipped.
 
