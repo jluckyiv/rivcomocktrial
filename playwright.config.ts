@@ -1,5 +1,9 @@
 import { defineConfig } from "@playwright/test";
 
+if (!process.env.PB_URL) {
+  throw new Error("PB_URL is not set. Run `npm run e2e` at the repo root.");
+}
+
 /**
  * E2E tests run against the SvelteKit dev server (port 5173).
  * PocketBase must be running first: npm run pb:start

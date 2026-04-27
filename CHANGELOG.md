@@ -6,6 +6,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Changed
+
+- `playwright.config.ts`: guard throws at startup if `PB_URL` is unset
+  instead of silently passing an empty string.
+- `tests/e2e/helpers/auth.ts`: resolve `PB_ADMIN_EMAIL` / `PB_ADMIN_PASSWORD`
+  at module load via `requireEnv`; throws immediately if unset rather than
+  hanging until Playwright timeout.
+- `package.json` `e2e` script: adds `PB_URL=http://localhost:8090` so the
+  new guard passes when running `npm run e2e`.
+
 ## v0.9.11 — test: migrate hook tests to Vitest server layer (#216)
 
 ### Added
