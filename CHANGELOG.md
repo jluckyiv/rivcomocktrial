@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.9 — fix: seed-staging-smoke-users.sh sets wrong fields for the coach record (#256)
+
+Closes #256. The staging smoke-seed script POSTed a coach record
+with `name: "Smoke Coach"` and no `team_name` / `school`. Before
+#266 that combination would crash the registration post-commit hook
+trying to auto-create a team without those fields and silently
+roll back the coach record. #266 (v0.10.7) made the hook bypass
+team creation entirely when superuser-authenticated creates omit
+team intent, so the script now seeds successfully as-is.
+
+### Fixed
+
+- `scripts/seed-staging-smoke-users.sh` — drop the unused
+  `name: "Smoke Coach"` field from the coach POST body. The smoke
+  spec (`deploy-smoke-coach.e2e.ts`) never asserts on `name`, and
+  removing it makes the script's intent (bare admin seed, no team)
+  match the post-#266 hook contract self-documenting. Header
+  comment updated to explain why the smoke coach has no team and
+  how `/team` and the smoke spec handle that.
+
 ## v0.10.8 — fix: contact_route.pb.js fallback query missing try/catch (#202)
 
 Closes #202. The fallback `findRecordsByFilter` call (used when no
