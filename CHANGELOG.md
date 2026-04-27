@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.5 — fix: widen year input on Tournaments admin page (#258)
+
+Closes #258. The year input in the "Add tournament" row was too narrow
+— browser number-spinner arrows clipped the fourth digit of the
+four-digit year. Adding `w-28` (7 rem) gives the input enough room to
+display the full value alongside the spinner controls.
+
+### Fixed
+
+- `web/src/routes/admin/tournaments/+page.svelte` — add `w-28` to the
+  `year` input so the full four-digit year is never clipped.
+
 ## v0.10.4 — refactor: stop calling op at runtime; load creds into env vars once (#262)
 
 Closes #261. Subprocess sandboxes (Claude Code's Bash tool, CI runners,
