@@ -124,7 +124,7 @@
 						name="year"
 						form="create-tournament"
 						type="number"
-						class="h-8"
+						class="h-8 w-28"
 						value={new Date().getFullYear()}
 						required
 					/>
