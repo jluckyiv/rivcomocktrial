@@ -16,7 +16,7 @@ const w2: Witness = { name: 'Casey Morgan', role: 'Expert Analyst' };
 describe('Awards', () => {
 	describe('nominationCategory', () => {
 		test('BestAttorney Prosecution → Advocate', () => {
-			expect(nominationCategory({ kind: 'BestAttorney', side: 'Prosecution' })).toBe('__BROKEN__');
+			expect(nominationCategory({ kind: 'BestAttorney', side: 'Prosecution' })).toBe('Advocate');
 		});
 
 		test('BestAttorney Defense → Advocate', () => {
