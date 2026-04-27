@@ -4,6 +4,43 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.4 — refactor: stop calling op at runtime; load creds into env vars once (#262)
+
+Closes #261. Subprocess sandboxes (Claude Code's Bash tool, CI runners,
+non-interactive shells) can't reach the 1Password desktop daemon, so
+every embedded `$(op read …)` was a flaky runtime dependency that
+surfaced as `RequestDelegatedSession: cannot setup session`. Replaces
+runtime `op` calls with a static `.env.local` file — populated once,
+auto-loaded by direnv on every `cd` into the repo.
+
+### Added
+
+- `.envrc` — `dotenv_if_exists .env.local` for direnv.
+- `.env.local.example` — typed credential schema (`PB_DEV_*`,
+  `STAGING_*`, `PROD_*`) with comments pointing to the 1P items.
+- `scripts/load-1p-creds.sh` — the only place `op` is invoked.
+  Run once (or after rotating creds) and pipe to `.env.local`.
+
+### Changed
+
+- `package.json`, `web/package.json` — smoke + seed scripts read env
+  vars instead of shelling out to `op`. Translate prefixed names
+  (`STAGING_*` / `PROD_*`) into the `SMOKE_*` names Playwright config
+  expects.
+- `scripts/seed-prod-bootstrap.sh` — picks `PROD_*` or `STAGING_*`
+  based on the app argument. Incidentally fixes a pre-existing bug
+  where `rivcomocktrial-staging` silently received production
+  credentials.
+- `scripts/seed-staging-smoke-users.sh` — validates required env vars
+  at the top and fails loud if any are missing.
+- `README.md`, `docs/smoke-tests.md` — document the `.env.local` flow
+  and direnv setup.
+
+### Removed
+
+- `npm run pb:credentials` — cache-file pattern superseded by
+  `.env.local`.
+
 ## v0.10.3 — feat: add deploy:staging and deploy:prod npm scripts (#259)
 
 Wraps `gh workflow run deploy.yml -f target=<env>` as npm scripts so

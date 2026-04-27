@@ -70,8 +70,9 @@ To run both servers: `npm run pb:dev` from repo root (foreground), then `cd web 
 2. **Plan** — use plan mode to design the approach
 3. **Issue** — create a GitHub issue with the plan (clears context, sets benchmarks)
 4. **Implement** — TDD by default (ask first); red/green/refactor with real local PocketBase
-5. **Document** — update README and `docs/` so documentation is current with the code
-6. **Commit & PR** — commit, push branch, open PR
+5. **Document** — update README, `docs/`, and CHANGELOG on the feature branch before
+   opening the PR. All docs ship with the code, never as a post-merge chore commit.
+6. **Commit & PR** — use `/ship` to commit, push, and open the PR
 7. **Merge** — merge PR to main
 8. **Tag** — at milestones only (not every PR)
 9. **Update memory** — capture patterns, decisions, and lessons learned
