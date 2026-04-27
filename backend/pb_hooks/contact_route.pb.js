@@ -9,8 +9,6 @@
 // If no superuser is flagged `is_primary_contact`, falls back to
 // the first superuser by creation date.
 routerAdd("GET", "/api/contact", (e) => {
-    let record;
-
     try {
         const flagged = $app.findRecordsByFilter(
             "_superusers",
@@ -19,22 +17,19 @@ routerAdd("GET", "/api/contact", (e) => {
             1,
             0
         );
-        record = flagged[0];
+        const record =
+            flagged[0] ??
+            $app.findRecordsByFilter("_superusers", "", "created", 1, 0)[0];
+
+        if (!record) {
+            return e.json(404, { error: "No superusers configured." });
+        }
+
+        return e.json(200, {
+            email: record.get("email"),
+            name: record.get("name") || "",
+        });
     } catch (_) {
-        record = undefined;
+        return e.json(503, { error: "Contact information temporarily unavailable." });
     }
-
-    if (!record) {
-        const all = $app.findRecordsByFilter("_superusers", "", "created", 1, 0);
-        record = all[0];
-    }
-
-    if (!record) {
-        return e.json(404, { error: "No superusers configured." });
-    }
-
-    return e.json(200, {
-        email: record.get("email"),
-        name: record.get("name") || "",
-    });
 });
