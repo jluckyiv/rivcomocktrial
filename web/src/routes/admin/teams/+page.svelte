@@ -1,24 +1,24 @@
 <script lang="ts">
 	import * as Table from '$lib/components/ui/table';
-	import { canRunTournament } from '$lib/domain/registration';
+	import { canRunTournament } from '$lib/domain/eligibility';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
-	const readiness = $derived(canRunTournament(data.teams));
+	const readiness = $derived(canRunTournament(data.eligibilityRows));
 
-	const TEAM_STATUS_LABEL: Record<string, string> = {
+	const ELIGIBILITY_LABEL: Record<string, string> = {
 		pending: 'Pending',
-		active: 'Active',
-		withdrawn: 'Withdrawn',
-		rejected: 'Rejected'
+		eligible: 'Eligible',
+		ineligible: 'Not eligible',
+		withdrawn: 'Withdrawn'
 	};
 
-	const STATUS_DOT: Record<string, string> = {
+	const ELIGIBILITY_DOT: Record<string, string> = {
 		pending: 'bg-amber-500',
-		active: 'bg-emerald-500',
-		withdrawn: 'bg-zinc-400',
-		rejected: 'bg-rose-500'
+		eligible: 'bg-emerald-500',
+		ineligible: 'bg-rose-500',
+		withdrawn: 'bg-zinc-400'
 	};
 </script>
 
@@ -65,7 +65,7 @@
 				class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"
 				role="status"
 			>
-				✓ {readiness.activeCount} active teams — ready to run.
+				✓ {readiness.eligibleCount} eligible teams — ready to run.
 			</div>
 		{/if}
 
@@ -94,11 +94,12 @@
 							<Table.Cell>
 								<span class="inline-flex items-center gap-2">
 									<span
-										class="inline-block h-2 w-2 shrink-0 rounded-full {STATUS_DOT[team.status] ??
-											'bg-zinc-400'}"
+										class="inline-block h-2 w-2 shrink-0 rounded-full {ELIGIBILITY_DOT[
+											data.eligibilityByTeamId[team.id]
+										] ?? 'bg-zinc-400'}"
 										aria-hidden="true"
 									></span>
-									{TEAM_STATUS_LABEL[team.status] ?? team.status}
+									{ELIGIBILITY_LABEL[data.eligibilityByTeamId[team.id]] ?? '—'}
 								</span>
 							</Table.Cell>
 						</Table.Row>

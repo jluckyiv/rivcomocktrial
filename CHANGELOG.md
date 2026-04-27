@@ -4,15 +4,12 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased — refactor: split enrollment from eligibility (#274)
+## Unreleased — refactor: split enrollment from eligibility (#274 #275)
 
-**Note: the frontend will not compile until PR #275 lands. Land them
-back-to-back. Do not tag a release until both are merged and the build
-is green.**
-
-Closes #274. Introduces `tournaments_teams` — a many-to-many join
-between tournaments and teams that tracks per-tournament eligibility
-status separate from the durable coach/team enrollment records.
+Closes #274 and #275. Introduces `tournaments_teams` — a many-to-many
+join between tournaments and teams that tracks per-tournament eligibility
+status separate from the durable coach/team enrollment records. Frontend
+updated in the same PR so the build stays green throughout.
 
 ### Added
 
@@ -36,10 +33,18 @@ status separate from the durable coach/team enrollment records.
   `tournaments_teams` instead of `teams.status`.
 - `backend/pb_hooks/withdrawal.pb.js` — sets `tournaments_teams.status`
   to `withdrawn` instead of `team.status`.
+- `web/src/routes/admin/teams/+page.server.ts` — loads `tournaments_teams`
+  rows alongside teams; returns `eligibilityRows` and `eligibilityByTeamId`.
+- `web/src/routes/admin/teams/+page.svelte` — renders eligibility from
+  `tournaments_teams` instead of the removed `team.status`; uses
+  `canRunTournament` from `eligibility.ts`.
+- `web/src/routes/team/+page.server.ts` — loads the `tournaments_teams`
+  row for the coach's team; returns `eligibility` string.
+- `web/src/routes/team/+page.svelte` — displays eligibility status from
+  `tournaments_teams` instead of the removed `team.status`.
 - `web/src/lib/domain/registration.ts` — removes `TEAM_STATUS`,
   `TeamStatus`, `activeTeamCount`, `TournamentReadiness`,
-  `canRunTournament`, and `nextTeamStatusForUserStatus`. Frontend
-  callers will fail to compile until PR #275.
+  `canRunTournament`, and `nextTeamStatusForUserStatus`.
 - `web/src/lib/pocketbase-types.ts` — regenerated; `TeamsRecord` no
   longer has `status`; `TournamentsTeamsRecord` added.
 
