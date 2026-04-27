@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.0 — milestone: audit complete (docs/audit-2026-04-26.md)
+
+All 14 tasks from the April 2026 codebase audit are shipped.
+
 ## v0.9.19 — chore: remove unused vitest client project (task 14) (#237)
 
 ### Removed
