@@ -6,16 +6,16 @@
 # needed because fly.io exposes the app publicly and the admin API is protected
 # by an authenticated superuser token obtained first.
 #
-# Accounts created:
-#   smoke-admin@rivcomocktrial.org  — superuser (can log into /admin)
+# Account created:
 #   smoke-coach@rivcomocktrial.org  — approved coach (can log into /team)
 #
-# Credentials are stored in 1Password:
-#   op://Private/rivcomocktrial-staging-smoke
-#     admin_email, admin_password, coach_email, coach_password
+# The staging superuser (op://Private/rivcomocktrial-staging) authenticates
+# the admin API calls and also serves as the admin smoke-test credential
+# in test:smoke:staging. No dedicated smoke-admin account is needed.
 #
-# The bootstrap superuser (op://Private/rivcomocktrial) is used to authenticate
-# the admin API calls. That item must already exist in 1Password.
+# Coach credentials are stored in:
+#   op://Private/rivcomocktrial-staging-smoke
+#     coach_email, coach_password
 #
 # Usage:
 #   scripts/seed-staging-smoke-users.sh
@@ -28,7 +28,7 @@
 set -e
 
 STAGING_URL="https://rivcomocktrial-staging.fly.dev"
-BOOTSTRAP_ITEM="op://Private/rivcomocktrial"
+STAGING_ITEM="op://Private/rivcomocktrial-staging"
 SMOKE_ITEM="op://Private/rivcomocktrial-staging-smoke"
 
 for cmd in op curl jq; do
@@ -40,59 +40,31 @@ done
 
 echo "Reading credentials from 1Password..."
 
-BOOT_EMAIL=$(op read "${BOOTSTRAP_ITEM}/username")
-BOOT_PASSWORD=$(op read "${BOOTSTRAP_ITEM}/password")
-SMOKE_ADMIN_EMAIL=$(op read "${SMOKE_ITEM}/admin_email")
-SMOKE_ADMIN_PASSWORD=$(op read "${SMOKE_ITEM}/admin_password")
+BOOT_EMAIL=$(op read "${STAGING_ITEM}/username")
+BOOT_PASSWORD=$(op read "${STAGING_ITEM}/password")
 SMOKE_COACH_EMAIL=$(op read "${SMOKE_ITEM}/coach_email")
 SMOKE_COACH_PASSWORD=$(op read "${SMOKE_ITEM}/coach_password")
 
 if [ -z "$BOOT_EMAIL" ] || [ -z "$BOOT_PASSWORD" ]; then
-    echo "Could not read bootstrap credentials from ${BOOTSTRAP_ITEM}" >&2
+    echo "Could not read staging superuser credentials from ${STAGING_ITEM}" >&2
     exit 1
 fi
 
-if [ -z "$SMOKE_ADMIN_EMAIL" ] || [ -z "$SMOKE_ADMIN_PASSWORD" ] || \
-   [ -z "$SMOKE_COACH_EMAIL" ] || [ -z "$SMOKE_COACH_PASSWORD" ]; then
-    echo "Could not read smoke credentials from ${SMOKE_ITEM}" >&2
-    echo "Create the item with fields: admin_email, admin_password, coach_email, coach_password" >&2
+if [ -z "$SMOKE_COACH_EMAIL" ] || [ -z "$SMOKE_COACH_PASSWORD" ]; then
+    echo "Could not read coach credentials from ${SMOKE_ITEM}" >&2
+    echo "Create the item with fields: coach_email, coach_password" >&2
     exit 1
 fi
 
-echo "Authenticating as bootstrap superuser on staging..."
+echo "Authenticating as staging superuser..."
 
-TOKEN=$(curl -sf -X POST "${STAGING_URL}/api/admins/auth-with-password" \
+TOKEN=$(curl -sf -X POST "${STAGING_URL}/api/collections/_superusers/auth-with-password" \
     -H "Content-Type: application/json" \
     -d "{\"identity\":\"${BOOT_EMAIL}\",\"password\":\"${BOOT_PASSWORD}\"}" \
     | jq -r '.token')
 
-# Fall back to superusers collection (PB v0.23+)
 if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
-    TOKEN=$(curl -sf -X POST "${STAGING_URL}/api/collections/_superusers/auth-with-password" \
-        -H "Content-Type: application/json" \
-        -d "{\"identity\":\"${BOOT_EMAIL}\",\"password\":\"${BOOT_PASSWORD}\"}" \
-        | jq -r '.token')
-fi
-
-if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
-    echo "Failed to authenticate as bootstrap superuser on ${STAGING_URL}" >&2
-    exit 1
-fi
-
-echo "Seeding smoke-admin superuser..."
-
-ADMIN_RESP=$(curl -s -o /dev/null -w "%{http_code}" \
-    -X POST "${STAGING_URL}/api/collections/_superusers/records" \
-    -H "Authorization: Bearer ${TOKEN}" \
-    -H "Content-Type: application/json" \
-    -d "{\"email\":\"${SMOKE_ADMIN_EMAIL}\",\"password\":\"${SMOKE_ADMIN_PASSWORD}\",\"passwordConfirm\":\"${SMOKE_ADMIN_PASSWORD}\"}")
-
-if [ "$ADMIN_RESP" = "200" ] || [ "$ADMIN_RESP" = "201" ]; then
-    echo "  Created ${SMOKE_ADMIN_EMAIL}"
-elif [ "$ADMIN_RESP" = "400" ]; then
-    echo "  ${SMOKE_ADMIN_EMAIL} already exists — skipping"
-else
-    echo "  Unexpected HTTP ${ADMIN_RESP} creating ${SMOKE_ADMIN_EMAIL}" >&2
+    echo "Failed to authenticate as staging superuser on ${STAGING_URL}" >&2
     exit 1
 fi
 
@@ -114,5 +86,5 @@ else
 fi
 
 echo ""
-echo "Done. Verify both accounts can log in at ${STAGING_URL}/login before running smoke tests."
+echo "Done. Verify the coach account can log in at ${STAGING_URL}/login before running smoke tests."
 echo "Next: cd web && npm run test:smoke:staging"

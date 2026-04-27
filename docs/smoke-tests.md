@@ -27,13 +27,18 @@ No coach account is seeded on production. The coach spec self-skips when
 
 ### Staging
 
-Dedicated smoke accounts are stored in a separate 1Password item:
+Admin credentials reuse the existing staging superuser item:
+
+- `op://Private/rivcomocktrial-staging/username`
+- `op://Private/rivcomocktrial-staging/password`
+
+Coach credentials are stored in a separate item:
 
 - Item: `op://Private/rivcomocktrial-staging-smoke`
-- Fields: `admin_email`, `admin_password`, `coach_email`, `coach_password`
+- Fields: `coach_email`, `coach_password`
 
-These accounts must be seeded before running staging smokes — see below.
-Do not add these accounts to migrations; they must never reach production.
+The coach account must be seeded before running staging smokes — see below.
+Do not add this account to migrations; it must never reach production.
 
 ## How to run
 
@@ -60,12 +65,11 @@ scripts/seed-staging-smoke-users.sh
 
 The script:
 
-1. Reads the bootstrap superuser credentials from
-   `op://Private/rivcomocktrial`.
+1. Reads the staging superuser credentials from
+   `op://Private/rivcomocktrial-staging`.
 2. Authenticates against the staging PB API to get an admin token.
-3. Creates `smoke-admin@rivcomocktrial.org` as a superuser.
-4. Creates `smoke-coach@rivcomocktrial.org` as an approved coach.
-5. Skips creation if either account already exists (HTTP 400).
+3. Creates `smoke-coach@rivcomocktrial.org` as an approved coach.
+4. Skips creation if the account already exists (HTTP 400).
 
 Prerequisites: `op` CLI authed, `curl` and `jq` on PATH.
 
