@@ -45,6 +45,31 @@ export default defineConfig(
 		}
 	},
 	{
+		files: ['**/*.{ts,js,svelte}'],
+		ignores: ['**/*.spec.ts', '**/*.spec.js', '**/test-helpers/**'],
+		rules: {
+			'no-restricted-imports': [
+				'error',
+				{
+					patterns: [
+						{
+							group: [
+								'**/test-helpers/**',
+								'$lib/test-helpers/**',
+								'**/*.spec',
+								'**/*.spec.ts',
+								'**/*.spec.js'
+							],
+							message:
+								'Test helpers and spec files must not be imported from production code. ' +
+								'If you genuinely need this code in production, move it out of test-helpers/ first.'
+						}
+					]
+				}
+			]
+		}
+	},
+	{
 		rules: {
 			// Not using SvelteKit base path — static hrefs are fine everywhere
 			'svelte/no-navigation-without-resolve': 'off'
