@@ -39,7 +39,7 @@ onRecordCreateRequest((e) => {
             if (tournaments.length === 0) {
                 throw new BadRequestError(
                     "Cannot auto-create team: no tournament is in registration status. " +
-                    "Either set a tournament to 'registration' or omit team_name/school " +
+                    "Either set a tournament to \'registration\' or omit team_name/school " +
                     "to skip team creation."
                 );
             }
@@ -115,7 +115,7 @@ onRecordCreateRequest((e) => {
 }, "users");
 
 
-// Post-commit: create a pending team or join request after the user commits.
+// Post-commit: create a pending team + eligibility row, or a join request.
 //
 // Reads team intent from the record itself rather than checking who
 // authenticated. Public registrations always carry team_name + school
@@ -124,7 +124,7 @@ onRecordCreateRequest((e) => {
 // (e.g. staging smoke seeds) don't accidentally trigger team creation
 // — and don't fall over when no registration tournament exists.
 onRecordAfterCreateSuccess((e) => {
-    const { TOURNAMENT_STATUS, USER_ROLE, TEAM_STATUS, JOIN_REQUEST_STATUS } =
+    const { TOURNAMENT_STATUS, USER_ROLE, ELIGIBILITY_STATUS, JOIN_REQUEST_STATUS } =
         require(`${__hooks}/_constants.js`);
     const user = e.record;
 
@@ -180,7 +180,7 @@ onRecordAfterCreateSuccess((e) => {
         return;
     }
 
-    // New-team path: create a pending team linked to this coach.
+    // New-team path: create a team linked to this coach.
     const teamsCollection = $app.findCollectionByNameOrId("teams");
     const team = new Record(teamsCollection);
 
@@ -188,7 +188,6 @@ onRecordAfterCreateSuccess((e) => {
     team.set("school", user.get("school"));
     team.set("name", user.get("team_name"));
     team.set("coaches", [user.id]);
-    team.set("status", TEAM_STATUS.PENDING);
 
     try {
         $app.save(team);
@@ -205,13 +204,40 @@ onRecordAfterCreateSuccess((e) => {
                 user.id + " — manual cleanup required. Error: " + deleteErr
             );
         }
+        return;
+    }
+
+    // Create the per-tournament eligibility record.
+    const tournamentsTeamsCollection = $app.findCollectionByNameOrId("tournaments_teams");
+    const eligibilityRow = new Record(tournamentsTeamsCollection);
+    eligibilityRow.set("team", team.id);
+    eligibilityRow.set("tournament", tournament.id);
+    eligibilityRow.set("status", ELIGIBILITY_STATUS.PENDING);
+
+    try {
+        $app.save(eligibilityRow);
+    } catch (err) {
+        console.error(
+            "[registration] Failed to save tournaments_teams for team " + team.id +
+            " — rolling back team and user records. Error: " + err
+        );
+        try {
+            $app.delete(team);
+        } catch (deleteErr) {
+            console.error("[registration] Failed to delete orphaned team " + team.id + ": " + deleteErr);
+        }
+        try {
+            $app.delete(user);
+        } catch (deleteErr) {
+            console.error("[registration] Failed to delete orphaned user " + user.id + ": " + deleteErr);
+        }
     }
 }, "users");
 
 
 // Pre-delete: block coach deletion if they are the sole coach on any
-// active or pending team. The caller must add another coach or withdraw
-// the team before the coach record can be deleted.
+// team that is currently enrolled (pending or eligible) in a tournament.
+// The caller must add another coach or withdraw the team first.
 onRecordDeleteRequest((e) => {
     const { USER_ROLE } = require(`${__hooks}/_constants.js`);
     const user = e.record;
@@ -220,16 +246,18 @@ onRecordDeleteRequest((e) => {
         return e.next();
     }
 
-    const teams = $app.findRecordsByFilter(
-        "teams",
-        "coaches ~ {:coachId} && (status = 'pending' || status = 'active')",
+    const eligibilityRows = $app.findRecordsByFilter(
+        "tournaments_teams",
+        "team.coaches ~ {:coachId} && (status = \'pending\' || status = \'eligible\')",
         "",
         100,
         0,
         { coachId: user.id }
     );
 
-    for (const team of teams) {
+    for (const row of eligibilityRows) {
+        const teamId = row.get("team");
+        const team = $app.findRecordById("teams", teamId);
         const coaches = team.getStringSlice("coaches");
         if (coaches.length <= 1) {
             throw new BadRequestError(
@@ -243,10 +271,10 @@ onRecordDeleteRequest((e) => {
 }, "users");
 
 
-// When a coach's status changes to approved or rejected, sync
-// the linked team's status. Runs after the user record commits.
+// When a coach's enrollment is approved or rejected, sync the eligibility
+// of their pending tournament enrollments. Runs after the user record commits.
 onRecordAfterUpdateSuccess((e) => {
-    const { USER_ROLE, USER_STATUS, TEAM_STATUS } = require(`${__hooks}/_constants.js`);
+    const { USER_ROLE, USER_STATUS, ELIGIBILITY_STATUS } = require(`${__hooks}/_constants.js`);
     const user = e.record;
 
     if (user.get("role") !== USER_ROLE.COACH) {
@@ -254,34 +282,35 @@ onRecordAfterUpdateSuccess((e) => {
     }
 
     const status = user.get("status");
-    let teamStatus;
+    let eligibilityStatus;
 
     if (status === USER_STATUS.APPROVED) {
-        teamStatus = TEAM_STATUS.ACTIVE;
+        eligibilityStatus = ELIGIBILITY_STATUS.ELIGIBLE;
     } else if (status === USER_STATUS.REJECTED) {
-        teamStatus = TEAM_STATUS.REJECTED;
+        eligibilityStatus = ELIGIBILITY_STATUS.INELIGIBLE;
     } else {
         return;
     }
 
-    // Only promote/reject pending teams. Active or withdrawn teams
-    // must not be touched if the coach record is updated later.
-    const teams = $app.findRecordsByFilter(
-        "teams",
-        "coaches ~ {:coachId} && status = 'pending'",
+    // Only update pending eligibility rows. Eligible, withdrawn, or
+    // ineligible rows must not be touched if the coach record is updated later.
+    const eligibilityRows = $app.findRecordsByFilter(
+        "tournaments_teams",
+        "team.coaches ~ {:coachId} && status = \'pending\'",
         "",
         100,
         0,
         { coachId: user.id }
     );
 
-    for (const team of teams) {
-        team.set("status", teamStatus);
+    for (const row of eligibilityRows) {
+        row.set("status", eligibilityStatus);
         try {
-            $app.save(team);
+            $app.save(row);
         } catch (err) {
             console.error(
-                "[registration] Failed to save team status " + team.id + " — " + err
+                "[registration] Failed to save eligibility status for tournaments_teams " +
+                row.id + " — " + err
             );
         }
     }

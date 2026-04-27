@@ -1,6 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-// When a withdrawal request is approved, set the team status to "withdrawn".
+// When a withdrawal request is approved, set the tournaments_teams eligibility
+// status to "withdrawn" for the team's originating tournament.
 onRecordAfterUpdateSuccess((e) => {
     const req = e.record;
 
@@ -20,12 +21,34 @@ onRecordAfterUpdateSuccess((e) => {
         return;
     }
 
-    team.set("status", "withdrawn");
+    const tournamentId = team.get("tournament");
+    if (!tournamentId) {
+        console.error(
+            "[withdrawal] Team " + teamId + " has no tournament FK — cannot update eligibility."
+        );
+        return;
+    }
+
+    let ttRow;
     try {
-        $app.save(team);
+        ttRow = $app.findFirstRecordByFilter(
+            "tournaments_teams",
+            "team = {:teamId} && tournament = {:tournamentId}",
+            { teamId, tournamentId }
+        );
+    } catch (_) {
+        console.error(
+            "[withdrawal] No tournaments_teams row for team " + teamId + " in tournament " + tournamentId
+        );
+        return;
+    }
+
+    ttRow.set("status", "withdrawn");
+    try {
+        $app.save(ttRow);
     } catch (err) {
         console.error(
-            "[withdrawal] Failed to save team status for request " + req.id + " — " + err
+            "[withdrawal] Failed to save tournaments_teams status for request " + req.id + " — " + err
         );
     }
 }, "withdrawal_requests");

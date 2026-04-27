@@ -4,6 +4,50 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased — refactor: split enrollment from eligibility (#274)
+
+**Note: the frontend will not compile until PR #275 lands. Land them
+back-to-back. Do not tag a release until both are merged and the build
+is green.**
+
+Closes #274. Introduces `tournaments_teams` — a many-to-many join
+between tournaments and teams that tracks per-tournament eligibility
+status separate from the durable coach/team enrollment records.
+
+### Added
+
+- `backend/pb_migrations/1800000011_split_team_eligibility.js` — creates
+  `tournaments_teams` collection, backfills from `teams.status`, then
+  drops the `teams.status` field. Down migration restores the old schema.
+- `backend/pb_hooks/_constants.js` — adds `ELIGIBILITY_STATUS` constant
+  (`pending | eligible | ineligible | withdrawn`).
+- `web/src/lib/domain/eligibility.ts` — new domain module with
+  `ELIGIBILITY_STATUS`, `EligibilityStatus`, `nextEligibilityForUserStatus`,
+  `eligibleTeamCount`, and `canRunTournament`.
+- `web/src/lib/schema/tournaments-teams.spec.ts` — schema assertions for
+  the new collection and confirmation that `teams.status` is gone.
+
+### Changed
+
+- `backend/pb_hooks/registration.pb.js` — post-create hook now writes a
+  `tournaments_teams` row (status `pending`) instead of setting
+  `team.status`. Status sync hook updates `tournaments_teams.status`
+  instead of `team.status`. Sole-coach delete guard queries
+  `tournaments_teams` instead of `teams.status`.
+- `backend/pb_hooks/withdrawal.pb.js` — sets `tournaments_teams.status`
+  to `withdrawn` instead of `team.status`.
+- `web/src/lib/domain/registration.ts` — removes `TEAM_STATUS`,
+  `TeamStatus`, `activeTeamCount`, `TournamentReadiness`,
+  `canRunTournament`, and `nextTeamStatusForUserStatus`. Frontend
+  callers will fail to compile until PR #275.
+- `web/src/lib/pocketbase-types.ts` — regenerated; `TeamsRecord` no
+  longer has `status`; `TournamentsTeamsRecord` added.
+
+### Removed
+
+- `teams.status` field (dropped by migration 1800000011).
+- `TEAM_STATUS` constant from `backend/pb_hooks/_constants.js`.
+
 ## v0.10.14 — docs: README Operations runbook and ADR-015 realtime clarification (#213)
 
 Closes #213.
