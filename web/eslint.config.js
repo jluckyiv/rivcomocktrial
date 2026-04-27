@@ -46,7 +46,7 @@ export default defineConfig(
 	},
 	{
 		files: ['**/*.{ts,js,svelte}'],
-		ignores: ['**/*.spec.ts', '**/*.spec.js', 'src/lib/test-helpers/**'],
+		ignores: ['**/*.spec.ts', '**/*.spec.js', '**/test-helpers/**'],
 		rules: {
 			'no-restricted-imports': [
 				'error',
