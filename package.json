@@ -16,6 +16,8 @@
     "pb:test:down": "docker compose -f docker-compose.test.yml down -v",
     "pb:test:reset": "npm run pb:test:down && npm run pb:test:up",
     "e2e": "npm run pb:test:up && set -a && . ./.env.test && set +a && npx playwright test",
+    "deploy:staging": "gh workflow run deploy.yml -f target=staging",
+    "deploy:prod": "gh workflow run deploy.yml -f target=production",
     "lint:js": "eslint backend/pb_hooks/",
     "lint": "npm run lint:js",
     "test:hooks": "npm run pb:test:up && set -a && . ./.env.test && set +a && npm run --prefix web test:hooks",

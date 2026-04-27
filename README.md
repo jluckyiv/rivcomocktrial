@@ -110,6 +110,8 @@ docker compose exec pocketbase \
 | `npm run test:hooks`     | Vitest hook tests (auto-starts test PB) |
 | `npm run test:schema`    | Vitest schema tests (auto-starts test PB) |
 | `npm run e2e`            | Playwright e2e against test PB on 28090 (auto-starts test PB, builds + previews on 4173) |
+| `npm run deploy:staging` | Trigger staging deploy via gh CLI |
+| `npm run deploy:prod`    | Trigger production deploy via gh CLI |
 | `npm run web:dev`        | SvelteKit dev server          |
 | `npm run web:build`      | Build frontend for prod       |
 | `cd web && npm run test:smoke:staging` | Read-only smoke tests against staging |
@@ -206,8 +208,20 @@ Staging data is disposable. Production holds real data.
   `workflow_dispatch`. The `production` GitHub Environment is gated
   by required reviewer.
 
-To deploy production: GitHub → Actions → "Deploy to fly.io" → Run
-workflow → target `production`. Approve the environment prompt.
+To deploy production:
+
+```bash
+npm run deploy:prod
+```
+
+This runs `gh workflow run deploy.yml -f target=production`. The
+`production` GitHub Environment is gated by required reviewer —
+approve the prompt in GitHub Actions after triggering. You can also
+trigger staging manually:
+
+```bash
+npm run deploy:staging
+```
 
 ### DNS and TLS for the production domain
 
