@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.12 — fix: 301 redirect www.rivcomocktrial.org to apex (#271)
+
+Closes #211. Adds a `@www` host matcher in Caddyfile that redirects
+`www.rivcomocktrial.org` → `https://rivcomocktrial.org` before any
+other routing fires. Resolves the pending www decision (option B).
+
+### Fixed
+
+- `backend/Caddyfile` — `@www` host matcher + 301 redirect to apex
+
 ## v0.10.11 — fix: add PROTOCOL_HEADER and HOST_HEADER to fly configs (#270)
 
 Closes #209. SvelteKit adapter-node requires these env vars to trust
