@@ -1,7 +1,7 @@
 /**
- * PocketBase admin API helpers for test setup and teardown.
- * All created records use the "playwright-" prefix so they're easy to
- * identify and clean up if a test run is interrupted.
+ * PocketBase admin API helpers for e2e test setup and teardown.
+ * All helpers throw on non-2xx so failures surface at the bad call,
+ * not two assertions later.
  */
 
 const PB_URL = "http://localhost:8090";
@@ -22,8 +22,9 @@ async function adminToken(): Promise<string> {
       body: JSON.stringify({ identity: email, password }),
     }
   );
-  const data = await res.json();
-  return data.token as string;
+  if (!res.ok) throw new Error(`Admin auth failed: ${res.status}`);
+  const data = (await res.json()) as { token: string };
+  return data.token;
 }
 
 export async function pbCreate(
@@ -39,7 +40,9 @@ export async function pbCreate(
     },
     body: JSON.stringify(body),
   });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) throw new Error(`pbCreate ${collection} failed ${res.status}: ${JSON.stringify(data)}`);
+  return data as Record<string, unknown>;
 }
 
 export async function pbPatch(
@@ -59,7 +62,9 @@ export async function pbPatch(
       body: JSON.stringify(body),
     }
   );
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) throw new Error(`pbPatch ${collection}/${id} failed ${res.status}: ${JSON.stringify(data)}`);
+  return data as Record<string, unknown>;
 }
 
 export async function pbDelete(
@@ -67,10 +72,16 @@ export async function pbDelete(
   id: string
 ): Promise<void> {
   const token = await adminToken();
-  await fetch(`${PB_URL}/api/collections/${collection}/records/${id}`, {
+  const res = await fetch(`${PB_URL}/api/collections/${collection}/records/${id}`, {
     method: "DELETE",
     headers: { Authorization: token },
   });
+  if (!res.ok) {
+    const body = res.headers.get("content-type")?.includes("application/json")
+      ? JSON.stringify(await res.json())
+      : "";
+    throw new Error(`pbDelete ${collection}/${id} failed ${res.status}: ${body}`);
+  }
 }
 
 export async function pbList(
@@ -84,5 +95,6 @@ export async function pbList(
     { headers: { Authorization: token } }
   );
   const data = await res.json();
-  return data.items ?? [];
+  if (!res.ok) throw new Error(`pbList ${collection} failed ${res.status}: ${JSON.stringify(data)}`);
+  return (data as { items: Record<string, unknown>[] }).items ?? [];
 }

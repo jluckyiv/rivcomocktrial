@@ -16,6 +16,7 @@
 		"test": "npm run test:unit -- --run && npm run test:e2e",
 		"test:e2e": "playwright test",
 		"test:smoke": "playwright test --config playwright.deploy.config.ts",
+		"test:hooks": "vitest run --project=server src/lib/hooks",
 		"test:schema": "vitest run --project=server src/lib/schema"
 	},
 	"devDependencies": {
