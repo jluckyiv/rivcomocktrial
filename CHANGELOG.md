@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.11 — fix: add PROTOCOL_HEADER and HOST_HEADER to fly configs (#270)
+
+Closes #209. SvelteKit adapter-node requires these env vars to trust
+`x-forwarded-proto` and `x-forwarded-host` from the fly proxy. Without
+them, CSRF checks on form action POSTs silently return 403.
+
+### Fixed
+
+- `fly.toml` — add `PROTOCOL_HEADER` and `HOST_HEADER`
+- `fly.staging.toml` — add `PROTOCOL_HEADER` and `HOST_HEADER`
+
 ## v0.10.10 — fix: Caddyfile cold-start 502 and missing security headers (#269)
 
 Closes #206, #214.
