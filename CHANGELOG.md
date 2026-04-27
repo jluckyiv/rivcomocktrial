@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.9.13 — docs: pb data backup policy via Fly volume snapshots (#230)
+
+### Added
+
+- `docs/backups.md` — backup policy document: what Fly volume snapshots
+  cover, what is not covered (hooks/migrations are in git; secrets in
+  fly secrets), and a step-by-step recovery procedure using
+  `fly volumes create --snapshot-id`.
+- `CLAUDE.md` — new `## Operations` section pointing to
+  `docs/backups.md`.
+
+### Changed
+
+- Fly volume snapshot retention set to 14 days on both
+  `rivcomocktrial` (prod) and `rivcomocktrial-staging`.
+- Anchor snapshot `vs_RpqkkjoM1Ybc5x9oaoY` taken on prod volume at
+  time of this release.
+- Recovery procedure rehearsed end-to-end on staging; `data.db`
+  confirmed present (416 KB) in forked volume.
+
 ## v0.9.12 — fix: vitest preflight gate for unreachable PocketBase (#220)
 
 ### Added
