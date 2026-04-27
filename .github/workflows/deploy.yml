@@ -71,21 +71,75 @@ jobs:
     needs: migrate-check
     if: github.event_name == 'push' || github.event.inputs.target == 'staging'
     runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_APP: rivcomocktrial-staging
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Snapshot pb_data before deploy
+        # Take a fresh snapshot of the pb_data volume before deploying.
+        # If this step fails the job fails and `flyctl deploy` does not run,
+        # so the live volume is never touched without a known-good snapshot.
+        # See docs/backups.md for the rollback procedure.
+        run: |
+          set -euo pipefail
+          VOLUME_ID=$(flyctl volumes list -a "$FLY_APP" --json | jq -r '.[0].id')
+          if [ -z "$VOLUME_ID" ] || [ "$VOLUME_ID" = "null" ]; then
+            echo "Could not resolve volume ID for $FLY_APP" >&2
+            exit 1
+          fi
+          PRE=$(flyctl volumes snapshots list "$VOLUME_ID" -a "$FLY_APP" --json | jq -r '.[].id' | sort)
+          flyctl volumes snapshots create "$VOLUME_ID" -a "$FLY_APP"
+          POST=$(flyctl volumes snapshots list "$VOLUME_ID" -a "$FLY_APP" --json | jq -r '.[].id' | sort)
+          SNAPSHOT_ID=$(comm -13 <(echo "$PRE") <(echo "$POST") | head -n 1)
+          {
+            echo "## Pre-deploy snapshot"
+            echo ""
+            echo "- App: \`$FLY_APP\`"
+            echo "- Volume: \`$VOLUME_ID\`"
+            echo "- Snapshot: \`${SNAPSHOT_ID:-unknown}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - run: flyctl deploy --remote-only --config fly.staging.toml
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
   production:
     needs: migrate-check
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'production'
     runs-on: ubuntu-latest
     environment: production
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_APP: rivcomocktrial
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Snapshot pb_data before deploy
+        # Take a fresh snapshot of the pb_data volume before deploying.
+        # If this step fails the job fails and `flyctl deploy` does not run,
+        # so the live volume is never touched without a known-good snapshot.
+        # See docs/backups.md for the rollback procedure.
+        run: |
+          set -euo pipefail
+          VOLUME_ID=$(flyctl volumes list -a "$FLY_APP" --json | jq -r '.[0].id')
+          if [ -z "$VOLUME_ID" ] || [ "$VOLUME_ID" = "null" ]; then
+            echo "Could not resolve volume ID for $FLY_APP" >&2
+            exit 1
+          fi
+          PRE=$(flyctl volumes snapshots list "$VOLUME_ID" -a "$FLY_APP" --json | jq -r '.[].id' | sort)
+          flyctl volumes snapshots create "$VOLUME_ID" -a "$FLY_APP"
+          POST=$(flyctl volumes snapshots list "$VOLUME_ID" -a "$FLY_APP" --json | jq -r '.[].id' | sort)
+          SNAPSHOT_ID=$(comm -13 <(echo "$PRE") <(echo "$POST") | head -n 1)
+          {
+            echo "## Pre-deploy snapshot"
+            echo ""
+            echo "- App: \`$FLY_APP\`"
+            echo "- Volume: \`$VOLUME_ID\`"
+            echo "- Snapshot: \`${SNAPSHOT_ID:-unknown}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - run: flyctl deploy --remote-only --config fly.toml
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

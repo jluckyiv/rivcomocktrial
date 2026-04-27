@@ -4,6 +4,27 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.1 — feat: pre-deploy pb_data snapshot in CI (#233)
+
+Closes the last open audit task. Every staging and production deploy
+now snapshots the `pb_data` volume before `flyctl deploy` runs, so a
+bad deploy can be rolled back without losing more than a few seconds
+of writes.
+
+### Added
+
+- `.github/workflows/deploy.yml` — "Snapshot pb_data before deploy"
+  step in the staging and production jobs. Resolves the volume ID,
+  creates a snapshot, diffs the snapshot list to find the new ID, and
+  writes app + volume + snapshot + commit SHA to the GitHub Actions
+  step summary. Step failure aborts the job before `flyctl deploy`.
+
+### Changed
+
+- `docs/backups.md` — replaced the "once Task 10 is implemented"
+  placeholder with a description of the actual deploy step and how to
+  use the step summary for rollback.
+
 ## v0.10.0 — milestone: audit complete (docs/audit-2026-04-26.md)
 
 All 14 tasks from the April 2026 codebase audit are shipped.
