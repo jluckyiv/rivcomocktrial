@@ -32,6 +32,7 @@ export const Collections = {
 	Students: "students",
 	Teams: "teams",
 	Tournaments: "tournaments",
+	TournamentsTeams: "tournaments_teams",
 	Trials: "trials",
 	Users: "users",
 	WithdrawalRequests: "withdrawal_requests",
@@ -440,20 +441,12 @@ export type StudentsRecord = {
 	updated: IsoAutoDateString
 }
 
-export const TeamsStatusOptions = {
-	"pending": "pending",
-	"active": "active",
-	"withdrawn": "withdrawn",
-	"rejected": "rejected",
-} as const
-export type TeamsStatusOptions = typeof TeamsStatusOptions[keyof typeof TeamsStatusOptions]
 export type TeamsRecord = {
-	coaches?: RecordIdString[]
+	coaches?: RecordIdString
 	created: IsoAutoDateString
 	id: string
 	name?: string
 	school: RecordIdString
-	status?: TeamsStatusOptions
 	team_number?: number
 	tournament: RecordIdString
 	updated: IsoAutoDateString
@@ -477,6 +470,22 @@ export type TournamentsRecord = {
 	status: TournamentsStatusOptions
 	updated: IsoAutoDateString
 	year: number
+}
+
+export const TournamentsTeamsStatusOptions = {
+	"pending": "pending",
+	"eligible": "eligible",
+	"ineligible": "ineligible",
+	"withdrawn": "withdrawn",
+} as const
+export type TournamentsTeamsStatusOptions = typeof TournamentsTeamsStatusOptions[keyof typeof TournamentsTeamsStatusOptions]
+export type TournamentsTeamsRecord = {
+	created: IsoAutoDateString
+	id: string
+	status: TournamentsTeamsStatusOptions
+	team: RecordIdString
+	tournament: RecordIdString
+	updated: IsoAutoDateString
 }
 
 export type TrialsRecord = {
@@ -565,6 +574,7 @@ export type ScorerTokensResponse<Texpand = unknown> = Required<ScorerTokensRecor
 export type StudentsResponse<Texpand = unknown> = Required<StudentsRecord> & BaseSystemFields<Texpand>
 export type TeamsResponse<Texpand = unknown> = Required<TeamsRecord> & BaseSystemFields<Texpand>
 export type TournamentsResponse<Texpand = unknown> = Required<TournamentsRecord> & BaseSystemFields<Texpand>
+export type TournamentsTeamsResponse<Texpand = unknown> = Required<TournamentsTeamsRecord> & BaseSystemFields<Texpand>
 export type TrialsResponse<Texpand = unknown> = Required<TrialsRecord> & BaseSystemFields<Texpand>
 export type UsersResponse<Texpand = unknown> = Required<UsersRecord> & AuthSystemFields<Texpand>
 export type WithdrawalRequestsResponse<Texpand = unknown> = Required<WithdrawalRequestsRecord> & BaseSystemFields<Texpand>
@@ -598,6 +608,7 @@ export type CollectionRecords = {
 	students: StudentsRecord
 	teams: TeamsRecord
 	tournaments: TournamentsRecord
+	tournaments_teams: TournamentsTeamsRecord
 	trials: TrialsRecord
 	users: UsersRecord
 	withdrawal_requests: WithdrawalRequestsRecord
@@ -630,6 +641,7 @@ export type CollectionResponses = {
 	students: StudentsResponse
 	teams: TeamsResponse
 	tournaments: TournamentsResponse
+	tournaments_teams: TournamentsTeamsResponse
 	trials: TrialsResponse
 	users: UsersResponse
 	withdrawal_requests: WithdrawalRequestsResponse

@@ -20,11 +20,11 @@ module.exports = {
         APPROVED: "approved",
         REJECTED: "rejected",
     },
-    TEAM_STATUS: {
+    ELIGIBILITY_STATUS: {
         PENDING: "pending",
-        ACTIVE: "active",
+        ELIGIBLE: "eligible",
+        INELIGIBLE: "ineligible",
         WITHDRAWN: "withdrawn",
-        REJECTED: "rejected",
     },
     JOIN_REQUEST_STATUS: {
         PENDING: "pending",

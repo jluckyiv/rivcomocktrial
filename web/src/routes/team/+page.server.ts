@@ -1,6 +1,11 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import type { SchoolsResponse, TeamsResponse, TournamentsResponse } from '$lib/pocketbase-types';
+import type {
+	SchoolsResponse,
+	TeamsResponse,
+	TournamentsResponse,
+	TournamentsTeamsResponse
+} from '$lib/pocketbase-types';
 
 type TeamWithRelations = TeamsResponse<{
 	school?: SchoolsResponse;
@@ -20,5 +25,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 		sort: '-created'
 	});
 
-	return { team: teams[0] ?? null };
+	const team = teams[0] ?? null;
+
+	const eligibilityRows = team
+		? await locals.pb
+				.collection('tournaments_teams')
+				.getFullList<TournamentsTeamsResponse>({ filter: `team = "${team.id}"` })
+		: [];
+
+	return { team, eligibility: eligibilityRows[0]?.status ?? null };
 };

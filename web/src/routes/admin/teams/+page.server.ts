@@ -3,6 +3,7 @@ import type {
 	SchoolsResponse,
 	TeamsResponse,
 	TournamentsResponse,
+	TournamentsTeamsResponse,
 	UsersResponse
 } from '$lib/pocketbase-types';
 
@@ -30,5 +31,16 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			})
 		: [];
 
-	return { tournaments, selected, teams };
+	const eligibilityRows = selected
+		? await locals.pb
+				.collection('tournaments_teams')
+				.getFullList<TournamentsTeamsResponse>({ filter: `tournament = "${selected.id}"` })
+		: [];
+
+	const eligibilityByTeamId: Record<string, string> = {};
+	for (const row of eligibilityRows) {
+		eligibilityByTeamId[row.team] = row.status;
+	}
+
+	return { tournaments, selected, teams, eligibilityRows, eligibilityByTeamId };
 };

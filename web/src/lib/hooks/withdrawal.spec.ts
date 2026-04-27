@@ -2,8 +2,8 @@
  * Hook integration tests for withdrawal.pb.js.
  *
  * Covers onRecordAfterUpdateSuccess on "withdrawal_requests":
- *   approve withdrawal request → team.status becomes "withdrawn"
- *   update to non-approved status → team.status unchanged
+ *   approve withdrawal request → tournaments_teams.status becomes "withdrawn"
+ *   update to non-approved status → tournaments_teams.status unchanged
  *
  * Run: `npm run test:hooks` from repo root.
  */
@@ -22,7 +22,7 @@ function track(collection: string, id: string) {
 	tracked.push({ collection, id });
 }
 
-const CLEANUP_ORDER = ['withdrawal_requests', 'teams', 'tournaments'] as const;
+const CLEANUP_ORDER = ['withdrawal_requests', 'tournaments_teams', 'teams', 'tournaments'] as const;
 
 async function cleanup() {
 	const failures: string[] = [];
@@ -70,15 +70,22 @@ beforeAll(async () => {
 afterAll(cleanup);
 
 describe('withdrawal_requests', () => {
-	it('approve withdrawal request sets team.status to "withdrawn"', async () => {
+	it('approve withdrawal request sets tournaments_teams.status to "withdrawn"', async () => {
 		const team = await pbCreate('teams', {
 			name: `hooks-withdrawal-team-approve-${RUN_ID}`,
 			school: schoolId,
-			tournament: tournamentId,
-			status: 'active'
+			tournament: tournamentId
 		});
 		const teamId = (team as { id: string }).id;
 		track('teams', teamId);
+
+		const ttRow = await pbCreate('tournaments_teams', {
+			team: teamId,
+			tournament: tournamentId,
+			status: 'eligible'
+		});
+		const ttRowId = (ttRow as { id: string }).id;
+		track('tournaments_teams', ttRowId);
 
 		const req = await pbCreate('withdrawal_requests', {
 			team: teamId,
@@ -89,19 +96,26 @@ describe('withdrawal_requests', () => {
 
 		await pbPatch('withdrawal_requests', reqId, { status: 'approved' });
 
-		const updated = await pbList('teams', `id = '${teamId}'`);
+		const updated = await pbList('tournaments_teams', `id = '${ttRowId}'`);
 		expect((updated[0] as { status: string }).status).toBe('withdrawn');
 	});
 
-	it('non-approved update does not change team.status', async () => {
+	it('non-approved update does not change tournaments_teams.status', async () => {
 		const team = await pbCreate('teams', {
 			name: `hooks-withdrawal-team-reject-${RUN_ID}`,
 			school: schoolId,
-			tournament: tournamentId,
-			status: 'active'
+			tournament: tournamentId
 		});
 		const teamId = (team as { id: string }).id;
 		track('teams', teamId);
+
+		const ttRow = await pbCreate('tournaments_teams', {
+			team: teamId,
+			tournament: tournamentId,
+			status: 'eligible'
+		});
+		const ttRowId = (ttRow as { id: string }).id;
+		track('tournaments_teams', ttRowId);
 
 		const req = await pbCreate('withdrawal_requests', {
 			team: teamId,
@@ -112,7 +126,7 @@ describe('withdrawal_requests', () => {
 
 		await pbPatch('withdrawal_requests', reqId, { status: 'rejected' });
 
-		const updated = await pbList('teams', `id = '${teamId}'`);
-		expect((updated[0] as { status: string }).status).toBe('active');
+		const updated = await pbList('tournaments_teams', `id = '${ttRowId}'`);
+		expect((updated[0] as { status: string }).status).toBe('eligible');
 	});
 });

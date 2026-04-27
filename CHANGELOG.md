@@ -4,6 +4,55 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased — refactor: split enrollment from eligibility (#274 #275)
+
+Closes #274 and #275. Introduces `tournaments_teams` — a many-to-many
+join between tournaments and teams that tracks per-tournament eligibility
+status separate from the durable coach/team enrollment records. Frontend
+updated in the same PR so the build stays green throughout.
+
+### Added
+
+- `backend/pb_migrations/1800000011_split_team_eligibility.js` — creates
+  `tournaments_teams` collection, backfills from `teams.status`, then
+  drops the `teams.status` field. Down migration restores the old schema.
+- `backend/pb_hooks/_constants.js` — adds `ELIGIBILITY_STATUS` constant
+  (`pending | eligible | ineligible | withdrawn`).
+- `web/src/lib/domain/eligibility.ts` — new domain module with
+  `ELIGIBILITY_STATUS`, `EligibilityStatus`, `nextEligibilityForUserStatus`,
+  `eligibleTeamCount`, and `canRunTournament`.
+- `web/src/lib/schema/tournaments-teams.spec.ts` — schema assertions for
+  the new collection and confirmation that `teams.status` is gone.
+
+### Changed
+
+- `backend/pb_hooks/registration.pb.js` — post-create hook now writes a
+  `tournaments_teams` row (status `pending`) instead of setting
+  `team.status`. Status sync hook updates `tournaments_teams.status`
+  instead of `team.status`. Sole-coach delete guard queries
+  `tournaments_teams` instead of `teams.status`.
+- `backend/pb_hooks/withdrawal.pb.js` — sets `tournaments_teams.status`
+  to `withdrawn` instead of `team.status`.
+- `web/src/routes/admin/teams/+page.server.ts` — loads `tournaments_teams`
+  rows alongside teams; returns `eligibilityRows` and `eligibilityByTeamId`.
+- `web/src/routes/admin/teams/+page.svelte` — renders eligibility from
+  `tournaments_teams` instead of the removed `team.status`; uses
+  `canRunTournament` from `eligibility.ts`.
+- `web/src/routes/team/+page.server.ts` — loads the `tournaments_teams`
+  row for the coach's team; returns `eligibility` string.
+- `web/src/routes/team/+page.svelte` — displays eligibility status from
+  `tournaments_teams` instead of the removed `team.status`.
+- `web/src/lib/domain/registration.ts` — removes `TEAM_STATUS`,
+  `TeamStatus`, `activeTeamCount`, `TournamentReadiness`,
+  `canRunTournament`, and `nextTeamStatusForUserStatus`.
+- `web/src/lib/pocketbase-types.ts` — regenerated; `TeamsRecord` no
+  longer has `status`; `TournamentsTeamsRecord` added.
+
+### Removed
+
+- `teams.status` field (dropped by migration 1800000011).
+- `TEAM_STATUS` constant from `backend/pb_hooks/_constants.js`.
+
 ## v0.10.18 — docs: add supersession notes to Elm-era ADRs
 
 Adds `**Superseded by ADR-014.**` to ADR-002, ADR-004, ADR-005,

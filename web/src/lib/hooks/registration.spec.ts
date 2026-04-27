@@ -41,7 +41,7 @@ function untrack(collection: string, id: string) {
 // LIFO insertion order. The sole-coach delete guard (registration.pb.js)
 // fires when a user delete leaves a team with no coaches, so all
 // dependent records must be gone before any user is deleted.
-const CLEANUP_ORDER = ['join_requests', 'teams', 'users', 'tournaments'] as const;
+const CLEANUP_ORDER = ['join_requests', 'tournaments_teams', 'teams', 'users', 'tournaments'] as const;
 
 async function cleanup() {
 	const failures: string[] = [];
@@ -111,11 +111,16 @@ describe('new-team path', () => {
 
 		const teams = await pbList('teams', `coaches ~ '${coachId}'`);
 		expect(teams).toHaveLength(1);
-		const team = teams[0] as { id: string; coaches: string[]; status: string };
+		const team = teams[0] as { id: string; coaches: string[] };
 		track('teams', team.id);
 
 		expect(team.coaches).toContain(coachId);
-		expect(team.status).toBe('pending');
+
+		const ttRows = await pbList('tournaments_teams', `team = '${team.id}'`);
+		expect(ttRows).toHaveLength(1);
+		const ttRow = ttRows[0] as { id: string; status: string };
+		track('tournaments_teams', ttRow.id);
+		expect(ttRow.status).toBe('pending');
 	});
 });
 
@@ -230,7 +235,7 @@ describe('two-coach delete allowed', () => {
 });
 
 describe('status sync', () => {
-	it('promotes team to active when coach is approved', async () => {
+	it('promotes team eligibility to eligible when coach is approved', async () => {
 		const coach = await pbCreatePublic(
 			'users',
 			coachBody('sync-approve', 'hooks-reg-sync-approve')
@@ -242,13 +247,17 @@ describe('status sync', () => {
 		const team = teams[0] as { id: string };
 		track('teams', team.id);
 
+		const ttRows = await pbList('tournaments_teams', `team = '${team.id}'`);
+		const ttRow = ttRows[0] as { id: string };
+		track('tournaments_teams', ttRow.id);
+
 		await pbPatch('users', coachId, { status: 'approved' });
 
-		const updated = await pbList('teams', `id = '${team.id}'`);
-		expect((updated[0] as { status: string }).status).toBe('active');
+		const updated = await pbList('tournaments_teams', `id = '${ttRow.id}'`);
+		expect((updated[0] as { status: string }).status).toBe('eligible');
 	});
 
-	it('rejects team when coach is rejected', async () => {
+	it('sets team eligibility to ineligible when coach is rejected', async () => {
 		const coach = await pbCreatePublic('users', coachBody('sync-reject', 'hooks-reg-sync-reject'));
 		const coachId = (coach as { id: string }).id;
 		track('users', coachId);
@@ -257,10 +266,14 @@ describe('status sync', () => {
 		const team = teams[0] as { id: string };
 		track('teams', team.id);
 
+		const ttRows = await pbList('tournaments_teams', `team = '${team.id}'`);
+		const ttRow = ttRows[0] as { id: string };
+		track('tournaments_teams', ttRow.id);
+
 		await pbPatch('users', coachId, { status: 'rejected' });
 
-		const updated = await pbList('teams', `id = '${team.id}'`);
-		expect((updated[0] as { status: string }).status).toBe('rejected');
+		const updated = await pbList('tournaments_teams', `id = '${ttRow.id}'`);
+		expect((updated[0] as { status: string }).status).toBe('ineligible');
 	});
 });
 
@@ -307,7 +320,7 @@ describe('admin bypass', () => {
 		}
 	});
 
-	it('admin create with team_name + school still auto-creates a team', async () => {
+	it('admin create with team_name + school still auto-creates a team with pending eligibility', async () => {
 		const coach = await pbCreate(
 			'users',
 			coachBody('admin-with-team', 'hooks-reg-admin-with-team')
@@ -317,9 +330,14 @@ describe('admin bypass', () => {
 
 		const teams = await pbList('teams', `coaches ~ '${coachId}'`);
 		expect(teams).toHaveLength(1);
-		const team = teams[0] as { id: string; status: string };
+		const team = teams[0] as { id: string };
 		track('teams', team.id);
-		expect(team.status).toBe('pending');
+
+		const ttRows = await pbList('tournaments_teams', `team = '${team.id}'`);
+		expect(ttRows).toHaveLength(1);
+		const ttRow = ttRows[0] as { id: string; status: string };
+		track('tournaments_teams', ttRow.id);
+		expect(ttRow.status).toBe('pending');
 	});
 
 	it('public create with no registration tournament still fails with the user-facing error', async () => {

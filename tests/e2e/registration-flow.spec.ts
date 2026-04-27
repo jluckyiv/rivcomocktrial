@@ -107,5 +107,5 @@ test('happy path: register → approve → login → see team', async ({ page, c
 	// Step 4: coach sees their team --------------------------------------------
 	await expect(page.getByRole('heading', { name: /my team/i })).toBeVisible();
 	await expect(page.locator('[data-slot="card-title"]')).toContainText('La Sierra');
-	await expect(page.getByText('Active', { exact: true })).toBeVisible();
+	await expect(page.getByText('Eligible', { exact: true })).toBeVisible();
 });

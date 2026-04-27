@@ -4,11 +4,11 @@
 
 	let { data }: { data: PageData } = $props();
 
-	const TEAM_STATUS_LABEL: Record<string, string> = {
+	const ELIGIBILITY_LABEL: Record<string, string> = {
 		pending: 'Pending approval',
-		active: 'Active',
-		withdrawn: 'Withdrawn',
-		rejected: 'Rejected'
+		eligible: 'Eligible',
+		ineligible: 'Not eligible',
+		withdrawn: 'Withdrawn'
 	};
 </script>
 
@@ -40,7 +40,7 @@
 				<div class="flex items-center justify-between">
 					<span class="text-muted-foreground">Status</span>
 					<span class="font-medium">
-						{TEAM_STATUS_LABEL[data.team.status] ?? data.team.status}
+						{ELIGIBILITY_LABEL[data.eligibility ?? ''] ?? '—'}
 					</span>
 				</div>
 				{#if data.team.expand?.school?.nickname}
