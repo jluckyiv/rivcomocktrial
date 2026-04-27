@@ -12,6 +12,8 @@ primary_region = "lax"
   SMTP_SENDER_ADDRESS = "noreply@rivcomocktrial.org"
   SMTP_SENDER_NAME = "Riverside County Mock Trial"
   ORIGIN = "https://rivcomocktrial-staging.fly.dev"
+  PROTOCOL_HEADER = "x-forwarded-proto"
+  HOST_HEADER = "x-forwarded-host"
 
 [http_service]
   internal_port = 8090
