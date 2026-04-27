@@ -49,9 +49,13 @@ Internal layout:
   (`auto_https off`).
 
 **Rationale:** Cookies stay SameSite=Lax because the browser, the
-SvelteKit Node bundle, and the PB API all share one origin. The PB
-SDK works as-is for realtime — no token-mint endpoint, no cookie
-bridging. CORS is gone. One URL per environment.
+SvelteKit Node bundle, and the PB API all share one origin. Single-
+origin makes realtime viable: the browser SDK and the PB API share
+the same origin, so auth can be threaded to the browser without
+cross-origin workarounds. The realtime auth mechanism (SSR-thread
+via `+layout.server.ts` hydration or a short-lived token endpoint)
+is a separate implementation decision, deferred to when realtime
+SSE is wired up. CORS is gone. One URL per environment.
 
 **Alternatives considered:**
 

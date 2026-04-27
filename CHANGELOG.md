@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.14 — docs: README Operations runbook and ADR-015 realtime clarification (#213)
+
+Closes #213.
+
+### Changed
+
+- `README.md` — add `## Operations` section with day-2 runbook: tail
+  logs, SSH console, rollback (with forward-only migration caveat),
+  manual volume snapshot, wake staging machine, add a second superuser,
+  and a placeholder for the uptime monitor URL (#212).
+- `docs/decisions.md` — fix ADR-015 Rationale: replace the misleading
+  "PB SDK works as-is for realtime" claim with an accurate statement
+  that single-origin makes realtime viable, and that the browser-side
+  auth mechanism (SSR-thread vs token endpoint) is a separate
+  implementation decision deferred to when realtime SSE is wired up.
+
 ## v0.10.13 — docs: archive completed audit and prune vestigial planning docs (#272)
 
 Audit work shipped across v0.9.12–v0.10.1; the audit doc itself is
