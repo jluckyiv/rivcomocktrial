@@ -1,6 +1,14 @@
 import { defineConfig } from '@playwright/test';
 
-const BASE_URL = process.env.SMOKE_BASE_URL ?? 'https://rivcomocktrial-staging.fly.dev';
+// SMOKE_BASE_URL is required — set explicitly via test:smoke:staging or
+// test:smoke:prod so nothing silently runs against the wrong target.
+const BASE_URL = process.env.SMOKE_BASE_URL;
+if (!BASE_URL) {
+	throw new Error(
+		'SMOKE_BASE_URL is required. Use `npm run test:smoke:staging` or ' +
+			'`npm run test:smoke:prod` instead of invoking playwright directly.'
+	);
+}
 
 export default defineConfig({
 	use: { baseURL: BASE_URL },

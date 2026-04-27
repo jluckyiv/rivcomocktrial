@@ -1,24 +1,30 @@
-/**
- * PocketBase admin API helpers for e2e test setup and teardown.
- * All helpers throw on non-2xx so failures surface at the bad call,
- * not two assertions later.
- */
+// PocketBase admin API helpers for e2e test setup and teardown.
+// Configuration comes from .env.test (sourced by `npm run e2e` at the
+// repo root). All helpers throw on non-2xx so failures surface at the
+// bad call, not two assertions later.
 
-// Credentials must match web/src/lib/test-helpers/test-admin.ts and pb:seed-test-admin.
-const TEST_ADMIN_EMAIL = "test-admin@test.invalid";
-const TEST_ADMIN_PASSWORD = "testpass1234";
+const PB_URL = requireEnv("PB_URL");
+const PB_ADMIN_EMAIL = requireEnv("PB_ADMIN_EMAIL");
+const PB_ADMIN_PASSWORD = requireEnv("PB_ADMIN_PASSWORD");
 
-const PB_URL = "http://localhost:8090";
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(
+      `${name} is not set. Source .env.test before running e2e ` +
+        `(npm run e2e at the repo root does this automatically).`
+    );
+  }
+  return value;
+}
 
 async function adminToken(): Promise<string> {
-  const email = process.env.PB_ADMIN_EMAIL ?? TEST_ADMIN_EMAIL;
-  const password = process.env.PB_ADMIN_PASSWORD ?? TEST_ADMIN_PASSWORD;
   const res = await fetch(
     `${PB_URL}/api/collections/_superusers/auth-with-password`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ identity: email, password }),
+      body: JSON.stringify({ identity: PB_ADMIN_EMAIL, password: PB_ADMIN_PASSWORD }),
     }
   );
   if (!res.ok) throw new Error(`Admin auth failed: ${res.status}`);

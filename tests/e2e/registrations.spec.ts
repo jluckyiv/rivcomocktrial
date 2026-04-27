@@ -1,55 +1,73 @@
 import { test, expect } from "@playwright/test";
-import { pbCreate, pbPatch, pbDelete, pbList } from "./helpers/pb";
+import { pbCreate, pbDelete, pbList } from "./helpers/pb";
 import { adminLogin } from "./helpers/auth";
 
-let createdIds: { collection: string; id: string }[] = [];
+const RUN_ID = Date.now().toString(36);
+const tracked: { collection: string; id: string }[] = [];
+const CLEANUP_ORDER = [
+  "join_requests",
+  "teams",
+  "users",
+  "schools",
+  "tournaments",
+] as const;
 
 async function cleanup() {
-  for (const { collection, id } of createdIds.reverse()) {
-    await pbDelete(collection, id);
+  const failures: string[] = [];
+  for (const collection of CLEANUP_ORDER) {
+    const ids = tracked.filter((t) => t.collection === collection).map((t) => t.id);
+    for (const id of ids) {
+      try {
+        await pbDelete(collection, id);
+      } catch (err) {
+        failures.push(`${collection}/${id}: ${String(err)}`);
+      }
+    }
   }
-  createdIds = [];
+  tracked.length = 0;
+  if (failures.length > 0) {
+    throw new Error(`Cleanup failed:\n  - ${failures.join("\n  - ")}`);
+  }
 }
 
 test.describe("Admin registrations", () => {
   test.beforeAll(async () => {
-    const tournaments = await pbList("tournaments", "status = 'registration'");
-    if (tournaments.length === 0) {
-      throw new Error(
-        "No registration-status tournament found. Seed the dev DB first."
-      );
-    }
+    const tournament = (await pbCreate("tournaments", {
+      name: `e2e-registrations-${RUN_ID}`,
+      year: 2099,
+      num_preliminary_rounds: 3,
+      num_elimination_rounds: 2,
+      status: "registration",
+    })) as { id: string };
+    tracked.push({ collection: "tournaments", id: tournament.id });
 
-    // district is a relation — look up a real one.
     const districts = await pbList("districts", "");
     if (districts.length === 0) {
-      throw new Error("No districts found. Seed the dev DB first.");
+      throw new Error("No districts seeded — migrations should provide them.");
     }
     const district = districts[0] as { id: string };
 
     const school = (await pbCreate("schools", {
-      name: "Playwright Test High School",
+      name: `Playwright Test High School ${RUN_ID}`,
       district: district.id,
     })) as { id: string };
-    createdIds.push({ collection: "schools", id: school.id });
+    tracked.push({ collection: "schools", id: school.id });
 
     const coach1 = (await pbCreate("users", {
-      email: "playwright-coach1@test.invalid",
+      email: `playwright-coach1-${RUN_ID}@test.invalid`,
       password: "testpass123",
       passwordConfirm: "testpass123",
       name: "PW Coach One",
       role: "coach",
       status: "pending",
       school: school.id,
-      team_name: "Playwright Test High School",
+      team_name: `Playwright Test Team ${RUN_ID}`,
     })) as { id: string };
-    createdIds.push({ collection: "users", id: coach1.id });
-
-    await pbPatch("users", coach1.id, { status: "approved" });
+    tracked.push({ collection: "users", id: coach1.id });
 
     const teams = await pbList("teams", `coaches ~ '${coach1.id}'`);
     for (const t of teams) {
-      createdIds.push({ collection: "teams", id: (t as { id: string }).id });
+      tracked.push({ collection: "teams", id: (t as { id: string }).id });
     }
   });
 
@@ -64,29 +82,26 @@ test.describe("Admin registrations", () => {
   });
 
   test("admin can approve a pending coach", async ({ page }) => {
-    const districts = await pbList("districts", "");
-    const district = districts[0] as { id: string };
-
     const school = (await pbList(
       "schools",
-      "name = 'Playwright Test High School'"
+      `name = 'Playwright Test High School ${RUN_ID}'`
     ))[0] as { id: string };
 
     const coach = (await pbCreate("users", {
-      email: "playwright-coach-approve@test.invalid",
+      email: `playwright-coach-approve-${RUN_ID}@test.invalid`,
       password: "testpass123",
       passwordConfirm: "testpass123",
       name: "PW Coach Approve",
       role: "coach",
       status: "pending",
       school: school.id,
-      team_name: "PW Approve Team",
+      team_name: `PW Approve Team ${RUN_ID}`,
     })) as { id: string };
-    createdIds.push({ collection: "users", id: coach.id });
+    tracked.push({ collection: "users", id: coach.id });
 
     const pendingTeams = await pbList("teams", `coaches ~ '${coach.id}'`);
     for (const t of pendingTeams) {
-      createdIds.push({ collection: "teams", id: (t as { id: string }).id });
+      tracked.push({ collection: "teams", id: (t as { id: string }).id });
     }
 
     await adminLogin(page);

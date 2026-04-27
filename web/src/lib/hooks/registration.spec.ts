@@ -150,11 +150,10 @@ describe('collision-without-intent', () => {
 		track('users', coachAId);
 
 		const teams = await pbList('teams', `coaches ~ '${coachAId}'`);
-		const team = teams[0] as { id: string };
+		const team = teams[0] as { id: string; name: string };
 		track('teams', team.id);
 
-		const colTeam = (await pbList('teams', `coaches ~ '${coachAId}'`))[0] as { name: string };
-		const err = await pbCreate('users', coachBody('col-b', '', { team_name: colTeam.name })).catch(
+		const err = await pbCreate('users', coachBody('col-b', '', { team_name: team.name })).catch(
 			(e: unknown) => e
 		);
 

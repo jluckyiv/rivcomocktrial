@@ -111,9 +111,11 @@ docker compose exec pocketbase \
 | `npm run pb:test:reset`  | Full reset of the test PB     |
 | `npm run test:hooks`     | Vitest hook tests (auto-starts test PB) |
 | `npm run test:schema`    | Vitest schema tests (auto-starts test PB) |
-| `npm run e2e`            | Playwright e2e (uses dev PB)  |
+| `npm run e2e`            | Playwright e2e against test PB on 28090 (auto-starts test PB, builds + previews on 4173) |
 | `npm run web:dev`        | SvelteKit dev server          |
 | `npm run web:build`      | Build frontend for prod       |
+| `cd web && npm run test:smoke:staging` | Read-only smoke tests against staging |
+| `cd web && npm run test:smoke:prod`    | Read-only smoke tests against production |
 
 ## Email
 

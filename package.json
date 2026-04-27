@@ -14,16 +14,16 @@
     "pb:seed-districts": "PB_ADMIN_EMAIL=$(cat .pocketbase/adminUserEmail 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Email') PB_ADMIN_PASSWORD=$(cat .pocketbase/adminUserPassword 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Password') node backend/pb_seed/seed_districts.js",
     "pb:seed-schools": "PB_ADMIN_EMAIL=$(cat .pocketbase/adminUserEmail 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Email') PB_ADMIN_PASSWORD=$(cat .pocketbase/adminUserPassword 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Password') node backend/pb_seed/seed_schools.js",
     "pb:credentials": "mkdir -p .pocketbase && op read 'op://Private/localhost dev pocketbase admin user/Email' > .pocketbase/adminUserEmail && op read 'op://Private/localhost dev pocketbase admin user/Password' > .pocketbase/adminUserPassword && echo 'Credentials saved to .pocketbase/'",
-    "pb:seed-test-admin": "set -a && . ./.env.test && set +a && docker compose exec pocketbase pocketbase superuser upsert \"$PB_ADMIN_EMAIL\" \"$PB_ADMIN_PASSWORD\" --dir=/pb/pb_data",
     "pb:test:up": "docker compose -f docker-compose.test.yml up -d --wait",
     "pb:test:down": "docker compose -f docker-compose.test.yml down -v",
     "pb:test:reset": "npm run pb:test:down && npm run pb:test:up",
-    "e2e": "set -a && . ./.env.test && set +a && npx playwright test",
+    "e2e": "npm run pb:test:up && set -a && . ./.env.test && set +a && npx playwright test",
     "lint:js": "eslint backend/pb_hooks/",
     "lint": "npm run lint:js",
     "test:hooks": "npm run pb:test:up && set -a && . ./.env.test && set +a && npm run --prefix web test:hooks",
     "test:schema": "npm run pb:test:up && set -a && . ./.env.test && set +a && npm run --prefix web test:schema"
   },
+  "engines": { "node": ">=20" },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.59.1",
