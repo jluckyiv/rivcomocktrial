@@ -4,6 +4,35 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.9.17 — test: expand deploy smoke tests with admin + coach login (#219)
+
+### Added
+
+- `web/e2e/deploy-smoke-admin.e2e.ts` — 3 admin login smoke tests (login
+  redirects to `/admin`, logout redirects to `/login`, protected route
+  guard). Runs on both staging and production. Self-skips when
+  `SMOKE_ADMIN_EMAIL` or `SMOKE_ADMIN_PASSWORD` is absent.
+- `web/e2e/deploy-smoke-coach.e2e.ts` — 2 coach login smoke tests (login
+  redirects to `/team`, logout redirects to `/login`). Staging only;
+  self-skips on production (no coach credentials in env).
+- `scripts/seed-staging-smoke-users.sh` — idempotent one-shot script that
+  seeds `smoke-admin@rivcomocktrial.org` and `smoke-coach@rivcomocktrial.org`
+  on the staging PB instance via the admin API. Reads credentials from
+  `op://Private/rivcomocktrial-staging-smoke`.
+- `docs/smoke-tests.md` — documents which suite runs in which env,
+  credential sources, how to run locally, and how to re-seed staging
+  smoke users.
+
+### Changed
+
+- `web/playwright.deploy.config.ts` — broadened `testMatch` from
+  `**/deploy-smoke.e2e.ts` to `**/deploy-smoke*.e2e.ts` so all three
+  smoke files are included automatically.
+- `web/package.json` — `test:smoke:staging` and `test:smoke:prod` now
+  inject credentials via `op read` from 1Password. Staging injects all
+  four smoke credentials; production injects admin credentials only
+  (coach spec self-skips).
+
 ## v0.9.16 — chore: remove dead district/school seed scripts (#218)
 
 ### Removed
