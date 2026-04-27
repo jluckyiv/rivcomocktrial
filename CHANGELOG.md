@@ -4,6 +4,43 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.21 — feat: add /audit-a11y skill
+
+Adds the `/audit-a11y` Claude Code skill — a WCAG 2.2 AA accessibility
+audit that runs axe-core via Playwright over the login, register, team,
+and admin flows.
+
+### Added
+
+- `.claude/skills/audit-a11y/SKILL.md` — skill definition with static
+  grep rubric, axe-driven dynamic checks, severity rules, per-route
+  violation table format, and baseline documentation guidance
+- `.claude/skills/audit-a11y/a11y-grep.sh` — static grep helper covering
+  div/span onclick, `javascript:` hrefs, `<a>` without href, missing `alt`,
+  empty `alt`, unlabeled inputs, missing `name`, `role="button"` without
+  keyboard handler, and `outline-none` without focus replacement
+- `web/playwright.a11y.config.ts` — Playwright config for the a11y spec
+  (test PB on port 28090, SvelteKit preview on port 4173, Chromium)
+- `web/e2e/a11y-flows.e2e.ts` — axe-core spec covering /login, /register,
+  /register/teacher-coach, /register/pending, /team (skipped when
+  A11Y_COACH_EMAIL unset), /admin, /admin/teams, /admin/tournaments
+- `docs/a11y-baseline-2026-04-27.md` — first-run baseline output
+- `e2e:a11y` npm script in root `package.json`
+- `@axe-core/playwright` and `axe-core` added to `web/package.json`
+  devDependencies
+
+### First-run findings
+
+- **Critical:** Missing `<title>` element on all 7 scanned routes (WCAG
+  2.4.2). Three unlabeled number inputs in the Create Tournament form on
+  `/admin/tournaments` (WCAG 4.1.2).
+- **Suggestion:** Tournament name input uses placeholder as sole label.
+- **Praise:** No div/span click handlers, no missing alts, no unlabeled
+  visible inputs outside the tournament form. All `outline-none` usages
+  pair with `focus-visible:ring-3`. svelte-check: 0 a11y warnings.
+
+---
+
 ## v0.10.20 — feat: add /audit-domain skill
 
 Adds the `/audit-domain` Claude Code skill — a domain modeling audit
