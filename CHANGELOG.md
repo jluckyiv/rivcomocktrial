@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.9.14 — feat: hook integration tests for auth, eligibility, withdrawal, ballot (#217)
+
+### Added
+
+- `web/src/lib/hooks/auth.spec.ts` — 3 cases for `auth_guard.pb.js`:
+  approved user passes, pending user blocked (403), rejected user blocked
+  (403). Users created without `role: 'coach'` so the registration hook
+  does not fire, keeping this spec fully isolated.
+- `web/src/lib/hooks/eligibility.spec.ts` — 3 cases for
+  `eligibility.pb.js`: approve "add" request creates an active
+  `eligibility_list_entries` row; approve "remove" request flips the
+  matching entry to "removed"; update to non-approved status leaves entries
+  unchanged.
+- `web/src/lib/hooks/withdrawal.spec.ts` — 2 cases for
+  `withdrawal.pb.js`: approve withdrawal request sets `team.status` to
+  "withdrawn"; non-approved update leaves team status unchanged.
+- `web/src/lib/hooks/ballot.spec.ts` — 5 cases for
+  `ballot_guard.pb.js`: valid scorer token creates submission and marks
+  token used; scorer token submitted to presider endpoint returns 400;
+  scorer token submitted twice returns 400; valid presider token creates
+  ballot and marks token used; presider token submitted to scorer endpoint
+  returns 400.
+
 ## v0.9.13 — docs: pb data backup policy via Fly volume snapshots (#230)
 
 ### Added
