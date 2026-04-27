@@ -11,6 +11,13 @@
 # Account created:
 #   smoke-coach@rivcomocktrial.org  — approved coach (can log into /team)
 #
+# The coach is seeded with no team_name/school. The registration hook
+# (registration.pb.js) detects superuser auth + absent team intent and
+# returns early in both pre-commit and post-commit, so no team is
+# auto-created. /team renders a "No team yet" card; the smoke spec
+# (deploy-smoke-coach.e2e.ts) only asserts on login + the unconditional
+# "My Team" heading, so a teamless smoke account is by design.
+#
 # The staging superuser authenticates the admin API calls and also serves as
 # the admin smoke-test credential in test:smoke:staging. No dedicated
 # smoke-admin account is needed.
@@ -70,7 +77,7 @@ COACH_RESP=$(curl -s -o "$COACH_BODY" -w "%{http_code}" \
     -X POST "${STAGING_BASE_URL}/api/collections/users/records" \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    -d "{\"email\":\"${STAGING_COACH_EMAIL}\",\"password\":\"${STAGING_COACH_PASSWORD}\",\"passwordConfirm\":\"${STAGING_COACH_PASSWORD}\",\"status\":\"approved\",\"role\":\"coach\",\"name\":\"Smoke Coach\"}")
+    -d "{\"email\":\"${STAGING_COACH_EMAIL}\",\"password\":\"${STAGING_COACH_PASSWORD}\",\"passwordConfirm\":\"${STAGING_COACH_PASSWORD}\",\"status\":\"approved\",\"role\":\"coach\"}")
 
 if [ "$COACH_RESP" = "200" ] || [ "$COACH_RESP" = "201" ]; then
     echo "  Created ${STAGING_COACH_EMAIL}"
