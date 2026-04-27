@@ -14,11 +14,19 @@ FROM alpine:3.19 AS pb-fetcher
 
 ARG PB_VERSION=0.36.3
 ARG TARGETARCH
+# Update both ARGs together when bumping PB_VERSION.
+ARG PB_SHA256_AMD64=4582b94d7751e8dfe1e140e318bdc845b53bb85468fcf335f4501033825bfb66
+ARG PB_SHA256_ARM64=df1af351322fed04de54730db56de2c5800869a49f467f545abee75deec1676d
 
 RUN apk add --no-cache ca-certificates unzip wget \
-	&& wget -q "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_${TARGETARCH}.zip" -O /tmp/pb.zip \
-	&& unzip /tmp/pb.zip -d /usr/local/bin/ \
-	&& rm /tmp/pb.zip \
+	&& wget -q "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_${TARGETARCH}.zip" -O /tmp/pocketbase.zip \
+	&& sh -c 'case "$TARGETARCH" in \
+		amd64) echo "${PB_SHA256_AMD64}  /tmp/pocketbase.zip" | sha256sum -c - ;; \
+		arm64) echo "${PB_SHA256_ARM64}  /tmp/pocketbase.zip" | sha256sum -c - ;; \
+		*) echo "Unsupported arch: $TARGETARCH" && exit 1 ;; \
+	esac' \
+	&& unzip /tmp/pocketbase.zip -d /usr/local/bin/ \
+	&& rm /tmp/pocketbase.zip \
 	&& chmod +x /usr/local/bin/pocketbase
 
 # Stage 3: Final runtime image
