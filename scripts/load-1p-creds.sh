@@ -36,13 +36,13 @@ read_field() {
     printf '%s' "$val"
 }
 
-DEV_EMAIL=$(read_field "op://Private/localhost dev pocketbase admin user" "Email")
-DEV_PASSWORD=$(read_field "op://Private/localhost dev pocketbase admin user" "Password")
+DEV_EMAIL=$(read_field "op://Private/localhost-dev-admin-user" "username")
+DEV_PASSWORD=$(read_field "op://Private/localhost-dev-admin-user" "password")
 
-STAGING_ADMIN_EMAIL=$(read_field "op://Private/rivcomocktrial-staging" "username")
-STAGING_ADMIN_PASSWORD=$(read_field "op://Private/rivcomocktrial-staging" "password")
-STAGING_COACH_EMAIL=$(read_field "op://Private/rivcomocktrial-staging-smoke" "username")
-STAGING_COACH_PASSWORD=$(read_field "op://Private/rivcomocktrial-staging-smoke" "password")
+STAGING_ADMIN_EMAIL=$(read_field "op://Private/rivcomocktrial-staging-admin" "username")
+STAGING_ADMIN_PASSWORD=$(read_field "op://Private/rivcomocktrial-staging-admin" "password")
+STAGING_COACH_EMAIL=$(read_field "op://Private/rivcomocktrial-staging-user" "username")
+STAGING_COACH_PASSWORD=$(read_field "op://Private/rivcomocktrial-staging-user" "password")
 
 PROD_ADMIN_EMAIL=$(read_field "op://Private/rivcomocktrial" "username")
 PROD_ADMIN_PASSWORD=$(read_field "op://Private/rivcomocktrial" "password")
