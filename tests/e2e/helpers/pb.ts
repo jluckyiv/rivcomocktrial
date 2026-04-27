@@ -1,29 +1,35 @@
-/**
- * PocketBase admin API helpers for test setup and teardown.
- * All created records use the "playwright-" prefix so they're easy to
- * identify and clean up if a test run is interrupted.
- */
+// PocketBase admin API helpers for e2e test setup and teardown.
+// Configuration comes from .env.test (sourced by `npm run e2e` at the
+// repo root). All helpers throw on non-2xx so failures surface at the
+// bad call, not two assertions later.
 
-const PB_URL = "http://localhost:8090";
+const PB_URL = requireEnv("PB_URL");
+const PB_ADMIN_EMAIL = requireEnv("PB_ADMIN_EMAIL");
+const PB_ADMIN_PASSWORD = requireEnv("PB_ADMIN_PASSWORD");
 
-async function adminToken(): Promise<string> {
-  const email = process.env.PB_ADMIN_EMAIL;
-  const password = process.env.PB_ADMIN_PASSWORD;
-  if (!email || !password) {
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
     throw new Error(
-      "Set PB_ADMIN_EMAIL and PB_ADMIN_PASSWORD env vars before running e2e tests."
+      `${name} is not set. Source .env.test before running e2e ` +
+        `(npm run e2e at the repo root does this automatically).`
     );
   }
+  return value;
+}
+
+async function adminToken(): Promise<string> {
   const res = await fetch(
     `${PB_URL}/api/collections/_superusers/auth-with-password`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ identity: email, password }),
+      body: JSON.stringify({ identity: PB_ADMIN_EMAIL, password: PB_ADMIN_PASSWORD }),
     }
   );
-  const data = await res.json();
-  return data.token as string;
+  if (!res.ok) throw new Error(`Admin auth failed: ${res.status}`);
+  const data = (await res.json()) as { token: string };
+  return data.token;
 }
 
 export async function pbCreate(
@@ -39,7 +45,9 @@ export async function pbCreate(
     },
     body: JSON.stringify(body),
   });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) throw new Error(`pbCreate ${collection} failed ${res.status}: ${JSON.stringify(data)}`);
+  return data as Record<string, unknown>;
 }
 
 export async function pbPatch(
@@ -59,7 +67,9 @@ export async function pbPatch(
       body: JSON.stringify(body),
     }
   );
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) throw new Error(`pbPatch ${collection}/${id} failed ${res.status}: ${JSON.stringify(data)}`);
+  return data as Record<string, unknown>;
 }
 
 export async function pbDelete(
@@ -67,10 +77,16 @@ export async function pbDelete(
   id: string
 ): Promise<void> {
   const token = await adminToken();
-  await fetch(`${PB_URL}/api/collections/${collection}/records/${id}`, {
+  const res = await fetch(`${PB_URL}/api/collections/${collection}/records/${id}`, {
     method: "DELETE",
     headers: { Authorization: token },
   });
+  if (!res.ok) {
+    const body = res.headers.get("content-type")?.includes("application/json")
+      ? JSON.stringify(await res.json())
+      : "";
+    throw new Error(`pbDelete ${collection}/${id} failed ${res.status}: ${body}`);
+  }
 }
 
 export async function pbList(
@@ -78,11 +94,13 @@ export async function pbList(
   filter: string
 ): Promise<Record<string, unknown>[]> {
   const token = await adminToken();
-  const params = new URLSearchParams({ filter, perPage: "100" });
+  const params = new URLSearchParams({ perPage: "100" });
+  if (filter) params.set("filter", filter);
   const res = await fetch(
     `${PB_URL}/api/collections/${collection}/records?${params}`,
     { headers: { Authorization: token } }
   );
   const data = await res.json();
-  return data.items ?? [];
+  if (!res.ok) throw new Error(`pbList ${collection} failed ${res.status}: ${JSON.stringify(data)}`);
+  return (data as { items: Record<string, unknown>[] }).items ?? [];
 }

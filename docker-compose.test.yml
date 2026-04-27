@@ -1,0 +1,38 @@
+name: rivcomt-test
+
+services:
+  pocketbase-test:
+    container_name: rivcomt-pocketbase-test
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.dev
+    ports:
+      - "28090:8090"
+    env_file: .env.test
+    volumes:
+      - pb_test_data:/pb/pb_data
+      - ./backend/pb_migrations:/pb/pb_migrations
+      - ./backend/pb_hooks:/pb/pb_hooks
+    # Seed the test superuser then serve. `superuser upsert` is
+    # idempotent and auto-runs migrations, so this works on a fresh
+    # volume or a warm one. Keeps test setup in the test compose file
+    # rather than borrowing the production bootstrap_superuser hook.
+    command:
+      - sh
+      - -c
+      - |
+        pocketbase superuser upsert "$$PB_ADMIN_EMAIL" "$$PB_ADMIN_PASSWORD" --dir=/pb/pb_data &&
+        exec pocketbase serve \
+          --http=0.0.0.0:8090 \
+          --dir=/pb/pb_data \
+          --migrationsDir=/pb/pb_migrations \
+          --hooksDir=/pb/pb_hooks \
+          --publicDir=/pb/pb_public
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8090/api/health"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+volumes:
+  pb_test_data:

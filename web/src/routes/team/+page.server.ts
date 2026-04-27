@@ -15,7 +15,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	}
 
 	const teams = await locals.pb.collection('teams').getFullList<TeamWithRelations>({
-		filter: `coach = "${userId}"`,
+		filter: `coaches ~ "${userId}"`,
 		expand: 'school,tournament',
 		sort: '-created'
 	});

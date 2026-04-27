@@ -106,8 +106,16 @@ docker compose exec pocketbase \
 | `npm run pb:seed-districts` | Seed districts from districts.json |
 | `npm run pb:seed-schools`   | Seed schools (requires districts)  |
 | `npm run pb:seed-admins`    | Seed superusers from admins.json   |
+| `npm run pb:test:up`     | Start isolated test PocketBase (port 28090) |
+| `npm run pb:test:down`   | Stop test PB and wipe its data volume |
+| `npm run pb:test:reset`  | Full reset of the test PB     |
+| `npm run test:hooks`     | Vitest hook tests (auto-starts test PB) |
+| `npm run test:schema`    | Vitest schema tests (auto-starts test PB) |
+| `npm run e2e`            | Playwright e2e against test PB on 28090 (auto-starts test PB, builds + previews on 4173) |
 | `npm run web:dev`        | SvelteKit dev server          |
 | `npm run web:build`      | Build frontend for prod       |
+| `cd web && npm run test:smoke:staging` | Read-only smoke tests against staging |
+| `cd web && npm run test:smoke:prod`    | Read-only smoke tests against production |
 
 ## Email
 

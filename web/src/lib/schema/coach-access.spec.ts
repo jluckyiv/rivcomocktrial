@@ -5,12 +5,9 @@
  * every collection touched by the multi-coach migration (1800000009) and the
  * join-requests migration (1800000010).
  *
- * Pre-conditions (same as e2e tests):
- *   npm run pb:start        # start PocketBase via docker compose
- *   npm run pb:seed-admins  # provision superuser (one-time per fresh pb_data)
- *   npm run pb:credentials  # save 1Password creds locally (if .pocketbase/ missing)
- *
- * Run: npm run test:schema  (from repo root)
+ * Run: `npm run test:schema` from repo root. The script starts the
+ * isolated test PocketBase (docker-compose.test.yml) on port 28090
+ * and sources .env.test for credentials.
  */
 
 import { beforeAll, describe, expect, it } from "vitest";

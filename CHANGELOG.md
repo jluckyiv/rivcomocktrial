@@ -6,6 +6,111 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added
+
+- Issue #219 — proposal for tiered deploy smoke tests (comprehensive
+  staging suite, minimal prod-safe suite that uses the bootstrap admin
+  to view pre-seeded districts/schools, no fake data on prod).
+- `"engines": { "node": ">=20" }` added to root `package.json` and
+  `web/package.json` to declare the Node floor in use.
+
+### Changed
+
+- All local Playwright e2e tests run against the isolated test
+  PocketBase (port 28090), not the dev container. Root
+  `playwright.config.ts` builds and previews SvelteKit on port 4173
+  with `PB_INTERNAL_URL` pointed at the test PB so SSR talks to the
+  test container. `npm run e2e` now auto-starts the test PB, sources
+  `.env.test`, and runs all e2e specs in one pass.
+- Consolidated e2e tests into `tests/e2e/` at the repo root. Moved
+  `web/e2e/registration-flow.e2e.ts` → `tests/e2e/registration-flow.spec.ts`
+  and reworked it to seed its own tournament, track records for
+  dependency-ordered cleanup, fail loudly on missing env (instead of
+  silently self-skipping), and use `PB_ADMIN_*` env vars for
+  consistency with the hook + schema layer.
+- `tests/e2e/registrations.spec.ts`: same dependency-ordered cleanup
+  pattern as the hook tests; seeds its own tournament + school per run.
+- `tests/e2e/helpers/pb.ts`: requires `PB_URL`, `PB_ADMIN_EMAIL`,
+  `PB_ADMIN_PASSWORD` from env at module load — no hardcoded fallbacks
+  to the dev container.
+- `web/playwright.deploy.config.ts`: `SMOKE_BASE_URL` is now required;
+  the staging default was removed so the bare playwright invocation
+  fails loudly. Use the explicit npm scripts.
+- `web/package.json`: `test:smoke` split into `test:smoke:staging`
+  (staging URL) and `test:smoke:prod` (production URL). `test:e2e`
+  removed — local e2e lives at the repo root now.
+- `CLAUDE.md` + `README.md`: testing tables updated for the new layout
+  and target containers.
+
+### Fixed
+
+- `web/src/lib/hooks/registration.spec.ts` collision-without-intent
+  describe fetched the team list twice — once to get the ID, once to
+  read `.name`. Now fetches once with a widened type cast (#222
+  partial, see issue).
+- `web/src/lib/schema/coach-access.spec.ts:8-11`: replaced stale
+  pre-conditions block referencing `pb:seed-admins` and
+  `pb:credentials`. Both helpers now point at `.env.test` (#223
+  partial, see issue).
+- `web/src/routes/team/+page.server.ts`: filter was `coach = "..."`
+  (singular, equality) but the schema is `coaches` (multi-relation,
+  per migration `1800000009_multi_coach_teams.js`). The page returned
+  500 when an approved coach hit `/team`. Caught by the registration
+  flow e2e once it stopped self-skipping on missing env.
+
+### Removed
+
+- `web/playwright.config.ts` and `web/e2e/registration-flow.e2e.ts`:
+  duplicate config + relocated test.
+- `pb:seed-test-admin` script: no longer needed; the dev container
+  doesn't host test admin credentials, and the test container
+  auto-seeds its own.
+
+## v0.9.11 — test: migrate hook tests to Vitest server layer (#216)
+
+### Added
+
+- `web/src/lib/hooks/registration.spec.ts`: Vitest server-project hook
+  integration tests for all four `registration.pb.js` callbacks — new-team
+  path, join-existing path, collision-without-intent (400 + `existingTeamId`),
+  sole-coach delete blocked (400), two-coach delete allowed, status-sync
+  approve (team → active), status-sync reject (team → rejected).
+- `web/src/lib/test-helpers/pb-admin.ts`: `pbCreate`, `pbPatch`, `pbDelete`,
+  `pbList` helpers that throw `PbError` (`.status`, `.data`) on non-2xx.
+- `test:hooks` npm script in `web/package.json` and root `package.json`.
+- `docker-compose.test.yml`: isolated test PocketBase container on host
+  port 28090 with a dedicated named volume (`pb_test_data`). Auto-seeds
+  the test superuser via the compose `command:` (no production hook
+  borrowed). Hook + schema tests now run against this container,
+  eliminating the prior shared-DB pollution.
+- `.env.test`: single source of truth for `PB_URL`, `PB_ADMIN_EMAIL`,
+  `PB_ADMIN_PASSWORD`. Sourced by docker compose AND npm scripts.
+- Root `package.json`: `pb:test:up`, `pb:test:down`, `pb:test:reset`
+  scripts. `test:hooks` and `test:schema` now auto-start the test PB.
+
+### Changed
+
+- `tests/e2e/helpers/pb.ts`: all helpers now throw on non-2xx so Playwright
+  test failures surface at the bad API call, not two assertions later.
+- `CLAUDE.md`: documents the three-layer testing model (schema, hook
+  integration, UI e2e), the two-container split (dev 8090 / test 28090),
+  and the dependency-ordered cleanup contract for hook tests.
+- `web/src/lib/hooks/registration.spec.ts`: cleanup walks tracked records
+  by collection class in dependency order
+  (`join_requests → teams → users → tournaments`) instead of LIFO. Throws
+  on any failure. Fixes silent one-orphan-per-run leak from the two-coach
+  delete test.
+- `web/src/lib/test-helpers/pb-admin.ts`: requires `PB_URL`,
+  `PB_ADMIN_EMAIL`, `PB_ADMIN_PASSWORD` from env at module load, throws
+  if missing. No hardcoded fallbacks.
+
+### Removed
+
+- `tests/e2e/multi-coach.spec.ts`: fully superseded by `registration.spec.ts`
+  in the hook integration layer.
+- `web/src/lib/test-helpers/test-admin.ts`: hardcoded credentials replaced
+  by `.env.test` as the single source of truth.
+
 ## v0.9.10 — feat: multi-coach teams, join requests, sole-coach guard, schema tests (#198)
 
 ### Added
