@@ -18,18 +18,38 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - `web/src/lib/test-helpers/pb-admin.ts`: `pbCreate`, `pbPatch`, `pbDelete`,
   `pbList` helpers that throw `PbError` (`.status`, `.data`) on non-2xx.
 - `test:hooks` npm script in `web/package.json` and root `package.json`.
+- `docker-compose.test.yml`: isolated test PocketBase container on host
+  port 28090 with a dedicated named volume (`pb_test_data`). Auto-seeds
+  the test superuser via the compose `command:` (no production hook
+  borrowed). Hook + schema tests now run against this container,
+  eliminating the prior shared-DB pollution.
+- `.env.test`: single source of truth for `PB_URL`, `PB_ADMIN_EMAIL`,
+  `PB_ADMIN_PASSWORD`. Sourced by docker compose AND npm scripts.
+- Root `package.json`: `pb:test:up`, `pb:test:down`, `pb:test:reset`
+  scripts. `test:hooks` and `test:schema` now auto-start the test PB.
 
 ### Changed
 
 - `tests/e2e/helpers/pb.ts`: all helpers now throw on non-2xx so Playwright
   test failures surface at the bad API call, not two assertions later.
 - `CLAUDE.md`: documents the three-layer testing model (schema, hook
-  integration, UI e2e) with guidance on which layer to reach for.
+  integration, UI e2e), the two-container split (dev 8090 / test 28090),
+  and the dependency-ordered cleanup contract for hook tests.
+- `web/src/lib/hooks/registration.spec.ts`: cleanup walks tracked records
+  by collection class in dependency order
+  (`join_requests → teams → users → tournaments`) instead of LIFO. Throws
+  on any failure. Fixes silent one-orphan-per-run leak from the two-coach
+  delete test.
+- `web/src/lib/test-helpers/pb-admin.ts`: requires `PB_URL`,
+  `PB_ADMIN_EMAIL`, `PB_ADMIN_PASSWORD` from env at module load, throws
+  if missing. No hardcoded fallbacks.
 
 ### Removed
 
 - `tests/e2e/multi-coach.spec.ts`: fully superseded by `registration.spec.ts`
   in the hook integration layer.
+- `web/src/lib/test-helpers/test-admin.ts`: hardcoded credentials replaced
+  by `.env.test` as the single source of truth.
 
 ## v0.9.10 — feat: multi-coach teams, join requests, sole-coach guard, schema tests (#198)
 
