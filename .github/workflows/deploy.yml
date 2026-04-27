@@ -9,6 +9,7 @@ on:
       - "fly.staging.toml"
       - "fly.toml"
       - ".dockerignore"
+      - ".github/workflows/deploy.yml"
   workflow_dispatch:
     inputs:
       target:
