@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased — refactor: split enrollment from eligibility (#274 #275)
+## v0.10.19 — refactor: split enrollment from eligibility (#274 #275)
 
 Closes #274 and #275. Introduces `tournaments_teams` — a many-to-many
 join between tournaments and teams that tracks per-tournament eligibility
