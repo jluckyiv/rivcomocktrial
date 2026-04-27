@@ -4,6 +4,35 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.17 — feat: add /audit-docs skill
+
+Adds the `/audit-docs` Claude Code skill — a documentation drift audit
+that verifies every load-bearing claim in `CLAUDE.md`, `README.md`,
+`docs/decisions.md` (ADRs), and other `docs/*.md` files matches code
+reality.
+
+### Added
+
+- `.claude/skills/audit-docs/SKILL.md` — skill definition with steps,
+  rubric, severity rules, and out-of-scope guard
+- `.claude/skills/audit-docs/docs-claims.sh` — bash helper that
+  extracts file path references, shell command references, port
+  numbers, stack component names, hook file names, and ADR supersession
+  state; cross-checks each against the filesystem and config files
+
+### Smoke test result
+
+Script ran clean. Opus agent found:
+
+- **Critical:** ADR-002 (Bulma) contradicts current Tailwind v4 stack
+  with no supersession note. Also flagged ADR-004, ADR-005, ADR-006,
+  ADR-008, ADR-010, ADR-011 as Elm-era decisions with no supersession.
+- **Praise:** ADR-013/014 supersession in place; port numbers correct
+  across all files; all script references valid; all hook file
+  references valid.
+
+---
+
 ## v0.10.16 — feat: add /audit-schema skill
 
 Adds the `/audit-schema` Claude Code skill — a PocketBase schema
