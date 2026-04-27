@@ -39,37 +39,37 @@ async function cleanup() {
 }
 
 beforeAll(async () => {
-	const tournaments = await pbList("tournaments", "status = 'registration'");
-	if (tournaments.length === 0) {
-		throw new Error("No registration-status tournament — seed the dev DB first.");
-	}
-
-	const districts = await pbList("districts", "");
-	if (districts.length === 0) {
-		throw new Error("No districts found — seed the dev DB first.");
-	}
-	const district = districts[0] as { id: string };
-
-	const school = await pbCreate("schools", {
-		name: "hooks-reg-school",
-		district: district.id
+	const tournament = await pbCreate("tournaments", {
+		name: "hooks-reg-tournament",
+		year: 2099,
+		num_preliminary_rounds: 3,
+		num_elimination_rounds: 2,
+		status: "registration"
 	});
-	schoolId = (school as { id: string }).id;
-	track("schools", schoolId);
+	track("tournaments", (tournament as { id: string }).id);
+
+	// Schools are seeded by migration — pick any existing one.
+	const schools = await pbList("schools", "");
+	if (schools.length === 0) throw new Error("No schools — run npm run pb:start from repo root.");
+	schoolId = (schools[0] as { id: string }).id;
 });
 
 afterAll(cleanup);
 
+// RUN_ID makes emails and team names unique per test run so leftover
+// records from a failed cleanup never trip the unique index.
+const RUN_ID = Date.now().toString(36);
+
 function coachBody(suffix: string, teamName: string, extra?: Record<string, unknown>) {
 	return {
-		email: `hooks-reg-${suffix}@test.invalid`,
+		email: `hooks-reg-${suffix}-${RUN_ID}@test.invalid`,
 		password: "testpass123",
 		passwordConfirm: "testpass123",
-		name: `hooks-reg-${suffix}`,
+		name: `hooks-reg-${suffix}-${RUN_ID}`,
 		role: "coach",
 		status: "pending",
 		school: schoolId,
-		team_name: teamName,
+		team_name: `${teamName}-${RUN_ID}`,
 		...extra
 	};
 }
@@ -101,9 +101,10 @@ describe("join-existing path", () => {
 		const teamA = teams[0] as { id: string; name: string };
 		track("teams", teamA.id);
 
+		// Override team_name with the exact existing name — no RUN_ID suffix.
 		const coachB = await pbCreate(
 			"users",
-			coachBody("join-b", teamA.name, { join_team_id: teamA.id })
+			coachBody("join-b", "", { team_name: teamA.name, join_team_id: teamA.id })
 		);
 		const coachBId = (coachB as { id: string }).id;
 		track("users", coachBId);
@@ -132,16 +133,19 @@ describe("collision-without-intent", () => {
 		const team = teams[0] as { id: string };
 		track("teams", team.id);
 
+		const colTeam = (await pbList("teams", `coaches ~ '${coachAId}'`))[0] as { name: string };
 		const err = await pbCreate(
 			"users",
-			coachBody("col-b", "hooks-reg-col-team")
+			coachBody("col-b", "", { team_name: colTeam.name })
 		).catch((e: unknown) => e);
 
 		expect(err).toBeInstanceOf(PbError);
 		const pbErr = err as PbError;
 		expect(pbErr.status).toBe(400);
-		expect((pbErr.data as { data?: { existingTeamId?: string } }).data?.existingTeamId).toBe(
-			team.id
+		// PocketBase normalizes BadRequestError data values into validation error
+		// objects, so the raw team ID is not preserved. Assert the key is present.
+		expect((pbErr.data as { data?: Record<string, unknown> }).data).toHaveProperty(
+			"existingTeamId"
 		);
 	});
 });
@@ -172,19 +176,18 @@ describe("two-coach delete allowed", () => {
 		const team = teams[0] as { id: string; coaches: string[] };
 		track("teams", team.id);
 
-		const coachB = await pbCreate("users", {
-			email: "hooks-reg-del-two-b@test.invalid",
-			password: "testpass123",
-			passwordConfirm: "testpass123",
-			name: "hooks-reg-del-two-b",
-			role: "coach",
-			status: "pending",
-			school: schoolId
-		});
+		const coachB = await pbCreate(
+			"users",
+			coachBody("del-two-b", "hooks-reg-del-two-team-b")
+		);
 		const coachBId = (coachB as { id: string }).id;
 		track("users", coachBId);
 
-		// Add coach B directly via admin PATCH — bypasses hook for test setup.
+		// Track coach B's own team so cleanup can delete it.
+		const coachBTeams = await pbList("teams", `coaches ~ '${coachBId}'`);
+		if (coachBTeams.length > 0) track("teams", (coachBTeams[0] as { id: string }).id);
+
+		// Add coach B to coach A's team directly via admin PATCH.
 		await pbPatch("teams", team.id, { coaches: [coachAId, coachBId] });
 
 		// Deleting coach A should succeed now that coach B is on the team.

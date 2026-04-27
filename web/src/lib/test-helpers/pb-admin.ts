@@ -1,3 +1,5 @@
+import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from "./test-admin";
+
 const PB_URL = "http://localhost:8090";
 
 export type CollectionRules = {
@@ -19,14 +21,8 @@ export class PbError extends Error {
 }
 
 async function adminToken(): Promise<string> {
-	const email = process.env.PB_ADMIN_EMAIL;
-	const password = process.env.PB_ADMIN_PASSWORD;
-	if (!email || !password) {
-		throw new Error(
-			"PB_ADMIN_EMAIL and PB_ADMIN_PASSWORD are required for hook/schema tests.\n" +
-				"Run: npm run pb:credentials (from repo root)"
-		);
-	}
+	const email = process.env.PB_ADMIN_EMAIL ?? TEST_ADMIN_EMAIL;
+	const password = process.env.PB_ADMIN_PASSWORD ?? TEST_ADMIN_PASSWORD;
 	const res = await fetch(`${PB_URL}/api/collections/_superusers/auth-with-password`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
@@ -97,7 +93,8 @@ export async function pbList(
 	filter: string
 ): Promise<Record<string, unknown>[]> {
 	const token = await adminToken();
-	const params = new URLSearchParams({ filter, perPage: "100" });
+	const params = new URLSearchParams({ perPage: "100" });
+	if (filter) params.set("filter", filter);
 	const res = await fetch(`${PB_URL}/api/collections/${collection}/records?${params}`, {
 		headers: { Authorization: token }
 	});
