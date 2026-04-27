@@ -4,6 +4,20 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.10 — fix: Caddyfile cold-start 502 and missing security headers (#269)
+
+Closes #206, #214.
+
+### Fixed
+
+- `backend/Caddyfile` — add `lb_try_duration 5s` / `lb_try_interval
+  250ms` to the SvelteKit reverse proxy so Caddy retries during Node
+  startup instead of returning 502 on cold machine wake.
+- `backend/Caddyfile` — add site-level `header` block with HSTS
+  (`max-age=31536000; includeSubDomains`), `X-Content-Type-Options`,
+  `X-Frame-Options`, and `Referrer-Policy`. These were specified in
+  #173 but never added in PR #180.
+
 ## v0.10.9 — fix: seed-staging-smoke-users.sh sets wrong fields for the coach record (#256)
 
 Closes #256. The staging smoke-seed script POSTed a coach record
