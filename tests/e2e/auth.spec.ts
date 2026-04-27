@@ -6,7 +6,7 @@ test.describe("Admin auth", () => {
     await adminLogin(page);
     await expect(page).toHaveURL(/\/admin$/);
     await expect(
-      page.getByRole("heading", { name: "__INTENTIONAL_BREAK__" })
+      page.getByRole("heading", { name: "Dashboard" })
     ).toBeVisible();
   });
 
