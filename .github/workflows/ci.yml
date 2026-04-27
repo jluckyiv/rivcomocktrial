@@ -4,99 +4,87 @@ on:
   push:
     branches: [main]
     paths:
-      - "frontend/**"
+      - "web/**"
       - "backend/pb_hooks/**"
       - "backend/pb_migrations/**"
+      - "backend/Dockerfile.dev"
+      - "docker-compose.test.yml"
+      - ".env.test"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/ci.yml"
   pull_request:
     paths:
-      - "frontend/**"
+      - "web/**"
       - "backend/pb_hooks/**"
       - "backend/pb_migrations/**"
+      - "backend/Dockerfile.dev"
+      - "docker-compose.test.yml"
+      - ".env.test"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/ci.yml"
 
 jobs:
-  test:
-    name: elm-test
+  web-tests:
+    name: web tests
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
 
-      - name: Install dependencies
-        run: npm install
-        working-directory: frontend
+      - name: Install root dependencies
+        run: npm ci
 
-      - name: Generate elm-land source files
-        run: npx elm-land generate
-        working-directory: frontend
+      - name: Install web dependencies
+        run: npm ci
+        working-directory: web
 
-      - name: Run tests
-        run: npx elm-test
-        working-directory: frontend
+      - name: Install Playwright browsers
+        # prepare script runs `playwright install || echo ''` which silences
+        # failures; this step ensures chromium + OS deps are present for the
+        # vitest client-project browser test in vitest-examples.
+        run: npx playwright install --with-deps chromium
+        working-directory: web
 
-  review:
-    name: elm-review
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      - name: Load test environment
+        # .env.test is committed — local test credentials with no production value.
+        # Appending to GITHUB_ENV makes PB_URL, PB_ADMIN_EMAIL, PB_ADMIN_PASSWORD
+        # available to all subsequent steps without re-sourcing.
+        run: cat .env.test >> $GITHUB_ENV
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
+      - name: Start test PocketBase container
+        # docker-compose.test.yml port 28090; --wait polls the healthcheck.
+        # Starting here (before test:unit) ensures the vitest server project's
+        # hook and schema specs have PocketBase available.
+        run: npm run pb:test:up
 
-      - name: Install dependencies
-        run: npm install
-        working-directory: frontend
+      - name: Lint
+        run: npm run lint
+        working-directory: web
 
-      - name: Generate elm-land source files
-        run: npx elm-land generate
-        working-directory: frontend
+      - name: Type check
+        run: npm run check
+        working-directory: web
 
-      - name: Run elm-review
-        run: npx elm-review
-        working-directory: frontend
+      - name: Unit tests
+        # Runs all vitest projects (server + client). GitHub Actions sets CI=true,
+        # which causes vitest v4 to run once rather than entering watch mode.
+        run: npm run test:unit
+        working-directory: web
 
-  domain-tdd:
-    # Backstop for the in-session TDD hook + lefthook. Verifies every
-    # top-level domain module in frontend/src/ has a sibling test file
-    # in frontend/tests/. See docs/refactor-process.md.
-    name: domain-tdd
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Every domain module has a sibling test
-        run: |
-          missing=0
-          # Framework files are not domain modules; skip them.
-          framework_re='^(Api|Pb|Effect|Shared|Auth|UI|RemoteData)\.elm$'
-          # Pre-existing gaps grandfathered in by PR #139 (the PR that
-          # introduced this check). The list can only shrink:
-          #   - Error.elm (5 lines, type wrapper, no testable logic)
-          #   - RosterForm.elm (real test debt; address in roster
-          #     submission slice)
-          # Adding a new module to this list is forbidden; the CI
-          # PR review should reject it.
-          exempt_re='^(Error|RosterForm)\.elm$'
-          for f in $(find frontend/src -maxdepth 1 -name '*.elm' | sort); do
-            base=$(basename "$f")
-            if echo "$base" | grep -qE "$framework_re"; then
-              continue
-            fi
-            if echo "$base" | grep -qE "$exempt_re"; then
-              echo "::warning file=$f::grandfathered gap (no sibling test); see ci.yml exempt_re"
-              continue
-            fi
-            test="frontend/tests/${base%.elm}Test.elm"
-            if [ ! -f "$test" ]; then
-              echo "::error file=$f::missing paired test file: $test"
-              missing=1
-            fi
-          done
-          exit $missing
+      - name: Schema tests
+        # Root script: starts container (idempotent) + sources .env.test + vitest schema
+        run: npm run test:schema
 
+      - name: Hook integration tests
+        # Root script: starts container (idempotent) + sources .env.test + vitest hooks
+        run: npm run test:hooks
