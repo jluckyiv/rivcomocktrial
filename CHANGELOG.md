@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.9.16 — chore: remove dead district/school seed scripts (#218)
+
+### Removed
+
+- `backend/pb_seed/seed_districts.js`, `seed_schools.js`,
+  `districts.json`, `schools.json` — superseded by migrations
+  `1800000004_seed_districts.js` and `1800000005_seed_schools.js`.
+- `pb:seed-districts` and `pb:seed-schools` npm scripts.
+
 ## v0.9.15 — feat: schema rule tests for all PocketBase collections
 
 ### Added
