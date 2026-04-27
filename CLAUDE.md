@@ -10,7 +10,11 @@ Admin-side competition management tool + public-facing site for Riverside County
 
 - **Frontend:** SvelteKit + TypeScript (Svelte 5)
 - **Backend:** PocketBase v0.36.x — SQLite-based backend-as-a-service
-- **Deployment:** fly.io via Docker, single container serves both frontend and backend
+- **Deployment:** fly.io via Docker. One container runs PocketBase, the SvelteKit
+  Node server (adapter-node), and Caddy under tini.
+- **Routing:** Caddy listens on port 8090 and reverse-proxies `/api/*` and `/_/*`
+  to PocketBase (127.0.0.1:8091); everything else goes to the SvelteKit Node
+  server (127.0.0.1:3000).
 - **CI/CD:** GitHub Actions deploys to fly.io on push to main
 
 ## Project Layout
@@ -20,13 +24,15 @@ Admin-side competition management tool + public-facing site for Riverside County
 - `backend/` — PocketBase (Dockerfile, migrations, hooks)
 - `fly.toml` — fly.io config (root level)
 - `docker-compose.yml` — local dev (PocketBase in Docker)
+- `docker-compose.test.yml` — isolated test PocketBase (port 28090, named volume)
 
 ## Conventions
 
 - PocketBase migrations live in `backend/pb_migrations/` (JS format, version-controlled)
 - PocketBase hooks live in `backend/pb_hooks/` (version-controlled)
 - PocketBase data (`pb_data/`) is gitignored — never commit SQLite files
-- Frontend builds are copied into PocketBase's `pb_public/` via multi-stage Docker build
+- SvelteKit builds as a Node server (adapter-node) served by Caddy alongside
+  PocketBase — not copied into `pb_public/`
 - No custom Go extensions — using PocketBase out-of-the-box
 
 ## Dev Commands
@@ -55,14 +61,16 @@ To run both servers: `npm run pb:dev` from repo root (foreground), then `cd web 
 
 ## Development Workflow
 
-1. **Plan** — use plan mode to design the approach
-2. **Issue** — create a GitHub issue with the plan (clears context, sets benchmarks)
-3. **Implement** — TDD by default (ask first); red/green/refactor with real local PocketBase
-4. **Document** — update README and `docs/` so documentation is current with the code
-5. **Commit & PR** — commit, push branch, open PR
-6. **Merge** — merge PR to main
-7. **Tag** — at milestones only (not every PR)
-8. **Update memory** — capture patterns, decisions, and lessons learned
+1. **Worktree** — create a worktree at `.claude/worktrees/<task>` on branch
+   `feat/<topic>` (or `fix/`, `docs/`, `ci/`, `refactor/`). Never commit to main.
+2. **Plan** — use plan mode to design the approach
+3. **Issue** — create a GitHub issue with the plan (clears context, sets benchmarks)
+4. **Implement** — TDD by default (ask first); red/green/refactor with real local PocketBase
+5. **Document** — update README and `docs/` so documentation is current with the code
+6. **Commit & PR** — commit, push branch, open PR
+7. **Merge** — merge PR to main
+8. **Tag** — at milestones only (not every PR)
+9. **Update memory** — capture patterns, decisions, and lessons learned
 
 ## Testing
 
@@ -137,8 +145,11 @@ httpOnly cookies + server-side session. `hooks.server.ts` creates one
 if valid, and writes the cookie back on every response. Pages access
 `event.locals.pb` and `event.locals.user`.
 
-Two roles: superuser (admin) and coach. Login routes TBD (e.g. `/admin/login`,
-`/login`). The existing `auth_guard.pb.js` hook still gates coach login.
+Two roles: superuser (admin) and coach. Login is at `/login` and handles both
+roles: it tries `_superusers` first, then `users`. Successful superuser login
+redirects to `/admin`; coach login redirects to `/team`. The `/admin/*` layout
+guard redirects unauthenticated visitors to `/login?next=<path>`. The existing
+`auth_guard.pb.js` hook still gates coach login on `status=approved`.
 
 ### Data loading and mutations
 
