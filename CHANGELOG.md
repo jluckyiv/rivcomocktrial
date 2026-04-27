@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.16 — feat: add /audit-schema skill
+
+Adds the `/audit-schema` Claude Code skill — a PocketBase schema
+lockdown audit that verifies every collection in `pocketbase-types.ts`
+has a spec, and every spec assertion matches the live rule string on
+the test PB.
+
+### Added
+
+- `.claude/skills/audit-schema/SKILL.md` — skill definition with
+  steps, rubric, severity rules, and out-of-scope guard
+- `.claude/skills/audit-schema/schema-completeness.sh` — bash helper
+  that enumerates collections, fetches live rules from the test PB,
+  greps spec assertions, and reports coverage gaps
+
+### Smoke test result
+
+All 24 user collections covered. 120/120 rule slots asserted and
+matching live. 0 mismatches. 0 unasserted slots. 0 skipped tests.
+Deliberate wrong assertion confirmed Critical finding; reverted clean.
+
+---
+
 ## v0.10.15 — docs: add implementation brief for new audit skills (#276)
 
 Adds `docs/audit-skills-brief.md` — a self-contained build plan for 5
