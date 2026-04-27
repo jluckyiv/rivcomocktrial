@@ -4,6 +4,20 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.18 — docs: add supersession notes to Elm-era ADRs
+
+Adds `**Superseded by ADR-014.**` to ADR-002, ADR-004, ADR-005,
+ADR-006, ADR-008, ADR-010, and ADR-011 — the seven Elm-era decisions
+flagged as Critical by the `/audit-docs` smoke test.
+
+### Changed
+
+- `docs/decisions.md` — supersession note added immediately before the
+  `**Date:**` line of each Elm-era ADR, matching the style of ADR-012
+  and ADR-013
+
+---
+
 ## v0.10.17 — feat: add /audit-docs skill
 
 Adds the `/audit-docs` Claude Code skill — a documentation drift audit
