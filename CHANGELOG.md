@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.9.12 — fix: vitest preflight gate for unreachable PocketBase (#220)
+
+### Added
+
+- `web/src/lib/test-helpers/preflight.ts` — `beforeAll` setup that pings
+  `${PB_URL}/api/health` with a 2 s timeout and throws a clear error naming
+  PocketBase and the fix command (`npm run pb:test:up`) when the container is
+  not running.
+- `web/vite.config.ts` — `setupFiles` wired into the **server** project only;
+  the client project does not run the preflight.
+
 ## Unreleased
 
 ### Added
