@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "web/**"
+      - "tests/e2e/**"
       - "backend/pb_hooks/**"
       - "backend/pb_migrations/**"
       - "backend/Dockerfile.dev"
@@ -12,10 +13,12 @@ on:
       - ".env.test"
       - "package.json"
       - "package-lock.json"
+      - "playwright.config.ts"
       - ".github/workflows/ci.yml"
   pull_request:
     paths:
       - "web/**"
+      - "tests/e2e/**"
       - "backend/pb_hooks/**"
       - "backend/pb_migrations/**"
       - "backend/Dockerfile.dev"
@@ -23,6 +26,7 @@ on:
       - ".env.test"
       - "package.json"
       - "package-lock.json"
+      - "playwright.config.ts"
       - ".github/workflows/ci.yml"
 
 jobs:
@@ -89,3 +93,9 @@ jobs:
       - name: Hook integration tests
         # Root script: starts container (idempotent) + sources .env.test + vitest hooks
         run: npm run test:hooks
+
+      - name: e2e tests
+        # Root script: starts container (idempotent) + sources .env.test +
+        # builds + previews SvelteKit on port 4173 + runs Playwright against
+        # tests/e2e/ (root playwright.config.ts).
+        run: npm run e2e
