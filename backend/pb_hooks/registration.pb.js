@@ -6,11 +6,44 @@
 
 // Pre-commit: verify a registration-status tournament exists and handle
 // name+school+tournament collisions before the user record is created.
+//
+// Superuser-authenticated requests bypass the public-flow guard so
+// admins can seed, restore, or back-fill coach records outside an
+// active registration window.
 onRecordCreateRequest((e) => {
     const { TOURNAMENT_STATUS, USER_ROLE } = require(`${__hooks}/_constants.js`);
     const user = e.record;
 
     if (user.get("role") !== USER_ROLE.COACH) {
+        return e.next();
+    }
+
+    if (e.hasSuperuserAuth()) {
+        // Admin-driven coach creates skip the public-flow guards. But
+        // when the body requests team auto-creation (team_name +/or
+        // school), the post-commit hook needs an active registration
+        // tournament to attach the team to. Fail fast here with a
+        // clear error rather than letting the post-commit silently
+        // roll back the user record on a tournament.id throw.
+        const teamName = user.get("team_name");
+        const school = user.get("school");
+        if (teamName || school) {
+            const tournaments = $app.findRecordsByFilter(
+                "tournaments",
+                "status = {:status}",
+                "-created",
+                1,
+                0,
+                { status: TOURNAMENT_STATUS.REGISTRATION }
+            );
+            if (tournaments.length === 0) {
+                throw new BadRequestError(
+                    "Cannot auto-create team: no tournament is in registration status. " +
+                    "Either set a tournament to 'registration' or omit team_name/school " +
+                    "to skip team creation."
+                );
+            }
+        }
         return e.next();
     }
 
@@ -83,12 +116,29 @@ onRecordCreateRequest((e) => {
 
 
 // Post-commit: create a pending team or join request after the user commits.
+//
+// Reads team intent from the record itself rather than checking who
+// authenticated. Public registrations always carry team_name + school
+// (the form requires them); admin seeds/restores typically do not.
+// Skipping when no team intent is present means admin-driven creates
+// (e.g. staging smoke seeds) don't accidentally trigger team creation
+// — and don't fall over when no registration tournament exists.
 onRecordAfterCreateSuccess((e) => {
     const { TOURNAMENT_STATUS, USER_ROLE, TEAM_STATUS, JOIN_REQUEST_STATUS } =
         require(`${__hooks}/_constants.js`);
     const user = e.record;
 
     if (user.get("role") !== USER_ROLE.COACH) {
+        return;
+    }
+
+    const teamName = user.get("team_name");
+    const school = user.get("school");
+    // requestInfo is not available on RecordEvent; join intent was stashed on
+    // the record in the pre-commit hook via e.record.set("_join_team_id", ...).
+    const joinTeamId = user.get("_join_team_id") || null;
+
+    if (!teamName && !school && !joinTeamId) {
         return;
     }
 
@@ -102,9 +152,6 @@ onRecordAfterCreateSuccess((e) => {
     );
 
     const tournament = tournaments[0];
-    // requestInfo is not available on RecordEvent; join intent was stashed on
-    // the record in the pre-commit hook via e.record.set("_join_team_id", ...).
-    const joinTeamId = user.get("_join_team_id") || null;
 
     if (joinTeamId) {
         // Join-existing path: create a pending join request.

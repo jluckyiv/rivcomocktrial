@@ -4,24 +4,56 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
-## v0.10.6 — fix: replace Svelte favicon with RCOE flame logo (#190)
+## v0.10.7 — fix: registration.pb.js blocks admin API creates of coach users (#255)
 
-Closes #190. The default Svelte orange-flame SVG favicon has been
-replaced with the Riverside County Office of Education flame logo.
-The PNG is served as a static asset so it appears in browser tabs and
-bookmark bars without depending on the layout component.
+Closes #255. The registration hook treated every coach create as a
+public registration: it required an active `status=registration`
+tournament and unconditionally auto-created a team from
+`team_name` + `school`. This made it impossible for an admin to
+seed, restore, or back-fill a coach record outside an active
+registration window — surfaced when the staging smoke seed script
+failed off-season with "Registration is not currently open."
+
+### Fixed
+
+- `backend/pb_hooks/registration.pb.js` — pre-commit
+  `onRecordCreateRequest` now bypasses the registration-window
+  check for superuser-authenticated requests via
+  `e.hasSuperuserAuth()`. Post-commit `onRecordAfterCreateSuccess`
+  now reads team intent directly from the record (`team_name`,
+  `school`, `_join_team_id`); when none are present it returns
+  early. Public registrations (form-driven) are unchanged because
+  the form always supplies `team_name` + `school`. Admin-driven
+  bulk imports that DO include those fields still get a team
+  auto-created. Admin-driven creates that include `team_name` /
+  `school` but hit no registration tournament now fail fast in
+  pre-commit with an actionable error (instead of silently rolling
+  back the user record on a `tournament.id` throw inside the
+  post-commit catch).
+
+### Added
+
+- `web/src/lib/test-helpers/pb-admin.ts` — `pbCreatePublic` helper
+  that POSTs without an `Authorization` header so hook tests can
+  exercise the public-registration flow the way the form does
+  (rather than silently passing through admin auth).
+- `web/src/lib/hooks/registration.spec.ts` — new `admin bypass`
+  describe block covering: admin create with no team data
+  produces no team; admin create succeeds when no tournament is in
+  registration status; admin create WITH `team_name` + `school`
+  still auto-creates a team; public create still fails with the
+  user-facing error when no registration tournament exists; admin
+  create with team data and no registration tournament fails fast
+  with an actionable error message.
 
 ### Changed
 
-- `web/static/favicon.png` — 32×32 RCOE flame logo (new file).
-- `web/static/apple-touch-icon.png` — 180×180 RCOE flame logo for iOS
-  home-screen bookmarks (new file).
-- `web/src/app.html` — adds `<link rel="icon">` and
-  `<link rel="apple-touch-icon">` in the document head.
-- `web/src/routes/+layout.svelte` — removes the Svelte SVG favicon
-  import and `<svelte:head>` link; icon is now declared in `app.html`.
-- `web/src/lib/assets/favicon.svg` — deleted (Svelte default, no
-  longer used).
+- `web/src/lib/hooks/registration.spec.ts` — existing public-flow
+  tests switched from `pbCreate` (admin auth) to `pbCreatePublic`
+  so they actually exercise the public path. Without this switch,
+  the new admin bypass would silently make those tests pass even
+  if the public flow regressed.
+>>>>>>> c8f7946 (fix: registration.pb.js blocks admin API creates of coach users)
 
 ## v0.10.5 — fix: widen year input on Tournaments admin page (#258)
 
