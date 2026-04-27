@@ -59,6 +59,10 @@ SvelteKit dev commands (run from `web/`):
 
 To run both servers: `npm run pb:dev` from repo root (foreground), then `cd web && npm run dev` in a second terminal.
 
+## Operations
+
+- Backups: Fly volume snapshots, 14-day retention. See `docs/backups.md` for the recovery procedure.
+
 ## Development Workflow
 
 1. **Worktree** — create a worktree at `.claude/worktrees/<task>` on branch
