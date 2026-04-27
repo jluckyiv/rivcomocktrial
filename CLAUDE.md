@@ -62,11 +62,27 @@ To run both servers: `npm run pb:dev` from repo root (foreground), then `cd web 
 
 ## Testing
 
-- E2E tests: `npm run e2e` — Playwright, targets port 8090 (production build).
-- No mocks. Integration tests hit real local PocketBase.
+No mocks. All integration tests hit real local PocketBase.
 
-- Unit tests: `cd web && npm run test:unit` — Vitest, targets `web/src/`
-- E2E tests: `npm run e2e` from repo root — Playwright, targets port 8090 (production build).
+### Testing layers
+
+| Layer | Command | Location | Use for |
+|---|---|---|---|
+| Schema | `npm run test:schema` | `web/src/lib/schema/` | Migration-produced rule strings |
+| Hook integration | `npm run test:hooks` | `web/src/lib/hooks/` | Pre/post hook behavior via real PB API |
+| UI e2e | `npm run e2e` | `tests/e2e/` | Pages, forms, browser navigation |
+
+**Pick the lowest layer that reaches the behavior under test.** Hook behavior
+does not need a browser — use `test:hooks` (Vitest server, no Playwright
+overhead). Only reach for `e2e` when the test must load a page or navigate.
+
+- Unit tests: `cd web && npm run test:unit` — Vitest, `web/src/`
+- Hook integration: `npm run test:hooks` from repo root — Vitest server,
+  `web/src/lib/hooks/`, real PocketBase on port 8090
+- Schema tests: `npm run test:schema` from repo root — Vitest server,
+  `web/src/lib/schema/`, real PocketBase on port 8090
+- E2E tests: `npm run e2e` from repo root — Playwright, production build
+  on port 8090
 
 ## Frontend Architecture
 
