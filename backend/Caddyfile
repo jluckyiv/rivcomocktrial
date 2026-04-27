@@ -7,6 +7,9 @@
 :8090 {
 	encode zstd gzip
 
+	@www host www.rivcomocktrial.org
+	redir @www https://rivcomocktrial.org{uri} 301
+
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options nosniff
