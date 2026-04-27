@@ -4,6 +4,47 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.20 — feat: add /audit-domain skill
+
+Adds the `/audit-domain` Claude Code skill — a domain modeling audit
+that verifies `web/src/lib/domain/` and `web/src/routes/` follow
+ADR-009 (discriminated unions, parse-at-boundary) and ADR-012 (pages
+talk only to domain modules).
+
+### Added
+
+- `.claude/skills/audit-domain/SKILL.md` — skill definition with
+  13-item rubric, severity rules, boundary note (Svelte `$state`
+  exemption), and out-of-scope guard
+- `.claude/skills/audit-domain/domain-checks.sh` — grep helper
+  covering all 13 rubric items: boolean state flags, non-exhaustive
+  switches, validation cascades, domain logic in routes, mutation in
+  `load()`, `+server.ts` form POST detection, Result-shape
+  inconsistency, `enum` keyword, `any`/`as` casts in domain,
+  boolean-return state queries, optional-field state markers,
+  `$effect` derivable-state patterns, module-scope `let` in server
+  files
+
+### Smoke test result
+
+Script ran clean. Opus agent found:
+
+- **Critical:** None.
+- **Warnings:** Three `$effect` blocks in
+  `web/src/routes/register/teacher-coach/+page.svelte` (lines 42–52)
+  use one-shot mount logic to seed `$state` from server form values;
+  could be initial declaration or `$derived`.
+- **Suggestions:** `canRunTournament` in `registration.ts` uses
+  `reason:` in its Result failure shape while all other domain modules
+  use `error:` — cross-module inconsistency (note: this function has
+  since moved to `eligibility.ts` in v0.10.19).
+- **Praise:** `standings.ts` and `registration.ts` explicitly praised
+  as canonical; `awards.ts`, `roundProgress.ts`, `elimSideRules.ts`,
+  `eligibleStudents.ts`, `trialClosure.ts` also praised. No domain
+  logic leaked into routes, no `any`/`enum`/module-scope `let` found.
+
+---
+
 ## v0.10.19 — refactor: split enrollment from eligibility (#274 #275)
 
 Closes #274 and #275. Introduces `tournaments_teams` — a many-to-many
