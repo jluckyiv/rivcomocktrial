@@ -4,6 +4,25 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.6 — fix: replace Svelte favicon with RCOE flame logo (#190)
+
+Closes #190. The default Svelte orange-flame SVG favicon has been
+replaced with the Riverside County Office of Education flame logo.
+The PNG is served as a static asset so it appears in browser tabs and
+bookmark bars without depending on the layout component.
+
+### Changed
+
+- `web/static/favicon.png` — 32×32 RCOE flame logo (new file).
+- `web/static/apple-touch-icon.png` — 180×180 RCOE flame logo for iOS
+  home-screen bookmarks (new file).
+- `web/src/app.html` — adds `<link rel="icon">` and
+  `<link rel="apple-touch-icon">` in the document head.
+- `web/src/routes/+layout.svelte` — removes the Svelte SVG favicon
+  import and `<svelte:head>` link; icon is now declared in `app.html`.
+- `web/src/lib/assets/favicon.svg` — deleted (Svelte default, no
+  longer used).
+
 ## v0.10.5 — fix: widen year input on Tournaments admin page (#258)
 
 Closes #258. The year input in the "Add tournament" row was too narrow
