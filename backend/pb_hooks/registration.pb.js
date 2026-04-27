@@ -67,7 +67,9 @@ onRecordCreateRequest((e) => {
                 "The team ID does not match the existing team at your school."
             );
         }
-        // join_team_id matches the collision — proceed; post-commit creates join request.
+        // join_team_id matches the collision — stash on the record so the
+        // post-commit hook can read it (requestInfo is not available there).
+        e.record.set("_join_team_id", existingTeam.id);
     } else if (joinTeamId) {
         // join_team_id provided but no collision — ignore it and create a new team.
         console.warn(
@@ -100,7 +102,9 @@ onRecordAfterCreateSuccess((e) => {
     );
 
     const tournament = tournaments[0];
-    const joinTeamId = e.requestInfo?.body?.["join_team_id"] ?? null;
+    // requestInfo is not available on RecordEvent; join intent was stashed on
+    // the record in the pre-commit hook via e.record.set("_join_team_id", ...).
+    const joinTeamId = user.get("_join_team_id") || null;
 
     if (joinTeamId) {
         // Join-existing path: create a pending join request.
@@ -143,8 +147,17 @@ onRecordAfterCreateSuccess((e) => {
         $app.save(team);
     } catch (err) {
         console.error(
-            "[registration] Failed to save team for user " + user.id + " — " + err
+            "[registration] Failed to save team for user " + user.id +
+            " — rolling back user record. Error: " + err
         );
+        try {
+            $app.delete(user);
+        } catch (deleteErr) {
+            console.error(
+                "[registration] Failed to delete orphaned user " +
+                user.id + " — manual cleanup required. Error: " + deleteErr
+            );
+        }
     }
 }, "users");
 

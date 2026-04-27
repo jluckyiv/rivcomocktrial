@@ -30,6 +30,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `registration.pb.js` post-create hook: `e.requestInfo` does not exist on
+  `RecordEvent` (only on `RecordRequestEvent`), so reading `join_team_id` from
+  it always returned undefined — the join-existing branch was dead code. Fixed
+  by stashing join intent on the record in the pre-commit hook via
+  `e.record.set("_join_team_id", id)` and reading it back in the post-commit
+  hook via `user.get("_join_team_id")`. Also adds user rollback to the new-team
+  path to mirror the existing rollback on the join-request path.
 - `eligibility_change_requests` and `withdrawal_requests`: migration 1800000009
   now correctly leaves `updateRule` and `deleteRule` as null (admin-only) rather
   than overwriting them to coach-gated.
