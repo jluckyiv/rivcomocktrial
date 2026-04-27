@@ -18,7 +18,7 @@
     "e2e": "PB_ADMIN_EMAIL=$(cat .pocketbase/adminUserEmail 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Email') PB_ADMIN_PASSWORD=$(cat .pocketbase/adminUserPassword 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Password') npx playwright test",
     "lint:js": "eslint backend/pb_hooks/",
     "lint": "npm run lint:js",
-    "test:hooks": "PB_ADMIN_EMAIL=$(cat .pocketbase/adminUserEmail 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Email') PB_ADMIN_PASSWORD=$(cat .pocketbase/adminUserPassword 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Password') npm run --prefix web test:hooks",
+    "test:hooks": "PB_ADMIN_EMAIL=test-admin@test.invalid PB_ADMIN_PASSWORD=testpass1234 npm run --prefix web test:hooks",
     "test:schema": "PB_ADMIN_EMAIL=$(cat .pocketbase/adminUserEmail 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Email') PB_ADMIN_PASSWORD=$(cat .pocketbase/adminUserPassword 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Password') npm run --prefix web test:schema"
   },
   "devDependencies": {
