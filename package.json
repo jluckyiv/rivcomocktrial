@@ -11,8 +11,6 @@
     "web:dev": "cd web && npm run dev",
     "web:build": "cd web && npm run build",
     "pb:seed-admins": "PB_ADMIN_EMAIL=$(cat .pocketbase/adminUserEmail 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Email') PB_ADMIN_PASSWORD=$(cat .pocketbase/adminUserPassword 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Password') node backend/pb_seed/seed_admins.js",
-    "pb:seed-districts": "PB_ADMIN_EMAIL=$(cat .pocketbase/adminUserEmail 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Email') PB_ADMIN_PASSWORD=$(cat .pocketbase/adminUserPassword 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Password') node backend/pb_seed/seed_districts.js",
-    "pb:seed-schools": "PB_ADMIN_EMAIL=$(cat .pocketbase/adminUserEmail 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Email') PB_ADMIN_PASSWORD=$(cat .pocketbase/adminUserPassword 2>/dev/null || op read 'op://Private/localhost dev pocketbase admin user/Password') node backend/pb_seed/seed_schools.js",
     "pb:credentials": "mkdir -p .pocketbase && op read 'op://Private/localhost dev pocketbase admin user/Email' > .pocketbase/adminUserEmail && op read 'op://Private/localhost dev pocketbase admin user/Password' > .pocketbase/adminUserPassword && echo 'Credentials saved to .pocketbase/'",
     "pb:test:up": "docker compose -f docker-compose.test.yml up -d --wait",
     "pb:test:down": "docker compose -f docker-compose.test.yml down -v",

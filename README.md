@@ -103,8 +103,6 @@ docker compose exec pocketbase \
 | `npm run pb:start`       | PocketBase in background      |
 | `npm run pb:stop`        | Stop PocketBase               |
 | `npm run pb:kill`        | Kill watch + stop             |
-| `npm run pb:seed-districts` | Seed districts from districts.json |
-| `npm run pb:seed-schools`   | Seed schools (requires districts)  |
 | `npm run pb:seed-admins`    | Seed superusers from admins.json   |
 | `npm run pb:test:up`     | Start isolated test PocketBase (port 28090) |
 | `npm run pb:test:down`   | Stop test PB and wipe its data volume |
