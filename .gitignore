@@ -19,8 +19,9 @@ docker-compose.override.yml
 # Environment
 .env
 .env.local
+.direnv/
 
-# Local PocketBase credentials (run `npm run pb:credentials` to populate)
+# Legacy local PocketBase credentials cache (superseded by .env.local)
 .pocketbase/
 
 # Playwright

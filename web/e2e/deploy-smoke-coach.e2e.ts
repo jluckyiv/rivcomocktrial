@@ -4,8 +4,9 @@ import { expect, test, type Page } from '@playwright/test';
 // Requires SMOKE_COACH_EMAIL and SMOKE_COACH_PASSWORD env vars.
 // Skips cleanly when either is missing — partial credentials must not fail the run.
 //
-// Staging only: credentials from op://Private/rivcomocktrial-staging-smoke
-// Production: no coach credentials seeded — this spec self-skips.
+// Staging only: credentials are loaded from .env.local via direnv
+// (STAGING_COACH_* → SMOKE_COACH_*). Production skips automatically — no
+// coach credentials are seeded there.
 //
 // Read-only — no record creates, patches, or deletes.
 

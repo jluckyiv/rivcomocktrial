@@ -4,8 +4,9 @@ import { expect, test, type Page } from '@playwright/test';
 // Requires SMOKE_ADMIN_EMAIL and SMOKE_ADMIN_PASSWORD env vars.
 // Skips cleanly when either is missing — partial credentials must not fail the run.
 //
-// Staging: credentials from op://Private/rivcomocktrial-staging-smoke
-// Production: credentials from op://Private/rivcomocktrial (bootstrap superuser)
+// Credentials are loaded from .env.local via direnv and passed through by the
+// `test:smoke:staging` / `test:smoke:prod` npm scripts (STAGING_ADMIN_* /
+// PROD_ADMIN_* → SMOKE_ADMIN_*).
 //
 // Read-only — no record creates, patches, or deletes.
 

@@ -1,35 +1,50 @@
 #!/bin/sh
-# Push BOOTSTRAP_SUPERUSER_* secrets to a fly app from 1Password so
+# Push BOOTSTRAP_SUPERUSER_* secrets to a fly app from local env vars so
 # the bootstrap_superuser.pb.js hook can create a baseline superuser
 # on first boot. Idempotent and safe to re-run — the hook only creates
 # the superuser if one with the matching email doesn't already exist.
+# Note: the hook does NOT update an existing superuser's password.
+#
+# Required env vars (loaded from .env.local via direnv):
+#   For rivcomocktrial:          PROD_ADMIN_EMAIL, PROD_ADMIN_PASSWORD
+#   For rivcomocktrial-staging:  STAGING_ADMIN_EMAIL, STAGING_ADMIN_PASSWORD
 #
 # Usage:
 #   scripts/seed-prod-bootstrap.sh                    # default: rivcomocktrial
 #   scripts/seed-prod-bootstrap.sh rivcomocktrial-staging
 #
-# Requires: fly CLI authed for the target app, 1Password CLI authed.
+# Requires: fly CLI authed for the target app.
 
 set -e
 
 APP="${1:-rivcomocktrial}"
-ITEM="op://Private/rivcomocktrial"
 
 if ! command -v fly >/dev/null 2>&1; then
     echo "fly CLI not found on PATH" >&2
     exit 1
 fi
 
-if ! command -v op >/dev/null 2>&1; then
-    echo "1Password CLI (op) not found on PATH" >&2
-    exit 1
-fi
-
-EMAIL=$(op read "${ITEM}/username")
-PASSWORD=$(op read "${ITEM}/password")
+case "$APP" in
+    rivcomocktrial)
+        EMAIL="$PROD_ADMIN_EMAIL"
+        PASSWORD="$PROD_ADMIN_PASSWORD"
+        VARS="PROD_ADMIN_EMAIL/PROD_ADMIN_PASSWORD"
+        ;;
+    rivcomocktrial-staging)
+        EMAIL="$STAGING_ADMIN_EMAIL"
+        PASSWORD="$STAGING_ADMIN_PASSWORD"
+        VARS="STAGING_ADMIN_EMAIL/STAGING_ADMIN_PASSWORD"
+        ;;
+    *)
+        echo "Unknown app: $APP" >&2
+        echo "Usage: scripts/seed-prod-bootstrap.sh [rivcomocktrial|rivcomocktrial-staging]" >&2
+        exit 1
+        ;;
+esac
 
 if [ -z "$EMAIL" ] || [ -z "$PASSWORD" ]; then
-    echo "Could not read username/password from 1Password (${ITEM})" >&2
+    echo "Missing $VARS in environment." >&2
+    echo "Populate .env.local from .env.local.example (direnv loads it automatically)." >&2
     exit 1
 fi
 

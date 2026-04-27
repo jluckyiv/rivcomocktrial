@@ -15,27 +15,31 @@ All three files match `**/deploy-smoke*.e2e.ts` in `web/playwright.deploy.config
 
 ## Credentials
 
+Smoke scripts read credentials from environment variables loaded by direnv
+from `.env.local`. See the [README](../README.md#credentials-envlocal) for
+one-time setup.
+
 ### Production
 
-Admin credentials come from the existing bootstrap superuser item in 1Password:
+Admin credentials:
 
-- `op://Private/rivcomocktrial/username`
-- `op://Private/rivcomocktrial/password`
+- `PROD_ADMIN_EMAIL`
+- `PROD_ADMIN_PASSWORD`
 
 No coach account is seeded on production. The coach spec self-skips when
 `SMOKE_COACH_EMAIL` is absent.
 
 ### Staging
 
-Admin credentials reuse the existing staging superuser item:
+Admin credentials (reuses the staging superuser):
 
-- `op://Private/rivcomocktrial-staging/username`
-- `op://Private/rivcomocktrial-staging/password`
+- `STAGING_ADMIN_EMAIL`
+- `STAGING_ADMIN_PASSWORD`
 
-Coach credentials are stored in a separate item:
+Coach credentials (separate, dedicated smoke account):
 
-- Item: `op://Private/rivcomocktrial-staging-smoke`
-- Fields: `username`, `password`
+- `STAGING_COACH_EMAIL`
+- `STAGING_COACH_PASSWORD`
 
 The coach account must be seeded before running staging smokes — see below.
 Do not add this account to migrations; it must never reach production.
@@ -52,8 +56,8 @@ npm run -w web test:smoke:staging
 npm run -w web test:smoke:prod
 ```
 
-Both commands read credentials from 1Password via `op read` and pass them as
-environment variables. The `op` CLI must be authenticated before running.
+The npm scripts translate the `STAGING_*` / `PROD_*` env vars into the
+unprefixed `SMOKE_*` names that Playwright config consumes.
 
 ## How to seed staging smoke users
 
@@ -65,13 +69,14 @@ scripts/seed-staging-smoke-users.sh
 
 The script:
 
-1. Reads the staging superuser credentials from
-   `op://Private/rivcomocktrial-staging`.
+1. Validates `STAGING_BASE_URL`, `STAGING_ADMIN_*`, `STAGING_COACH_*` are
+   set in the environment.
 2. Authenticates against the staging PB API to get an admin token.
-3. Creates `smoke-coach@rivcomocktrial.org` as an approved coach.
-4. Skips creation if the account already exists (HTTP 400).
+3. Creates `STAGING_COACH_EMAIL` as an approved coach.
+4. Skips creation if the account already exists (HTTP 400 disambiguated by
+   a follow-up GET).
 
-Prerequisites: `op` CLI authed, `curl` and `jq` on PATH.
+Prerequisites: `.env.local` populated; `curl` and `jq` on PATH.
 
 After seeding, verify both accounts can log in at
 `https://rivcomocktrial-staging.fly.dev/login` before running the smoke suite.

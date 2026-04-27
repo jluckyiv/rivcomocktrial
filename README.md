@@ -63,6 +63,31 @@ workflow.
 
 - Node.js v20+
 - Docker
+- [direnv](https://direnv.net/) (recommended) — auto-loads `.env.local`
+
+### Credentials (`.env.local`)
+
+Scripts and smoke tests read credentials from environment
+variables. Populate them once into `.env.local` and direnv
+will load them automatically every time you `cd` into the repo.
+
+```bash
+cp .env.local.example .env.local
+# Fill in the values from 1Password (manually via the GUI),
+# or — if you have the 1Password CLI signed in — pull them all
+# in one shot:
+scripts/load-1p-creds.sh > .env.local
+
+direnv allow   # one-time, after the file exists
+```
+
+`.env.local` is gitignored. `op` is invoked exactly once when
+you (re)generate the file; nothing else in the repo shells out
+to 1Password at runtime. Re-run `scripts/load-1p-creds.sh` after
+rotating any credential.
+
+Without direnv, source the file manually before running scripts:
+`set -a && . ./.env.local && set +a`.
 
 ### Running
 
@@ -368,7 +393,9 @@ superuser at PocketBase startup if `BOOTSTRAP_SUPERUSER_EMAIL` and
 `BOOTSTRAP_SUPERUSER_PASSWORD` are set. Idempotent — skips if the
 email already exists.
 
-Push the credentials from 1Password to fly via the helper:
+Push the credentials to fly via the helper. It reads from
+`.env.local` (loaded by direnv) — `STAGING_ADMIN_*` for staging,
+`PROD_ADMIN_*` for production — and runs `fly secrets set`.
 
 ```bash
 # Staging
@@ -378,9 +405,10 @@ scripts/seed-prod-bootstrap.sh rivcomocktrial-staging
 scripts/seed-prod-bootstrap.sh rivcomocktrial
 ```
 
-The helper reads `op://Private/rivcomocktrial/{username,password}`
-and runs `fly secrets set`. Safe to re-run; the hook only creates
-the superuser if one with that email doesn't already exist.
+Safe to re-run; the hook only creates the superuser if one with
+that email doesn't already exist. The hook does **not** update an
+existing superuser's password — to rotate, log in via the admin
+UI or run `pocketbase superuser update` over SSH.
 
 **Fallback** if you can't use the helper: `fly secrets set
 BOOTSTRAP_SUPERUSER_EMAIL=... BOOTSTRAP_SUPERUSER_PASSWORD=... --app
