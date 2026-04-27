@@ -13,11 +13,19 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { pbCreate, pbDelete, pbList, pbPatch, PbError } from '../test-helpers/pb-admin';
+import {
+	pbCreate,
+	pbCreatePublic,
+	pbDelete,
+	pbList,
+	pbPatch,
+	PbError
+} from '../test-helpers/pb-admin';
 
 type Tracked = { collection: string; id: string };
 
 let schoolId: string;
+let tournamentId: string;
 const tracked: Tracked[] = [];
 
 function track(collection: string, id: string) {
@@ -66,7 +74,8 @@ beforeAll(async () => {
 		num_elimination_rounds: 2,
 		status: 'registration'
 	});
-	track('tournaments', (tournament as { id: string }).id);
+	tournamentId = (tournament as { id: string }).id;
+	track('tournaments', tournamentId);
 
 	// Schools are seeded by migration — pick any existing one.
 	const schools = await pbList('schools', '');
@@ -96,7 +105,7 @@ function coachBody(suffix: string, teamName: string, extra?: Record<string, unkn
 
 describe('new-team path', () => {
 	it('creates a pending team linked to the coach', async () => {
-		const coach = await pbCreate('users', coachBody('new-team', 'hooks-reg-new-team'));
+		const coach = await pbCreatePublic('users', coachBody('new-team', 'hooks-reg-new-team'));
 		const coachId = (coach as { id: string }).id;
 		track('users', coachId);
 
@@ -112,7 +121,7 @@ describe('new-team path', () => {
 
 describe('join-existing path', () => {
 	it('creates a join_requests row and no duplicate team', async () => {
-		const coachA = await pbCreate('users', coachBody('join-a', 'hooks-reg-join-team'));
+		const coachA = await pbCreatePublic('users', coachBody('join-a', 'hooks-reg-join-team'));
 		const coachAId = (coachA as { id: string }).id;
 		track('users', coachAId);
 
@@ -122,7 +131,7 @@ describe('join-existing path', () => {
 		track('teams', teamA.id);
 
 		// Override team_name with the exact existing name — no RUN_ID suffix.
-		const coachB = await pbCreate(
+		const coachB = await pbCreatePublic(
 			'users',
 			coachBody('join-b', '', { team_name: teamA.name, join_team_id: teamA.id })
 		);
@@ -145,7 +154,7 @@ describe('join-existing path', () => {
 
 describe('collision-without-intent', () => {
 	it('returns 400 with existingTeamId when name+school collide and no join_team_id', async () => {
-		const coachA = await pbCreate('users', coachBody('col-a', 'hooks-reg-col-team'));
+		const coachA = await pbCreatePublic('users', coachBody('col-a', 'hooks-reg-col-team'));
 		const coachAId = (coachA as { id: string }).id;
 		track('users', coachAId);
 
@@ -153,9 +162,10 @@ describe('collision-without-intent', () => {
 		const team = teams[0] as { id: string; name: string };
 		track('teams', team.id);
 
-		const err = await pbCreate('users', coachBody('col-b', '', { team_name: team.name })).catch(
-			(e: unknown) => e
-		);
+		const err = await pbCreatePublic(
+			'users',
+			coachBody('col-b', '', { team_name: team.name })
+		).catch((e: unknown) => e);
 
 		expect(err).toBeInstanceOf(PbError);
 		const pbErr = err as PbError;
@@ -170,7 +180,7 @@ describe('collision-without-intent', () => {
 
 describe('sole-coach delete guard', () => {
 	it('blocks deletion of the sole coach on a pending team with 400', async () => {
-		const coach = await pbCreate('users', coachBody('del-sole', 'hooks-reg-del-sole-team'));
+		const coach = await pbCreatePublic('users', coachBody('del-sole', 'hooks-reg-del-sole-team'));
 		const coachId = (coach as { id: string }).id;
 		track('users', coachId);
 
@@ -186,7 +196,7 @@ describe('sole-coach delete guard', () => {
 
 describe('two-coach delete allowed', () => {
 	it('allows deleting one coach when another remains on the team', async () => {
-		const coachA = await pbCreate('users', coachBody('del-two-a', 'hooks-reg-del-two-team'));
+		const coachA = await pbCreatePublic('users', coachBody('del-two-a', 'hooks-reg-del-two-team'));
 		const coachAId = (coachA as { id: string }).id;
 		track('users', coachAId);
 
@@ -194,7 +204,10 @@ describe('two-coach delete allowed', () => {
 		const team = teams[0] as { id: string; coaches: string[] };
 		track('teams', team.id);
 
-		const coachB = await pbCreate('users', coachBody('del-two-b', 'hooks-reg-del-two-team-b'));
+		const coachB = await pbCreatePublic(
+			'users',
+			coachBody('del-two-b', 'hooks-reg-del-two-team-b')
+		);
 		const coachBId = (coachB as { id: string }).id;
 		track('users', coachBId);
 
@@ -218,7 +231,10 @@ describe('two-coach delete allowed', () => {
 
 describe('status sync', () => {
 	it('promotes team to active when coach is approved', async () => {
-		const coach = await pbCreate('users', coachBody('sync-approve', 'hooks-reg-sync-approve'));
+		const coach = await pbCreatePublic(
+			'users',
+			coachBody('sync-approve', 'hooks-reg-sync-approve')
+		);
 		const coachId = (coach as { id: string }).id;
 		track('users', coachId);
 
@@ -233,7 +249,7 @@ describe('status sync', () => {
 	});
 
 	it('rejects team when coach is rejected', async () => {
-		const coach = await pbCreate('users', coachBody('sync-reject', 'hooks-reg-sync-reject'));
+		const coach = await pbCreatePublic('users', coachBody('sync-reject', 'hooks-reg-sync-reject'));
 		const coachId = (coach as { id: string }).id;
 		track('users', coachId);
 
@@ -245,5 +261,99 @@ describe('status sync', () => {
 
 		const updated = await pbList('teams', `id = '${team.id}'`);
 		expect((updated[0] as { status: string }).status).toBe('rejected');
+	});
+});
+
+// Admin (superuser) creates bypass the registration-window guard and
+// the auto-team-creation post-commit. The post-commit hook reads
+// intent from the record itself: if team_name + school are absent,
+// no team is created (admin seed/restore use case). If they are
+// present, a team IS created — admin-driven bulk imports still work.
+describe('admin bypass', () => {
+	it('admin can create a coach with no team_name/school and no team is auto-created', async () => {
+		const coach = await pbCreate('users', {
+			email: `hooks-reg-admin-bare-${RUN_ID}@test.invalid`,
+			password: 'testpass123',
+			passwordConfirm: 'testpass123',
+			name: `hooks-reg-admin-bare-${RUN_ID}`,
+			role: 'coach',
+			status: 'approved'
+		});
+		const coachId = (coach as { id: string }).id;
+		track('users', coachId);
+
+		const teams = await pbList('teams', `coaches ~ '${coachId}'`);
+		expect(teams).toHaveLength(0);
+	});
+
+	it('admin can create a coach when no tournament is in registration status', async () => {
+		await pbPatch('tournaments', tournamentId, { status: 'completed' });
+		try {
+			const coach = await pbCreate('users', {
+				email: `hooks-reg-admin-norun-${RUN_ID}@test.invalid`,
+				password: 'testpass123',
+				passwordConfirm: 'testpass123',
+				name: `hooks-reg-admin-norun-${RUN_ID}`,
+				role: 'coach',
+				status: 'approved'
+			});
+			const coachId = (coach as { id: string }).id;
+			track('users', coachId);
+
+			const teams = await pbList('teams', `coaches ~ '${coachId}'`);
+			expect(teams).toHaveLength(0);
+		} finally {
+			await pbPatch('tournaments', tournamentId, { status: 'registration' });
+		}
+	});
+
+	it('admin create with team_name + school still auto-creates a team', async () => {
+		const coach = await pbCreate(
+			'users',
+			coachBody('admin-with-team', 'hooks-reg-admin-with-team')
+		);
+		const coachId = (coach as { id: string }).id;
+		track('users', coachId);
+
+		const teams = await pbList('teams', `coaches ~ '${coachId}'`);
+		expect(teams).toHaveLength(1);
+		const team = teams[0] as { id: string; status: string };
+		track('teams', team.id);
+		expect(team.status).toBe('pending');
+	});
+
+	it('public create with no registration tournament still fails with the user-facing error', async () => {
+		await pbPatch('tournaments', tournamentId, { status: 'completed' });
+		try {
+			const err = await pbCreatePublic(
+				'users',
+				coachBody('public-norun', 'hooks-reg-public-norun')
+			).catch((e: unknown) => e);
+
+			expect(err).toBeInstanceOf(PbError);
+			expect((err as PbError).status).toBe(400);
+		} finally {
+			await pbPatch('tournaments', tournamentId, { status: 'registration' });
+		}
+	});
+
+	it('admin create with team_name + school but no registration tournament fails fast', async () => {
+		await pbPatch('tournaments', tournamentId, { status: 'completed' });
+		try {
+			const err = await pbCreate(
+				'users',
+				coachBody('admin-team-norun', 'hooks-reg-admin-team-norun')
+			).catch((e: unknown) => e);
+
+			expect(err).toBeInstanceOf(PbError);
+			const pbErr = err as PbError;
+			expect(pbErr.status).toBe(400);
+			// Error message names the actionable fix so an admin doing a
+			// bulk import knows what to do, instead of a generic 400.
+			const message = JSON.stringify(pbErr.data);
+			expect(message).toContain('Cannot auto-create team');
+		} finally {
+			await pbPatch('tournaments', tournamentId, { status: 'registration' });
+		}
 	});
 });

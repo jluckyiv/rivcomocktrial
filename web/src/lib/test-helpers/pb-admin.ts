@@ -71,6 +71,24 @@ export async function pbCreate(
 	return data as Record<string, unknown>;
 }
 
+// Anonymous create — no Authorization header. Mirrors how the public
+// registration form POSTs so hook tests for the public flow exercise
+// the same code path (e.g. requestInfo().auth is undefined, not a
+// _superusers token).
+export async function pbCreatePublic(
+	collection: string,
+	body: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+	const res = await fetch(`${PB_URL}/api/collections/${collection}/records`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+	const data = await res.json();
+	if (!res.ok) throw new PbError(res.status, data);
+	return data as Record<string, unknown>;
+}
+
 export async function pbPatch(
 	collection: string,
 	id: string,
