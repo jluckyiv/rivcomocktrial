@@ -1,6 +1,8 @@
 #!/bin/sh
 # Seed dedicated smoke-test accounts on the staging PocketBase instance.
-# Idempotent — skips creation if the account already exists (HTTP 400 duplicate).
+# Idempotent — skips creation if the account already exists (verified by a
+# follow-up GET, since PocketBase returns HTTP 400 for any validation
+# failure, not just duplicate-email).
 #
 # Strategy: calls the staging PB admin API directly over HTTPS. No SSH tunnel
 # needed because fly.io exposes the app publicly and the admin API is protected
@@ -70,7 +72,10 @@ fi
 
 echo "Seeding smoke-coach user (status=approved)..."
 
-COACH_RESP=$(curl -s -o /dev/null -w "%{http_code}" \
+COACH_BODY=$(mktemp)
+trap 'rm -f "$COACH_BODY"' EXIT
+
+COACH_RESP=$(curl -s -o "$COACH_BODY" -w "%{http_code}" \
     -X POST "${STAGING_URL}/api/collections/users/records" \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
@@ -79,9 +84,21 @@ COACH_RESP=$(curl -s -o /dev/null -w "%{http_code}" \
 if [ "$COACH_RESP" = "200" ] || [ "$COACH_RESP" = "201" ]; then
     echo "  Created ${SMOKE_COACH_EMAIL}"
 elif [ "$COACH_RESP" = "400" ]; then
-    echo "  ${SMOKE_COACH_EMAIL} already exists — skipping"
+    # 400 alone is ambiguous: PB returns it for any validation failure,
+    # including hook-rejected creates. Confirm a real record exists before
+    # treating this as "already exists."
+    EXISTING=$(curl -sf -G "${STAGING_URL}/api/collections/users/records" \
+        -H "Authorization: Bearer ${TOKEN}" \
+        --data-urlencode "filter=email='${SMOKE_COACH_EMAIL}'" \
+        | jq -r '.totalItems // 0')
+    if [ "$EXISTING" -ge 1 ]; then
+        echo "  ${SMOKE_COACH_EMAIL} already exists — skipping"
+    else
+        echo "  Failed to create ${SMOKE_COACH_EMAIL}: $(jq -c . "$COACH_BODY" 2>/dev/null || cat "$COACH_BODY")" >&2
+        exit 1
+    fi
 else
-    echo "  Unexpected HTTP ${COACH_RESP} creating ${SMOKE_COACH_EMAIL}" >&2
+    echo "  Unexpected HTTP ${COACH_RESP} creating ${SMOKE_COACH_EMAIL}: $(cat "$COACH_BODY")" >&2
     exit 1
 fi
 
