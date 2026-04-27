@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.9.18 — chore: ESLint guard blocking test-helper imports in production
+code (#236)
+
+### Added
+
+- `web/eslint.config.js` — `no-restricted-imports` rule that blocks
+  production `.ts`, `.js`, and `.svelte` files from importing anything
+  under `**/test-helpers/**` or `$lib/test-helpers/**`, and from
+  importing any `**/*.spec` file. Spec files and files inside
+  `test-helpers/` themselves are excluded from the rule, so the 10
+  existing hook and schema spec imports remain clean.
+
 ## v0.9.17 — test: expand deploy smoke tests with admin + coach login (#219)
 
 ### Added
