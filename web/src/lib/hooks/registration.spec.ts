@@ -21,7 +21,6 @@ import { pbCreate, pbDelete, pbList, pbPatch, PbError } from "../test-helpers/pb
 type Tracked = { collection: string; id: string };
 
 let schoolId: string;
-let tournamentId: string;
 const tracked: Tracked[] = [];
 
 function track(collection: string, id: string) {
@@ -44,7 +43,6 @@ beforeAll(async () => {
 	if (tournaments.length === 0) {
 		throw new Error("No registration-status tournament — seed the dev DB first.");
 	}
-	tournamentId = (tournaments[0] as { id: string }).id;
 
 	const districts = await pbList("districts", "");
 	if (districts.length === 0) {
@@ -196,6 +194,11 @@ describe("two-coach delete allowed", () => {
 			(t) => t.collection === "users" && t.id === coachAId
 		);
 		if (idx !== -1) tracked.splice(idx, 1);
+
+		// Confirm coach A is gone and coach B remains on the team.
+		const remaining = await pbList("teams", `id = '${team.id}'`);
+		expect((remaining[0] as { coaches: string[] }).coaches).not.toContain(coachAId);
+		expect((remaining[0] as { coaches: string[] }).coaches).toContain(coachBId);
 	});
 });
 

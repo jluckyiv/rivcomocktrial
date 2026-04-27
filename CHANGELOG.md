@@ -6,6 +6,31 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## v0.9.11 — test: migrate hook tests to Vitest server layer (#216)
+
+### Added
+
+- `web/src/lib/hooks/registration.spec.ts`: Vitest server-project hook
+  integration tests for all four `registration.pb.js` callbacks — new-team
+  path, join-existing path, collision-without-intent (400 + `existingTeamId`),
+  sole-coach delete blocked (400), two-coach delete allowed, status-sync
+  approve (team → active), status-sync reject (team → rejected).
+- `web/src/lib/test-helpers/pb-admin.ts`: `pbCreate`, `pbPatch`, `pbDelete`,
+  `pbList` helpers that throw `PbError` (`.status`, `.data`) on non-2xx.
+- `test:hooks` npm script in `web/package.json` and root `package.json`.
+
+### Changed
+
+- `tests/e2e/helpers/pb.ts`: all helpers now throw on non-2xx so Playwright
+  test failures surface at the bad API call, not two assertions later.
+- `CLAUDE.md`: documents the three-layer testing model (schema, hook
+  integration, UI e2e) with guidance on which layer to reach for.
+
+### Removed
+
+- `tests/e2e/multi-coach.spec.ts`: fully superseded by `registration.spec.ts`
+  in the hook integration layer.
+
 ## v0.9.10 — feat: multi-coach teams, join requests, sole-coach guard, schema tests (#198)
 
 ### Added
