@@ -35,7 +35,7 @@ Admin credentials reuse the existing staging superuser item:
 Coach credentials are stored in a separate item:
 
 - Item: `op://Private/rivcomocktrial-staging-smoke`
-- Fields: `coach_email`, `coach_password`
+- Fields: `username`, `password`
 
 The coach account must be seeded before running staging smokes — see below.
 Do not add this account to migrations; it must never reach production.

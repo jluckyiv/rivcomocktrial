@@ -42,8 +42,8 @@ echo "Reading credentials from 1Password..."
 
 BOOT_EMAIL=$(op read "${STAGING_ITEM}/username")
 BOOT_PASSWORD=$(op read "${STAGING_ITEM}/password")
-SMOKE_COACH_EMAIL=$(op read "${SMOKE_ITEM}/coach_email")
-SMOKE_COACH_PASSWORD=$(op read "${SMOKE_ITEM}/coach_password")
+SMOKE_COACH_EMAIL=$(op read "${SMOKE_ITEM}/username")
+SMOKE_COACH_PASSWORD=$(op read "${SMOKE_ITEM}/password")
 
 if [ -z "$BOOT_EMAIL" ] || [ -z "$BOOT_PASSWORD" ]; then
     echo "Could not read staging superuser credentials from ${STAGING_ITEM}" >&2
@@ -52,7 +52,7 @@ fi
 
 if [ -z "$SMOKE_COACH_EMAIL" ] || [ -z "$SMOKE_COACH_PASSWORD" ]; then
     echo "Could not read coach credentials from ${SMOKE_ITEM}" >&2
-    echo "Create the item with fields: coach_email, coach_password" >&2
+    echo "Item must have fields: username, password" >&2
     exit 1
 fi
 
