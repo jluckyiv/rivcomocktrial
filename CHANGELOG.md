@@ -53,6 +53,96 @@ updated in the same PR so the build stays green throughout.
 - `teams.status` field (dropped by migration 1800000011).
 - `TEAM_STATUS` constant from `backend/pb_hooks/_constants.js`.
 
+## v0.10.18 — docs: add supersession notes to Elm-era ADRs
+
+Adds `**Superseded by ADR-014.**` to ADR-002, ADR-004, ADR-005,
+ADR-006, ADR-008, ADR-010, and ADR-011 — the seven Elm-era decisions
+flagged as Critical by the `/audit-docs` smoke test.
+
+### Changed
+
+- `docs/decisions.md` — supersession note added immediately before the
+  `**Date:**` line of each Elm-era ADR, matching the style of ADR-012
+  and ADR-013
+
+---
+
+## v0.10.17 — feat: add /audit-docs skill
+
+Adds the `/audit-docs` Claude Code skill — a documentation drift audit
+that verifies every load-bearing claim in `CLAUDE.md`, `README.md`,
+`docs/decisions.md` (ADRs), and other `docs/*.md` files matches code
+reality.
+
+### Added
+
+- `.claude/skills/audit-docs/SKILL.md` — skill definition with steps,
+  rubric, severity rules, and out-of-scope guard
+- `.claude/skills/audit-docs/docs-claims.sh` — bash helper that
+  extracts file path references, shell command references, port
+  numbers, stack component names, hook file names, and ADR supersession
+  state; cross-checks each against the filesystem and config files
+
+### Smoke test result
+
+Script ran clean. Opus agent found:
+
+- **Critical:** ADR-002 (Bulma) contradicts current Tailwind v4 stack
+  with no supersession note. Also flagged ADR-004, ADR-005, ADR-006,
+  ADR-008, ADR-010, ADR-011 as Elm-era decisions with no supersession.
+- **Praise:** ADR-013/014 supersession in place; port numbers correct
+  across all files; all script references valid; all hook file
+  references valid.
+
+---
+
+## v0.10.16 — feat: add /audit-schema skill
+
+Adds the `/audit-schema` Claude Code skill — a PocketBase schema
+lockdown audit that verifies every collection in `pocketbase-types.ts`
+has a spec, and every spec assertion matches the live rule string on
+the test PB.
+
+### Added
+
+- `.claude/skills/audit-schema/SKILL.md` — skill definition with
+  steps, rubric, severity rules, and out-of-scope guard
+- `.claude/skills/audit-schema/schema-completeness.sh` — bash helper
+  that enumerates collections, fetches live rules from the test PB,
+  greps spec assertions, and reports coverage gaps
+
+### Smoke test result
+
+All 24 user collections covered. 120/120 rule slots asserted and
+matching live. 0 mismatches. 0 unasserted slots. 0 skipped tests.
+Deliberate wrong assertion confirmed Critical finding; reverted clean.
+
+---
+
+## v0.10.15 — docs: add implementation brief for new audit skills (#276)
+
+Adds `docs/audit-skills-brief.md` — a self-contained build plan for 5
+new sibling audit skills (`/audit-schema`, `/audit-docs`,
+`/audit-domain`, `/audit-a11y`, `/audit-deps`) so a fresh Claude
+session can implement them one-per-worktree without re-deriving the
+design.
+
+The brief locks in the project's "Happy Path Svelte Development"
+stance: keep FP values (immutability, exhaustive matching,
+parse-at-boundary, Result-shaped returns, no-booleans-for-state) where
+they fit Svelte/TS idiom; drop them where they fight the grain. The
+`$state` boundary is called out explicitly — domain modules in `lib/`
+stay pure and immutable; component-level reactive state in `.svelte`
+files is mutation-by-design and must not be flagged as an
+anti-pattern.
+
+### Added
+
+- `docs/audit-skills-brief.md` — implementation brief for the 5 new
+  audit skills, in build order: schema → docs → domain → a11y → deps,
+  plus a follow-up section for updating the existing `/audit` skill
+  with Svelte 5 deltas.
+
 ## v0.10.14 — docs: README Operations runbook and ADR-015 realtime clarification (#213)
 
 Closes #213.

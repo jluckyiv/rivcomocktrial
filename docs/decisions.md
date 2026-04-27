@@ -410,6 +410,8 @@ do not):**
 
 ## ADR-011: Dual auth store isolation
 
+**Superseded by ADR-014.**
+
 **Date:** 2026-04-15
 
 **Context:** ADR-010 introduced two PocketBase SDK
@@ -454,6 +456,8 @@ sessions survive page refresh.
 ---
 
 ## ADR-010: PocketBase JS SDK as sole PB client
+
+**Superseded by ADR-014.**
 
 **Date:** 2026-03-07
 
@@ -613,6 +617,8 @@ there's no separate `missingScorers` function needed.
 ---
 
 ## ADR-008: URL design principles
+
+**Superseded by ADR-014.**
 
 **Date:** 2026-03-04
 
@@ -777,6 +783,8 @@ existing manual approval process.
 
 ## ADR-006: Flat module-per-concept for domain types
 
+**Superseded by ADR-014.**
+
 **Date:** 2026-03-01
 
 **Context:** Building a pure domain layer (no persistence
@@ -814,6 +822,8 @@ after the noun: `School.elm`, `Student.elm`, `Coach.elm`,
 ---
 
 ## ADR-005: Staging environment on fly.io
+
+**Superseded by ADR-014.**
 
 **Date:** 2026-02-28
 
@@ -855,6 +865,8 @@ push to main, scoped to app-relevant paths only
 ---
 
 ## ADR-004: Admin auth via PocketBase superuser (Milestone 1)
+
+**Superseded by ADR-014.**
 
 **Date:** 2026-02-28
 
@@ -936,6 +948,8 @@ get assigned to teams per tournament via round rosters
 ---
 
 ## ADR-002: Bulma CSS framework
+
+**Superseded by ADR-014.**
 
 **Date:** 2026-02-28 (Milestone 0)
 
