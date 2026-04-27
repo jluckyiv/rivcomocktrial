@@ -59,7 +59,8 @@ jobs:
         # .env.test is committed — local test credentials with no production value.
         # Appending to GITHUB_ENV makes PB_URL, PB_ADMIN_EMAIL, PB_ADMIN_PASSWORD
         # available to all subsequent steps without re-sourcing.
-        run: cat .env.test >> $GITHUB_ENV
+        # Strip comment lines and blank lines: GITHUB_ENV only accepts KEY=VALUE.
+        run: grep -v '^\s*#' .env.test | grep -v '^\s*$' >> $GITHUB_ENV
 
       - name: Start test PocketBase container
         # docker-compose.test.yml port 28090; --wait polls the healthcheck.
