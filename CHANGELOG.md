@@ -4,56 +4,25 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
-## v0.10.7 — fix: registration.pb.js blocks admin API creates of coach users (#255)
+## v0.10.8 — fix: contact_route.pb.js fallback query missing try/catch (#202)
 
-Closes #255. The registration hook treated every coach create as a
-public registration: it required an active `status=registration`
-tournament and unconditionally auto-created a team from
-`team_name` + `school`. This made it impossible for an admin to
-seed, restore, or back-fill a coach record outside an active
-registration window — surfaced when the staging smoke seed script
-failed off-season with "Registration is not currently open."
+Closes #202. The fallback `findRecordsByFilter` call (used when no
+superuser is flagged `is_primary_contact`) had no error handling.
+A database error would propagate uncaught to the public `/api/contact`
+endpoint and return a 500 with a stack trace.
 
-### Fixed
-
-- `backend/pb_hooks/registration.pb.js` — pre-commit
-  `onRecordCreateRequest` now bypasses the registration-window
-  check for superuser-authenticated requests via
-  `e.hasSuperuserAuth()`. Post-commit `onRecordAfterCreateSuccess`
-  now reads team intent directly from the record (`team_name`,
-  `school`, `_join_team_id`); when none are present it returns
-  early. Public registrations (form-driven) are unchanged because
-  the form always supplies `team_name` + `school`. Admin-driven
-  bulk imports that DO include those fields still get a team
-  auto-created. Admin-driven creates that include `team_name` /
-  `school` but hit no registration tournament now fail fast in
-  pre-commit with an actionable error (instead of silently rolling
-  back the user record on a `tournament.id` throw inside the
-  post-commit catch).
-
-### Added
-
-- `web/src/lib/test-helpers/pb-admin.ts` — `pbCreatePublic` helper
-  that POSTs without an `Authorization` header so hook tests can
-  exercise the public-registration flow the way the form does
-  (rather than silently passing through admin auth).
-- `web/src/lib/hooks/registration.spec.ts` — new `admin bypass`
-  describe block covering: admin create with no team data
-  produces no team; admin create succeeds when no tournament is in
-  registration status; admin create WITH `team_name` + `school`
-  still auto-creates a team; public create still fails with the
-  user-facing error when no registration tournament exists; admin
-  create with team data and no registration tournament fails fast
-  with an actionable error message.
+Consolidates both queries into a single outer try/catch. Uses `??` to
+resolve the primary-or-fallback record in one expression, eliminating
+the mutable `let record` variable. A DB failure now returns 503
+(service unavailable); an empty superusers table returns 404.
 
 ### Changed
 
-- `web/src/lib/hooks/registration.spec.ts` — existing public-flow
-  tests switched from `pbCreate` (admin auth) to `pbCreatePublic`
-  so they actually exercise the public path. Without this switch,
-  the new admin bypass would silently make those tests pass even
-  if the public flow regressed.
->>>>>>> c8f7946 (fix: registration.pb.js blocks admin API creates of coach users)
+- `backend/pb_hooks/contact_route.pb.js` — wrap entire handler body
+  in try/catch; replace mutable `let record` + two-block structure
+  with a single `const record` using `??` for the fallback lookup.
+
+## v0.10.7 — fix: registration.pb.js blocks admin API creates of coach users (#255)
 
 ## v0.10.5 — fix: widen year input on Tournaments admin page (#258)
 
