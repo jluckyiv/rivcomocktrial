@@ -18,7 +18,7 @@ export default defineConfig(
 	prettier,
 	svelte.configs.prettier,
 	{
-		ignores: ['src/lib/pocketbase-types.ts']
+		ignores: ['src/lib/pocketbase-types.ts', 'docs/**']
 	},
 	{
 		languageOptions: { globals: { ...globals.browser, ...globals.node } },
