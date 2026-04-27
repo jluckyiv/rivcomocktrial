@@ -13,8 +13,8 @@
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"test:unit": "vitest",
-		"test:smoke:staging": "SMOKE_BASE_URL=https://rivcomocktrial-staging.fly.dev playwright test --config playwright.deploy.config.ts",
-		"test:smoke:prod": "SMOKE_BASE_URL=https://rivcomocktrial.org playwright test --config playwright.deploy.config.ts",
+		"test:smoke:staging": "SMOKE_BASE_URL=https://rivcomocktrial-staging.fly.dev SMOKE_ADMIN_EMAIL=$(op read 'op://Private/rivcomocktrial-staging-smoke/admin_email') SMOKE_ADMIN_PASSWORD=$(op read 'op://Private/rivcomocktrial-staging-smoke/admin_password') SMOKE_COACH_EMAIL=$(op read 'op://Private/rivcomocktrial-staging-smoke/coach_email') SMOKE_COACH_PASSWORD=$(op read 'op://Private/rivcomocktrial-staging-smoke/coach_password') playwright test --config playwright.deploy.config.ts",
+		"test:smoke:prod": "SMOKE_BASE_URL=https://rivcomocktrial.org SMOKE_ADMIN_EMAIL=$(op read 'op://Private/rivcomocktrial/username') SMOKE_ADMIN_PASSWORD=$(op read 'op://Private/rivcomocktrial/password') playwright test --config playwright.deploy.config.ts",
 		"test:hooks": "vitest run --project=server src/lib/hooks",
 		"test:schema": "vitest run --project=server src/lib/schema"
 	},

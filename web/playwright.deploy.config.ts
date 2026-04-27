@@ -12,5 +12,5 @@ if (!BASE_URL) {
 
 export default defineConfig({
 	use: { baseURL: BASE_URL },
-	testMatch: '**/deploy-smoke.e2e.ts'
+	testMatch: '**/deploy-smoke*.e2e.ts'
 });
