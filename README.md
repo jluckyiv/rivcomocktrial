@@ -415,6 +415,70 @@ BOOTSTRAP_SUPERUSER_EMAIL=... BOOTSTRAP_SUPERUSER_PASSWORD=... --app
 <app>` directly, or SSH in and run
 `pocketbase superuser upsert email password --dir=/pb/pb_data`.
 
+## Operations
+
+Day-2 runbook for staging and production. Replace `<app>` with
+`rivcomocktrial` (prod) or `rivcomocktrial-staging` (staging).
+
+### Tail logs
+
+```bash
+fly logs --app <app>
+```
+
+### Shell into the running machine
+
+```bash
+fly ssh console --app <app>
+```
+
+### Roll back a deploy
+
+```bash
+fly releases rollback --app <app>
+```
+
+> **Note:** PocketBase migrations are forward-only. Rolling back the
+> image does **not** roll back the schema — the database stays at the
+> migration level it reached before rollback.
+
+### Manual volume snapshot (before risky migrations)
+
+CI snapshots automatically on every deploy. To snapshot manually:
+
+```bash
+VOLUME_ID=$(fly volumes list --app <app> --json | jq -r '.[0].id')
+fly volumes snapshots create "$VOLUME_ID" --app <app>
+```
+
+### Wake a stopped staging machine
+
+Staging uses `auto_start_machines = true` — any HTTP request wakes
+it. You can also start it explicitly:
+
+```bash
+fly machine start --app rivcomocktrial-staging
+```
+
+Or trigger a redeploy:
+
+```bash
+npm run deploy:staging
+```
+
+### Add a second superuser on a running app
+
+```bash
+fly ssh console --app <app>
+# Inside the container:
+pocketbase superuser upsert email@example.com password \
+  --dir=/pb/pb_data
+```
+
+### Uptime monitor
+
+TODO: add dashboard URL once #212 lands.
+
 ## Documentation
 
 - [Competition Workflow](docs/competition-workflow.md)
