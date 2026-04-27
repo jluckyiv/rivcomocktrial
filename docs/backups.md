@@ -144,11 +144,25 @@ Once you are confident the recovery is good, destroy the old
 fly volumes destroy <OLD_VOLUME_ID> -a <APP_NAME> --yes
 ```
 
-### Pre-deploy snapshots (Task 10)
+### Pre-deploy snapshots
 
-Once Task 10 is implemented, every deploy will create a snapshot tagged
-with the commit SHA. To roll back from a bad deploy, fork the snapshot
-taken immediately before that deploy rather than the most recent daily
+Every deploy job in `.github/workflows/deploy.yml` runs a "Snapshot
+pb_data before deploy" step before `flyctl deploy`. This step:
+
+- Resolves the volume ID for the target app.
+- Creates a fresh snapshot via `flyctl volumes snapshots create`.
+- Diffs the snapshot list against the pre-create state to identify
+  the new snapshot ID.
+- Writes the volume ID, snapshot ID, and commit SHA to the GitHub
+  Actions step summary.
+
+If snapshot creation fails the job fails and `flyctl deploy` does not
+run, so the live volume is never touched without a known-good
+snapshot.
+
+To roll back from a bad deploy, look at the deploy run's step summary
+for the snapshot ID taken just before the deploy, then follow the
+recovery procedure above with that snapshot ID instead of a daily
 snapshot.
 
 ---
