@@ -41,7 +41,13 @@ function untrack(collection: string, id: string) {
 // LIFO insertion order. The sole-coach delete guard (registration.pb.js)
 // fires when a user delete leaves a team with no coaches, so all
 // dependent records must be gone before any user is deleted.
-const CLEANUP_ORDER = ['join_requests', 'tournaments_teams', 'teams', 'users', 'tournaments'] as const;
+const CLEANUP_ORDER = [
+	'join_requests',
+	'tournaments_teams',
+	'teams',
+	'users',
+	'tournaments'
+] as const;
 
 async function cleanup() {
 	const failures: string[] = [];

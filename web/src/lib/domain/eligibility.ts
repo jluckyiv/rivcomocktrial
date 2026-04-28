@@ -40,9 +40,7 @@ export type TournamentReadiness =
 	| { ok: true; eligibleCount: number }
 	| { ok: false; eligibleCount: number; reason: string };
 
-export function canRunTournament(
-	rows: ReadonlyArray<{ status: string }>
-): TournamentReadiness {
+export function canRunTournament(rows: ReadonlyArray<{ status: string }>): TournamentReadiness {
 	const eligibleCount = eligibleTeamCount(rows);
 	if (eligibleCount === 0) {
 		return { ok: false, eligibleCount, reason: 'No eligible teams yet.' };
