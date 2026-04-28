@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — feat: registration collision dialog and join-existing flow (#169)
+## v0.10.24 — feat: registration collision dialog and join-existing flow (#169)
 
 Closes the first UI follow-up for #169 (multi-coach teams). When a second
 coach submits the same team name and school as an existing team, the
