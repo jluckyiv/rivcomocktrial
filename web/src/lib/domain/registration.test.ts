@@ -1,8 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import {
-	isTournamentOpenForRegistration,
-	TOURNAMENT_STATUS
-} from './registration';
+import { isTournamentOpenForRegistration, TOURNAMENT_STATUS } from './registration';
 
 describe('isTournamentOpenForRegistration', () => {
 	test('true when status is registration', () => {
