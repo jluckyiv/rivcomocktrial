@@ -39,18 +39,25 @@ export const actions: Actions = {
 			return fail(400, { error: 'Password must be at least 8 characters.', values });
 		}
 
+		const joinTeamId = (data.get('join_team_id') as string | null)?.trim() || null;
+
+		const createBody: Record<string, unknown> = {
+			name: `${firstName} ${lastName}`,
+			email,
+			emailVisibility: false,
+			password,
+			passwordConfirm,
+			role: 'coach',
+			status: 'pending',
+			school,
+			team_name: teamName
+		};
+		if (joinTeamId) {
+			createBody.join_team_id = joinTeamId;
+		}
+
 		try {
-			await locals.pb.collection('users').create({
-				name: `${firstName} ${lastName}`,
-				email,
-				emailVisibility: false,
-				password,
-				passwordConfirm,
-				role: 'coach',
-				status: 'pending',
-				school,
-				team_name: teamName
-			});
+			await locals.pb.collection('users').create(createBody);
 		} catch (e: unknown) {
 			const err = e as { data?: { email?: { code?: string } }; status?: number };
 
@@ -63,7 +70,22 @@ export const actions: Actions = {
 
 			if (err.status === 400) {
 				const msg = (e as { message?: string }).message ?? 'Registration failed.';
-				// PB hook throws BadRequestError when registration is closed
+
+				if (msg.startsWith('A team with this name already exists')) {
+					const collision = await locals.pb
+						.send<{ existingTeamId: string | null }>('/api/teams/check-collision', {
+							method: 'GET',
+							query: { name: teamName, school }
+						})
+						.catch(() => ({ existingTeamId: null }));
+					return fail(400, {
+						collision: true,
+						existingTeamId: collision.existingTeamId,
+						error: msg,
+						values
+					});
+				}
+
 				return fail(400, { error: msg, values });
 			}
 
