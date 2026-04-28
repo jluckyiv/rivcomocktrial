@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { tick } from 'svelte';
+	import { AlertDialog as AlertDialogPrimitive } from 'bits-ui';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
@@ -14,6 +16,31 @@
 	let schoolSearch = $state('');
 	let teamName = $state('');
 	let prevAutoName = $state('');
+	let joinTeamId = $state('');
+	let collisionDismissed = $state(false);
+
+	let formEl: HTMLFormElement | undefined = $state();
+
+	type CollisionForm = { collision: true; existingTeamId: string | null; values?: { teamName?: string } };
+	const formAsCollision = $derived(form as CollisionForm | null);
+	const collisionOpen = $derived(!!formAsCollision?.collision && !collisionDismissed && !joinTeamId);
+
+	function dismissCollision() {
+		collisionDismissed = true;
+	}
+
+	async function confirmJoin() {
+		joinTeamId = formAsCollision?.existingTeamId ?? '';
+		await tick();
+		formEl?.requestSubmit();
+	}
+
+	$effect(() => {
+		if (form) {
+			collisionDismissed = false;
+			joinTeamId = '';
+		}
+	});
 
 	const selectedSchool = $derived(data.schools.find((s) => s.id === schoolId));
 
@@ -47,7 +74,8 @@
 		const restored = form?.values?.teamName ?? '';
 		if (restored) {
 			teamName = restored;
-			prevAutoName = restored;
+			// prevAutoName is not updated here — the restored value was typed by
+			// the user, so the school auto-populate should not overwrite it.
 		}
 	});
 
@@ -84,18 +112,46 @@
 				</Card.Description>
 			</Card.Header>
 			<Card.Content>
+				<AlertDialogPrimitive.Root open={collisionOpen}>
+					<AlertDialogPrimitive.Portal>
+						<AlertDialogPrimitive.Overlay
+							class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+						/>
+						<AlertDialogPrimitive.Content
+							class="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-background p-6 shadow-lg"
+						>
+							<AlertDialogPrimitive.Title class="text-lg font-semibold">
+								Team already exists
+							</AlertDialogPrimitive.Title>
+							<AlertDialogPrimitive.Description class="mt-2 text-sm text-muted-foreground">
+								A team named <strong>{formAsCollision?.values?.teamName}</strong> already exists at this school.
+								Would you like to request to join it, or choose a different name?
+							</AlertDialogPrimitive.Description>
+							<div class="mt-6 flex justify-end gap-3">
+								<Button variant="outline" onclick={dismissCollision}>
+									Choose different name
+								</Button>
+								<Button onclick={confirmJoin}>Request to join</Button>
+							</div>
+						</AlertDialogPrimitive.Content>
+					</AlertDialogPrimitive.Portal>
+				</AlertDialogPrimitive.Root>
+
 				<form
+					bind:this={formEl}
 					method="POST"
 					use:enhance={() => {
 						submitting = true;
 						return async ({ update }) => {
 							submitting = false;
-							update();
+							update({ reset: false });
 						};
 					}}
 					class="grid gap-5"
 				>
-					{#if form?.error}
+					<input type="hidden" name="join_team_id" value={joinTeamId} />
+
+					{#if form?.error && !formAsCollision?.collision}
 						<p class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
 							{form.error}
 						</p>

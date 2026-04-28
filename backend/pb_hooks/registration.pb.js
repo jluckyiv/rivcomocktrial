@@ -104,11 +104,32 @@ onRecordCreateRequest((e) => {
         // post-commit hook can read it (requestInfo is not available there).
         e.record.set("_join_team_id", existingTeam.id);
     } else if (joinTeamId) {
-        // join_team_id provided but no collision — ignore it and create a new team.
-        console.warn(
-            "[registration] join_team_id provided but no name+school collision found. " +
-            "Creating new team instead."
-        );
+        // join_team_id provided with no current-tournament collision. This can
+        // happen when the active registration tournament changes between the
+        // client's first submit (which detected the collision and surfaced the
+        // team id) and the second submit (which carries the join intent). Look
+        // up the team directly by ID and validate name+school match so the
+        // join request is still honored.
+        try {
+            const targetTeam = $app.findRecordById("teams", joinTeamId);
+            if (
+                targetTeam.get("name") === teamName &&
+                targetTeam.get("school") === school
+            ) {
+                e.record.set("_join_team_id", joinTeamId);
+            } else {
+                throw new BadRequestError(
+                    "The team ID does not match the name and school you entered."
+                );
+            }
+        } catch (err) {
+            if (err instanceof BadRequestError) {
+                throw err;
+            }
+            throw new BadRequestError(
+                "Could not find the team to join. Please try again."
+            );
+        }
     }
 
     return e.next();

@@ -4,6 +4,48 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — feat: registration collision dialog and join-existing flow (#169)
+
+Closes the first UI follow-up for #169 (multi-coach teams). When a second
+coach submits the same team name and school as an existing team, the
+registration form now shows a dialog asking whether to join the existing team
+or choose a different name. Confirming resubmits with `join_team_id` so the
+backend creates a pending join request instead of a new team.
+
+### Added
+
+- `backend/pb_hooks/team_collision_route.pb.js` — public
+  `GET /api/teams/check-collision?name=&school=` route that resolves the
+  existing team's ID within the current registration tournament. The SvelteKit
+  server action calls this after catching the hook's collision error to
+  obtain the ID needed for the dialog.
+- `tests/e2e/register-join-existing.spec.ts` — two Playwright e2e tests:
+  full join flow (collision → dialog → "Request to join" → pending
+  `join_requests` row) and dismiss flow (dialog → "Choose different name" →
+  form intact).
+
+### Changed
+
+- `backend/pb_hooks/registration.pb.js` — the `else if (joinTeamId)` branch
+  now validates the team by ID directly (name + school check) when no
+  current-tournament collision is detected. This handles tournament drift
+  between the first and second submit.
+- `web/src/routes/register/teacher-coach/+page.server.ts` — reads optional
+  `join_team_id` from form data; includes it in the `users.create` body when
+  set; detects the collision error message and calls the new collision route to
+  resolve the existing team ID before returning the `collision` fail result.
+- `web/src/routes/register/teacher-coach/+page.svelte` — adds an AlertDialog
+  (bits-ui primitive) that appears on collision, with "Choose different name"
+  and "Request to join" actions. Join confirm sets `join_team_id` on the hidden
+  input and resubmits via `formEl.requestSubmit()`. Uses `update({ reset: false
+  })` in the enhance callback to preserve password fields across failed submits.
+  Team-name restore effect no longer updates `prevAutoName` so the school
+  auto-populate does not overwrite a manually-typed team name after a failure.
+- `playwright.config.ts` — sets `workers: 1` so spec files that each create a
+  registration-status tournament run serially and cannot race.
+
+---
+
 ## v0.10.23 — feat: add Svelte 5 checks to /audit skill
 
 Extends the existing `/audit` skill with Svelte 5–specific anti-pattern
