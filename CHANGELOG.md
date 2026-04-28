@@ -4,6 +4,36 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.23 — feat: add Svelte 5 checks to /audit skill
+
+Extends the existing `/audit` skill with Svelte 5–specific anti-pattern
+checks. All changes are additive — no existing checks removed or weakened.
+
+### Added
+
+- `audit-checks.sh` — six new check groups:
+  - `svelte/store` imports inside `.svelte` files (use `$state`)
+  - `writable`/`readable` calls inside `.svelte` files
+  - Bare `$state` exports in `.svelte.ts` modules (wrap in getter object)
+  - `$effect` writing to `$state` (use `$derived` for derivable values)
+  - Legacy Svelte 4 syntax: `export let`, `<slot>`, `<svelte:fragment>`,
+    `<svelte:component>`, `<svelte:self>`, `$$props`, `$$restProps`,
+    `on:` event directives, and event modifiers (`|preventDefault`, etc.)
+  - `+server.ts` handlers accepting form content-types (use form actions)
+- `audit-checks.sh` — fix root-detection to prefer `./package.json` at
+  CWD, preventing `frontend/package.json` from being picked up first.
+- `SKILL.md` — documents all new checks in steps 3 and 6 (review
+  criteria passed to the Opus agent).
+
+### Smoke test result
+
+Script ran on current codebase. `$effect`/`$state` check fired on three
+real `$effect` blocks in `register/teacher-coach/+page.svelte` (lines
+42–52) — consistent with the `/audit-domain` Warning already tracked.
+All other new checks returned clean passes.
+
+---
+
 ## v0.10.22 — feat: add /audit-deps skill
 
 Adds the fifth and final audit skill from the audit-skills brief.
