@@ -4,6 +4,25 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## v0.10.22 — feat: add /audit-deps skill
+
+Adds the fifth and final audit skill from the audit-skills brief.
+`/audit-deps` surfaces security-relevant dependency state and pin
+compliance: `npm audit` findings, major-version drift, unpinned GHA
+actions, unpinned Docker base images, and unverified binary downloads.
+The skill runs `deps-checks.sh` (grep + npm tooling), then briefs a
+fresh Opus agent for severity-ranked findings.
+
+### Added
+
+- `.claude/skills/audit-deps/SKILL.md` — skill definition, rubric,
+  pin classification table, severity rules, and out-of-scope list.
+- `.claude/skills/audit-deps/deps-checks.sh` — data-collection script:
+  `npm audit --json`, `npm outdated --json`, GHA `uses:` pin scan,
+  Dockerfile `FROM` pin scan, and binary download + checksum check.
+
+---
+
 ## v0.10.21 — feat: add /audit-a11y skill
 
 Adds the `/audit-a11y` Claude Code skill — a WCAG 2.2 AA accessibility
