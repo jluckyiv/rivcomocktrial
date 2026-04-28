@@ -71,6 +71,28 @@ What each section flags (for agent context):
 - **Direct `new PocketBase(`** — outside `hooks.server.ts` and
   test code, instances should be obtained from `event.locals.pb`
 
+**Svelte 5 specific**
+- **Store imports in `.svelte` files** — `writable`/`readable`
+  from `svelte/store` inside `.svelte` files; in Svelte 5,
+  component state belongs in `$state`; stores are for async
+  streams only. Allowed in `.svelte.ts` modules.
+- **Bare `$state` export in `.svelte.ts`** — Svelte forbids
+  re-assigning exported `$state` variables from a module; the
+  idiomatic pattern is an object with a getter:
+  `export const foo = { get value() { return state }, set(v) { state = v } }`
+- **`$effect` writing derivable state** — `$effect` assigning to
+  a `$state` variable based on other reactive values should be
+  `$derived`; `$effect` is an escape hatch for DOM / network /
+  analytics, not a reactive assignment tool
+- **Svelte 4 legacy syntax** — `export let` (use `$props()`),
+  `<slot>` (use `{@render children?.()}`), `<svelte:fragment>`,
+  `<svelte:component>`, `<svelte:self>`, `$$props`, `$$restProps`,
+  `on:click=` event directives (use `onclick=`), and event
+  modifiers (`|preventDefault`, `|stopPropagation`, etc.)
+- **`+server.ts` for form POSTs** — `+server.ts` handlers that
+  accept `application/x-www-form-urlencoded` or
+  `multipart/form-data`; use form actions instead
+
 **PocketBase pb_hooks**
 - **Filter string concatenation** — injection risk; use `{:param}`
   syntax with `findRecordsByFilter` / `findFirstRecordByFilter`
@@ -124,6 +146,17 @@ The prompt must be self-contained. Include:
 **SvelteKit / TS**
 - Svelte 5 runes only — no `let foo = ...` reactive state, no
   `$:`, no stores when `$state` in a module would work?
+- No Svelte 4 legacy syntax — `export let`, `<slot>`,
+  `<svelte:fragment>`, `<svelte:component>`, `<svelte:self>`,
+  `$$props`, `$$restProps`, `on:click=` directives, event modifiers
+  (`|preventDefault`, etc.) are all banned in Svelte 5?
+- No `writable`/`readable` store imports inside `.svelte` files
+  (stores are for async streams; use `$state` for component state)?
+- Shared reactive state in `.svelte.ts` uses getter-object pattern,
+  not bare exported `$state` variables?
+- `$effect` used only for DOM / network / analytics side effects —
+  not for writing derivable state (use `$derived` instead)?
+- `+server.ts` only for genuine APIs; form POSTs use form actions?
 - `any` rejected — `unknown` + type guards used to narrow?
 - `as` casts only at true boundaries with justification?
 - Server vs client boundaries respected — `.server.ts` for
