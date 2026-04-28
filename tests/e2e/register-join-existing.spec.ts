@@ -103,6 +103,14 @@ test('join-existing: collision dialog → Request to join → pending join_reque
 
 	// Step 4: confirm join -------------------------------------------------------
 	await page.getByRole('button', { name: 'Request to join' }).click();
+
+	// Regression guards: password fields must survive the failed first submit
+	// (update({ reset: false })), and the team name must not be overwritten by
+	// the school auto-populate (prevAutoName not set in restore effect).
+	await expect(page.getByLabel('Password', { exact: true })).toHaveValue(TEST_PASSWORD);
+	await expect(page.getByLabel('Confirm password')).toHaveValue(TEST_PASSWORD);
+	await expect(page.getByLabel('Team name')).toHaveValue(TEAM_NAME);
+
 	await expect(page).toHaveURL('/register/pending');
 
 	// Step 5: verify join_requests row -------------------------------------------
